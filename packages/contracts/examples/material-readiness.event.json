@@ -1,0 +1,16 @@
+{
+  "contractVersion": "1.0",
+  "eventId": "demo-event-001",
+  "eventType": "manufacturing.material_readiness_requested",
+  "payloadVersion": "1.0",
+  "occurredAt": "2026-10-15T09:00:00+06:00",
+  "correlationId": "demo-order-001",
+  "subject": { "type": "production_order", "id": "demo-order-001", "revision": "1" },
+  "payload": {
+    "siteId": "demo-site-001",
+    "materialLotId": "demo-lot-001",
+    "requiredQuantity": { "value": "1200.000", "unit": "metre" },
+    "neededBy": "2026-10-16T08:00:00+06:00",
+    "requestedInformation": ["usable_stock", "quality_disposition", "supplier_commitment"]
+  }
+}

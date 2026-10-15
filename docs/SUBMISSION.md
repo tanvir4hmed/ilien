@@ -4,7 +4,7 @@ This file tracks deliverable readiness; it is not evidence that submission is co
 
 Required before evaluation: runnable source and assets; reproducible instructions; actual qualifying AWS CDS SDK calls at runtime; deployed AI functionality; architecture documentation; English submission materials; public demonstration video; and required evaluator access. Public repositories must include an open-source license. Incorporated pre-existing work must be disclosed truthfully.
 
-Current contents: documentation and MIT license only. Application, infrastructure, workflows, deployment, runtime evidence and video are pending.
+Current contents: documentation, initial integration contracts, one synthetic event example and MIT license. Application runtime, infrastructure, workflows, deployment, runtime evidence and video are pending.
 
 Private working notes, credentials and customer information are excluded. Their exclusion must not remove source, configuration examples or instructions needed to run the submitted project.
 
