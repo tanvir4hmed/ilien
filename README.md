@@ -12,6 +12,7 @@ The demonstration will use synthetic manufacturing events and simulated operatio
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Integration contracts](packages/contracts/README.md)
+- [Configuration and credentials](docs/CONFIGURATION.md)
 - [Setup and runtime status](docs/RUNBOOK.md)
 - [Submission deliverables](docs/SUBMISSION.md)
 - [Security](SECURITY.md)
