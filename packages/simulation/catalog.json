@@ -1,0 +1,1850 @@
+[
+  {
+    "group": "IdentityEventType",
+    "fixture": "user.created.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "user.created"
+  },
+  {
+    "group": "IdentityEventType",
+    "fixture": "user.invited.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "user.invited"
+  },
+  {
+    "group": "IdentityEventType",
+    "fixture": "user.activated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "user.activated"
+  },
+  {
+    "group": "IdentityEventType",
+    "fixture": "user.disabled.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "user.disabled"
+  },
+  {
+    "group": "IdentityEventType",
+    "fixture": "user.password_changed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "user.password_changed"
+  },
+  {
+    "group": "StoresEventType",
+    "fixture": "stores.item_created.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "stores.item_created"
+  },
+  {
+    "group": "StoresEventType",
+    "fixture": "stores.lot_registered.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "stores.lot_registered"
+  },
+  {
+    "group": "StoresEventType",
+    "fixture": "stores.stock_received.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "stores.stock_received"
+  },
+  {
+    "group": "StoresEventType",
+    "fixture": "stores.stock_issued.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "stores.stock_issued"
+  },
+  {
+    "group": "StoresEventType",
+    "fixture": "stores.stock_returned.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "stores.stock_returned"
+  },
+  {
+    "group": "StoresEventType",
+    "fixture": "stores.stock_damaged.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "stores.stock_damaged"
+  },
+  {
+    "group": "InventoryEventType",
+    "fixture": "inventory.document_posted.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "inventory.document_posted"
+  },
+  {
+    "group": "InventoryEventType",
+    "fixture": "inventory.document_reversed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "inventory.document_reversed"
+  },
+  {
+    "group": "InventoryEventType",
+    "fixture": "inventory.grn_posted.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "inventory.grn_posted"
+  },
+  {
+    "group": "InventoryEventType",
+    "fixture": "inventory.issued.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "inventory.issued"
+  },
+  {
+    "group": "InventoryEventType",
+    "fixture": "inventory.returned.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "inventory.returned"
+  },
+  {
+    "group": "InventoryEventType",
+    "fixture": "inventory.written_off.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "inventory.written_off"
+  },
+  {
+    "group": "InventoryEventType",
+    "fixture": "inventory.adjusted.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "inventory.adjusted"
+  },
+  {
+    "group": "InventoryEventType",
+    "fixture": "inventory.transfer_approved.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "inventory.transfer_approved"
+  },
+  {
+    "group": "InventoryEventType",
+    "fixture": "inventory.transfer_rejected.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "inventory.transfer_rejected"
+  },
+  {
+    "group": "InventoryEventType",
+    "fixture": "inventory.transfer_cancelled.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "inventory.transfer_cancelled"
+  },
+  {
+    "group": "InventoryEventType",
+    "fixture": "inventory.transfer_dispatched.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "inventory.transfer_dispatched"
+  },
+  {
+    "group": "InventoryEventType",
+    "fixture": "inventory.transfer_received.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "inventory.transfer_received"
+  },
+  {
+    "group": "InventoryEventType",
+    "fixture": "inventory.lot_quarantined.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "inventory.lot_quarantined"
+  },
+  {
+    "group": "InventoryEventType",
+    "fixture": "inventory.lot_released.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "inventory.lot_released"
+  },
+  {
+    "group": "InventoryEventType",
+    "fixture": "inventory.lot_expiring.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "inventory.lot_expiring"
+  },
+  {
+    "group": "InventoryEventType",
+    "fixture": "inventory.stock_below_reorder.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "inventory.stock_below_reorder"
+  },
+  {
+    "group": "InventoryEventType",
+    "fixture": "inventory.reservation_expired.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "inventory.reservation_expired"
+  },
+  {
+    "group": "InventoryEventType",
+    "fixture": "inventory.lot_reallocated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "inventory.lot_reallocated"
+  },
+  {
+    "group": "InventoryEventType",
+    "fixture": "inventory.lot_substituted.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "inventory.lot_substituted"
+  },
+  {
+    "group": "InventoryEventType",
+    "fixture": "inventory.issued_over_plan.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "inventory.issued_over_plan"
+  },
+  {
+    "group": "PlanningEventType",
+    "fixture": "planning.plan_behind.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "planning.plan_behind"
+  },
+  {
+    "group": "PlanningEventType",
+    "fixture": "planning.capacity_gap.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "planning.capacity_gap"
+  },
+  {
+    "group": "PlanningEventType",
+    "fixture": "planning.plan_published.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "planning.plan_published"
+  },
+  {
+    "group": "PlanningEventType",
+    "fixture": "planning.daily_plan_published.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "planning.daily_plan_published"
+  },
+  {
+    "group": "PlanningEventType",
+    "fixture": "planning.order_released.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "planning.order_released"
+  },
+  {
+    "group": "PlanningEventType",
+    "fixture": "planning.order_scheduled.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "planning.order_scheduled"
+  },
+  {
+    "group": "PlanningEventType",
+    "fixture": "planning.order_completed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "planning.order_completed"
+  },
+  {
+    "group": "PlanningEventType",
+    "fixture": "planning.capacity_conflict_detected.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "planning.capacity_conflict_detected"
+  },
+  {
+    "group": "PlanningEventType",
+    "fixture": "planning.upstream_supply_shifted.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "planning.upstream_supply_shifted"
+  },
+  {
+    "group": "PlanningEventType",
+    "fixture": "planning.qc_hold_overridden.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "planning.qc_hold_overridden"
+  },
+  {
+    "group": "QualityEventType",
+    "fixture": "quality.inspections_opened.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "quality.inspections_opened"
+  },
+  {
+    "group": "QualityEventType",
+    "fixture": "quality.inspection_passed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "quality.inspection_passed"
+  },
+  {
+    "group": "QualityEventType",
+    "fixture": "quality.hourly_dhu_breach.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "quality.hourly_dhu_breach"
+  },
+  {
+    "group": "QualityEventType",
+    "fixture": "quality.entry_voided.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "quality.entry_voided"
+  },
+  {
+    "group": "QualityEventType",
+    "fixture": "quality.inspection_failed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "quality.inspection_failed"
+  },
+  {
+    "group": "QualityEventType",
+    "fixture": "quality.order_cleared.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "quality.order_cleared"
+  },
+  {
+    "group": "QualityEventType",
+    "fixture": "quality.capa_opened.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "quality.capa_opened"
+  },
+  {
+    "group": "QualityEventType",
+    "fixture": "quality.capa_closed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "quality.capa_closed"
+  },
+  {
+    "group": "QualityEventType",
+    "fixture": "quality.capa_verified.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "quality.capa_verified"
+  },
+  {
+    "group": "QualityEventType",
+    "fixture": "quality.capa_cancelled.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "quality.capa_cancelled"
+  },
+  {
+    "group": "QualityEventType",
+    "fixture": "quality.capa_escalated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "quality.capa_escalated"
+  },
+  {
+    "group": "ManufacturingEventType",
+    "fixture": "manufacturing.wip_discrepancy.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "manufacturing.wip_discrepancy"
+  },
+  {
+    "group": "ManufacturingEventType",
+    "fixture": "manufacturing.wip_unattributed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "manufacturing.wip_unattributed"
+  },
+  {
+    "group": "ManufacturingEventType",
+    "fixture": "manufacturing.output_recorded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "manufacturing.output_recorded"
+  },
+  {
+    "group": "ManufacturingEventType",
+    "fixture": "manufacturing.lineage_quantity_capture_failed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "manufacturing.lineage_quantity_capture_failed"
+  },
+  {
+    "group": "ManufacturingEventType",
+    "fixture": "manufacturing.lay_mixed_shade_overridden.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "manufacturing.lay_mixed_shade_overridden"
+  },
+  {
+    "group": "ManufacturingCatalogEventType",
+    "fixture": "spinning.output_recorded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "spinning.output_recorded"
+  },
+  {
+    "group": "ManufacturingCatalogEventType",
+    "fixture": "knitting.output_recorded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "knitting.output_recorded"
+  },
+  {
+    "group": "ManufacturingCatalogEventType",
+    "fixture": "dyeing.output_recorded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "dyeing.output_recorded"
+  },
+  {
+    "group": "ManufacturingCatalogEventType",
+    "fixture": "washing.output_recorded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "washing.output_recorded"
+  },
+  {
+    "group": "ManufacturingCatalogEventType",
+    "fixture": "printing.output_recorded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "printing.output_recorded"
+  },
+  {
+    "group": "ManufacturingCatalogEventType",
+    "fixture": "cutting.output_recorded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "cutting.output_recorded"
+  },
+  {
+    "group": "ManufacturingCatalogEventType",
+    "fixture": "sewing.output_recorded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "sewing.output_recorded"
+  },
+  {
+    "group": "ManufacturingCatalogEventType",
+    "fixture": "finishing.output_recorded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "finishing.output_recorded"
+  },
+  {
+    "group": "ManufacturingCatalogEventType",
+    "fixture": "weaving.output_recorded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "weaving.output_recorded"
+  },
+  {
+    "group": "ManufacturingCatalogEventType",
+    "fixture": "warping.output_recorded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "warping.output_recorded"
+  },
+  {
+    "group": "ManufacturingCatalogEventType",
+    "fixture": "sizing.output_recorded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "sizing.output_recorded"
+  },
+  {
+    "group": "EvidenceEventType",
+    "fixture": "evidence.submitted.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "evidence.submitted"
+  },
+  {
+    "group": "EvidenceEventType",
+    "fixture": "evidence.verified.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "evidence.verified"
+  },
+  {
+    "group": "EvidenceEventType",
+    "fixture": "evidence.rejected.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "evidence.rejected"
+  },
+  {
+    "group": "EvidenceEventType",
+    "fixture": "evidence.expired.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "evidence.expired"
+  },
+  {
+    "group": "EvidenceEventType",
+    "fixture": "evidence.superseded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "evidence.superseded"
+  },
+  {
+    "group": "SustainabilityEventType",
+    "fixture": "energy.consumption_recorded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "energy.consumption_recorded"
+  },
+  {
+    "group": "SustainabilityEventType",
+    "fixture": "water.consumption_recorded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "water.consumption_recorded"
+  },
+  {
+    "group": "SustainabilityEventType",
+    "fixture": "waste.recorded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "waste.recorded"
+  },
+  {
+    "group": "SustainabilityEventType",
+    "fixture": "carbon.lot_apportionment_calculated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "carbon.lot_apportionment_calculated"
+  },
+  {
+    "group": "EmailEventType",
+    "fixture": "email.requested.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "email.requested"
+  },
+  {
+    "group": "PortalEventType",
+    "fixture": "portal.invitation_created.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "portal.invitation_created"
+  },
+  {
+    "group": "PortalEventType",
+    "fixture": "portal.invitation_accepted.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "portal.invitation_accepted"
+  },
+  {
+    "group": "PortalEventType",
+    "fixture": "portal.membership_amended.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "portal.membership_amended"
+  },
+  {
+    "group": "PortalEventType",
+    "fixture": "portal.membership_suspended.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "portal.membership_suspended"
+  },
+  {
+    "group": "PortalEventType",
+    "fixture": "portal.membership_reactivated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "portal.membership_reactivated"
+  },
+  {
+    "group": "PortalEventType",
+    "fixture": "portal.membership_terminated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "portal.membership_terminated"
+  },
+  {
+    "group": "DocumentEventType",
+    "fixture": "document.uploaded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "document.uploaded"
+  },
+  {
+    "group": "DocumentEventType",
+    "fixture": "document.deleted.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "document.deleted"
+  },
+  {
+    "group": "PpcEventType",
+    "fixture": "ppc.production_orders_derived.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "ppc.production_orders_derived"
+  },
+  {
+    "group": "PpcEventType",
+    "fixture": "mrp.material_requirement_generated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "mrp.material_requirement_generated"
+  },
+  {
+    "group": "RulesEventType",
+    "fixture": "rules.evaluation_result.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "rules.evaluation_result"
+  },
+  {
+    "group": "SupplyChainEventType",
+    "fixture": "sc.rfq_opened.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "sc.rfq_opened"
+  },
+  {
+    "group": "SupplyChainEventType",
+    "fixture": "sc.rfq_bid_received.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "sc.rfq_bid_received"
+  },
+  {
+    "group": "SupplyChainEventType",
+    "fixture": "sc.rfq_awarded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "sc.rfq_awarded"
+  },
+  {
+    "group": "SupplyChainEventType",
+    "fixture": "supply_chain.disclosure_recorded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "supply_chain.disclosure_recorded"
+  },
+  {
+    "group": "SupplyChainEventType",
+    "fixture": "supply_chain.disclosure_verified.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "supply_chain.disclosure_verified"
+  },
+  {
+    "group": "SupplyChainEventType",
+    "fixture": "supply_chain.disclosure_disputed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "supply_chain.disclosure_disputed"
+  },
+  {
+    "group": "SupplyChainEventType",
+    "fixture": "supply_chain.disclosure_retracted.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "supply_chain.disclosure_retracted"
+  },
+  {
+    "group": "SupplyChainEventType",
+    "fixture": "certificate.registered.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "certificate.registered"
+  },
+  {
+    "group": "SupplyChainEventType",
+    "fixture": "certificate.expiring_soon.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "certificate.expiring_soon"
+  },
+  {
+    "group": "FinanceEventType",
+    "fixture": "finance.order_costed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "finance.order_costed"
+  },
+  {
+    "group": "FinanceEventType",
+    "fixture": "gl.entry_posted.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "gl.entry_posted"
+  },
+  {
+    "group": "FinanceEventType",
+    "fixture": "gl.period_closed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "gl.period_closed"
+  },
+  {
+    "group": "PlmEventType",
+    "fixture": "plm.techpack_approved.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "plm.techpack_approved"
+  },
+  {
+    "group": "PlmEventType",
+    "fixture": "plm.color_approved.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "plm.color_approved"
+  },
+  {
+    "group": "PlmEventType",
+    "fixture": "plm.style_production_ready.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "plm.style_production_ready"
+  },
+  {
+    "group": "IeEventType",
+    "fixture": "ie.smv_published.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "ie.smv_published"
+  },
+  {
+    "group": "IeEventType",
+    "fixture": "ie.line_balance_published.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "ie.line_balance_published"
+  },
+  {
+    "group": "IeEventType",
+    "fixture": "ie.ob_revision_cascade.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "ie.ob_revision_cascade"
+  },
+  {
+    "group": "ProcurementEventType",
+    "fixture": "procurement.pr_submitted.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "procurement.pr_submitted"
+  },
+  {
+    "group": "ProcurementEventType",
+    "fixture": "procurement.pr_approved.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "procurement.pr_approved"
+  },
+  {
+    "group": "ProcurementEventType",
+    "fixture": "procurement.po_approved.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "procurement.po_approved"
+  },
+  {
+    "group": "ProcurementEventType",
+    "fixture": "procurement.po_received.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "procurement.po_received"
+  },
+  {
+    "group": "WorkflowEventType",
+    "fixture": "workflow.transition_completed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "workflow.transition_completed"
+  },
+  {
+    "group": "WorkflowEventType",
+    "fixture": "workflow.approval_required.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "workflow.approval_required"
+  },
+  {
+    "group": "WorkflowEventType",
+    "fixture": "workflow.transition_blocked.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "workflow.transition_blocked"
+  },
+  {
+    "group": "WorkflowEventType",
+    "fixture": "workflow.partial_approval_recorded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "workflow.partial_approval_recorded"
+  },
+  {
+    "group": "WorkflowEventType",
+    "fixture": "workflow.state_overridden.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "workflow.state_overridden"
+  },
+  {
+    "group": "NotificationEventType",
+    "fixture": "notification.dispatched.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "notification.dispatched"
+  },
+  {
+    "group": "NotificationEventType",
+    "fixture": "notification.acknowledged.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "notification.acknowledged"
+  },
+  {
+    "group": "NotificationEventType",
+    "fixture": "notification.failed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "notification.failed"
+  },
+  {
+    "group": "NotificationEventType",
+    "fixture": "escalation.triggered.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "escalation.triggered"
+  },
+  {
+    "group": "NotificationEventType",
+    "fixture": "escalation.exhausted.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "escalation.exhausted"
+  },
+  {
+    "group": "MerchandisingEventType",
+    "fixture": "order.confirmed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "order.confirmed"
+  },
+  {
+    "group": "MerchandisingEventType",
+    "fixture": "order.amended.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "order.amended"
+  },
+  {
+    "group": "MerchandisingEventType",
+    "fixture": "order.cancelled.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "order.cancelled"
+  },
+  {
+    "group": "MerchandisingEventType",
+    "fixture": "merchandising.booking_submitted.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "merchandising.booking_submitted"
+  },
+  {
+    "group": "MerchandisingEventType",
+    "fixture": "merchandising.style_registered.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "merchandising.style_registered"
+  },
+  {
+    "group": "BillingEventType",
+    "fixture": "billing.payment_succeeded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "billing.payment_succeeded"
+  },
+  {
+    "group": "BillingEventType",
+    "fixture": "billing.renewal_succeeded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "billing.renewal_succeeded"
+  },
+  {
+    "group": "BillingEventType",
+    "fixture": "billing.refund_issued.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "billing.refund_issued"
+  },
+  {
+    "group": "BillingEventType",
+    "fixture": "billing.checkout_created.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "billing.checkout_created"
+  },
+  {
+    "group": "BillingEventType",
+    "fixture": "billing.payment_failed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "billing.payment_failed"
+  },
+  {
+    "group": "BillingEventType",
+    "fixture": "billing.dunning_notice.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "billing.dunning_notice"
+  },
+  {
+    "group": "BillingEventType",
+    "fixture": "billing.dunning_suspended.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "billing.dunning_suspended"
+  },
+  {
+    "group": "BillingEventType",
+    "fixture": "billing.dunning_canceled.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "billing.dunning_canceled"
+  },
+  {
+    "group": "BillingEventType",
+    "fixture": "subscription.upgraded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "subscription.upgraded"
+  },
+  {
+    "group": "BillingEventType",
+    "fixture": "subscription.downgraded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "subscription.downgraded"
+  },
+  {
+    "group": "BillingEventType",
+    "fixture": "subscription.cancelled.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "subscription.cancelled"
+  },
+  {
+    "group": "BillingEventType",
+    "fixture": "billing.gateway_config_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "billing.gateway_config_updated"
+  },
+  {
+    "group": "CommercialEventType",
+    "fixture": "commercial.shipment_created.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "commercial.shipment_created"
+  },
+  {
+    "group": "CommercialEventType",
+    "fixture": "commercial.shipment_status_changed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "commercial.shipment_status_changed"
+  },
+  {
+    "group": "CommercialEventType",
+    "fixture": "commercial.booking_confirmed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "commercial.booking_confirmed"
+  },
+  {
+    "group": "CommercialEventType",
+    "fixture": "commercial.booking_amended.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "commercial.booking_amended"
+  },
+  {
+    "group": "CommercialEventType",
+    "fixture": "commercial.booking_cancelled.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "commercial.booking_cancelled"
+  },
+  {
+    "group": "CommercialEventType",
+    "fixture": "commercial.lc_status_changed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "commercial.lc_status_changed"
+  },
+  {
+    "group": "CommercialEventType",
+    "fixture": "commercial.document_approved.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "commercial.document_approved"
+  },
+  {
+    "group": "CommercialEventType",
+    "fixture": "commercial.documents_ready.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "commercial.documents_ready"
+  },
+  {
+    "group": "CommercialEventType",
+    "fixture": "commercial.negotiation_presented.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "commercial.negotiation_presented"
+  },
+  {
+    "group": "CommercialEventType",
+    "fixture": "commercial.payment_realized.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "commercial.payment_realized"
+  },
+  {
+    "group": "CommercialEventType",
+    "fixture": "commercial.si_submitted.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "commercial.si_submitted"
+  },
+  {
+    "group": "CommercialEventType",
+    "fixture": "commercial.cutoff_at_risk.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "commercial.cutoff_at_risk"
+  },
+  {
+    "group": "CommercialEventType",
+    "fixture": "commercial.shipment_dispatch_overridden.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "commercial.shipment_dispatch_overridden"
+  },
+  {
+    "group": "AffiliateEventType",
+    "fixture": "affiliate.application_submitted.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "affiliate.application_submitted"
+  },
+  {
+    "group": "AffiliateEventType",
+    "fixture": "affiliate.account_approved.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "affiliate.account_approved"
+  },
+  {
+    "group": "AffiliateEventType",
+    "fixture": "affiliate.account_suspended.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "affiliate.account_suspended"
+  },
+  {
+    "group": "AffiliateEventType",
+    "fixture": "affiliate.account_terminated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "affiliate.account_terminated"
+  },
+  {
+    "group": "AffiliateEventType",
+    "fixture": "affiliate.program_toggled.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "affiliate.program_toggled"
+  },
+  {
+    "group": "AffiliateEventType",
+    "fixture": "affiliate.referral_attributed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "affiliate.referral_attributed"
+  },
+  {
+    "group": "AffiliateEventType",
+    "fixture": "affiliate.referral_converted.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "affiliate.referral_converted"
+  },
+  {
+    "group": "AffiliateEventType",
+    "fixture": "affiliate.commission_accrued.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "affiliate.commission_accrued"
+  },
+  {
+    "group": "AffiliateEventType",
+    "fixture": "affiliate.commission_clawed_back.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "affiliate.commission_clawed_back"
+  },
+  {
+    "group": "AffiliateEventType",
+    "fixture": "affiliate.payout_released.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "affiliate.payout_released"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.plan_created.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.plan_created"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.plan_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.plan_updated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.plan_pricing_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.plan_pricing_updated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.feature_flag_created.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.feature_flag_created"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.feature_flag_default_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.feature_flag_default_updated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.feature_flag_override_set.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.feature_flag_override_set"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.setting_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.setting_updated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.package_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.package_updated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.master_data_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.master_data_updated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.service_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.service_updated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.onboarding_catalog_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.onboarding_catalog_updated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.marketing_content_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.marketing_content_updated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.integration_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.integration_updated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.ai_config_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.ai_config_updated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.license_limit_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.license_limit_updated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.invoice_created.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.invoice_created"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.invoice_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.invoice_updated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.payment_recorded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.payment_recorded"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.coupon_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.coupon_updated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.plan_request_decided.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.plan_request_decided"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.comms_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.comms_updated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.crm_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.crm_updated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.ukh_curated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.ukh_curated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.contract_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.contract_updated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.payment_gateway_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.payment_gateway_updated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.security_policy_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.security_policy_updated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.ops_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.ops_updated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.tenant_updated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.tenant_updated"
+  },
+  {
+    "group": "PlatformEventType",
+    "fixture": "platform.live_snapshot_viewed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "platform.live_snapshot_viewed"
+  },
+  {
+    "group": "OpexEventType",
+    "fixture": "opex.control_breach.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "opex.control_breach"
+  },
+  {
+    "group": "OpexEventType",
+    "fixture": "opex.control_overdue.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "opex.control_overdue"
+  },
+  {
+    "group": "MaintenanceEventType",
+    "fixture": "maintenance.breakdown_logged.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "maintenance.breakdown_logged"
+  },
+  {
+    "group": "MaintenanceEventType",
+    "fixture": "maintenance.breakdown_resolved.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "maintenance.breakdown_resolved"
+  },
+  {
+    "group": "MaintenanceEventType",
+    "fixture": "maintenance.delivery_impact.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "maintenance.delivery_impact"
+  },
+  {
+    "group": "MaintenanceEventType",
+    "fixture": "maintenance.machine_swapped.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "maintenance.machine_swapped"
+  },
+  {
+    "group": "MaintenanceEventType",
+    "fixture": "maintenance.asset_registered.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "maintenance.asset_registered"
+  },
+  {
+    "group": "MaintenanceEventType",
+    "fixture": "maintenance.work_request_submitted.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "maintenance.work_request_submitted"
+  },
+  {
+    "group": "MaintenanceEventType",
+    "fixture": "maintenance.work_order_created.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "maintenance.work_order_created"
+  },
+  {
+    "group": "MaintenanceEventType",
+    "fixture": "maintenance.work_order_started.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "maintenance.work_order_started"
+  },
+  {
+    "group": "MaintenanceEventType",
+    "fixture": "maintenance.work_order_completed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "maintenance.work_order_completed"
+  },
+  {
+    "group": "MaintenanceEventType",
+    "fixture": "maintenance.work_order_closed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "maintenance.work_order_closed"
+  },
+  {
+    "group": "MaintenanceEventType",
+    "fixture": "maintenance.pm_generated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "maintenance.pm_generated"
+  },
+  {
+    "group": "HrEventType",
+    "fixture": "hr.operator_assigned.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "hr.operator_assigned"
+  },
+  {
+    "group": "HrEventType",
+    "fixture": "hr.attendance_recorded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "hr.attendance_recorded"
+  },
+  {
+    "group": "HrEventType",
+    "fixture": "hr.payroll_processed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "hr.payroll_processed"
+  },
+  {
+    "group": "TnaEventType",
+    "fixture": "tna.milestones_generated.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "tna.milestones_generated"
+  },
+  {
+    "group": "TnaEventType",
+    "fixture": "tna.milestone_completed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "tna.milestone_completed"
+  },
+  {
+    "group": "TnaEventType",
+    "fixture": "tna.milestone_breached.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "tna.milestone_breached"
+  },
+  {
+    "group": "TnaEventType",
+    "fixture": "tna.ship_date_at_risk.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "tna.ship_date_at_risk"
+  },
+  {
+    "group": "DppEventType",
+    "fixture": "dpp.passport_issued.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "dpp.passport_issued"
+  },
+  {
+    "group": "DppEventType",
+    "fixture": "dpp.certification_recorded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "dpp.certification_recorded"
+  },
+  {
+    "group": "DataEventType",
+    "fixture": "data.exported.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "data.exported"
+  },
+  {
+    "group": "RegistryEventType",
+    "fixture": "registry.submission_requested.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "registry.submission_requested"
+  },
+  {
+    "group": "RegistryEventType",
+    "fixture": "registry.submission_queued.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "registry.submission_queued"
+  },
+  {
+    "group": "RegistryEventType",
+    "fixture": "registry.submission_succeeded.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "registry.submission_succeeded"
+  },
+  {
+    "group": "RegistryEventType",
+    "fixture": "registry.passport_registered.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "registry.passport_registered"
+  },
+  {
+    "group": "RegistryEventType",
+    "fixture": "registry.submission_failed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "registry.submission_failed"
+  },
+  {
+    "group": "RegistryEventType",
+    "fixture": "registry.submission_dead_lettered.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "registry.submission_dead_lettered"
+  },
+  {
+    "group": "RegistryEventType",
+    "fixture": "registry.passport_revoked.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "registry.passport_revoked"
+  },
+  {
+    "group": "RegistryEventType",
+    "fixture": "registry.sync_divergence_found.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "registry.sync_divergence_found"
+  },
+  {
+    "group": "RegistryEventType",
+    "fixture": "registry.webhook_received.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "registry.webhook_received"
+  },
+  {
+    "group": "RegistryEventType",
+    "fixture": "registry.credential_expiring.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "registry.credential_expiring"
+  },
+  {
+    "group": "RegistryEventType",
+    "fixture": "registry.health_changed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "registry.health_changed"
+  },
+  {
+    "group": "OnboardingEventType",
+    "fixture": "onboarding.session_created.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "onboarding.session_created"
+  },
+  {
+    "group": "OnboardingEventType",
+    "fixture": "onboarding.step_progressed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "onboarding.step_progressed"
+  },
+  {
+    "group": "OnboardingEventType",
+    "fixture": "onboarding.state_changed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "onboarding.state_changed"
+  },
+  {
+    "group": "OnboardingEventType",
+    "fixture": "onboarding.approval_requested.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "onboarding.approval_requested"
+  },
+  {
+    "group": "OnboardingEventType",
+    "fixture": "onboarding.milestone_completed.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "onboarding.milestone_completed"
+  },
+  {
+    "group": "OnboardingEventType",
+    "fixture": "onboarding.stalled.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "onboarding.stalled"
+  },
+  {
+    "group": "ProductAnalyticsEventType",
+    "fixture": "product_analytics.feature_used.json",
+    "payloadStatus": "synthetic_unverified",
+    "workflowSupported": false,
+    "intakeDisposition": "triage",
+    "eventType": "product_analytics.feature_used"
+  }
+]

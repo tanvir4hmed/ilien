@@ -1,0 +1,16 @@
+{
+  "contractVersion": "1.0",
+  "eventId": "synthetic-32",
+  "eventType": "planning.plan_behind",
+  "payloadVersion": "synthetic-envelope-1",
+  "occurredAt": "2026-10-15T09:00:00+06:00",
+  "correlationId": "synthetic-subject-32",
+  "subject": {
+    "id": "synthetic-subject-32",
+    "type": "synthetic_subject"
+  },
+  "payload": {
+    "scenario": "Intake-only synthetic example",
+    "details": {}
+  }
+}

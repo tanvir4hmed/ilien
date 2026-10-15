@@ -1,0 +1,16 @@
+{
+  "contractVersion": "1.0",
+  "eventId": "synthetic-209",
+  "eventType": "tna.milestone_breached",
+  "payloadVersion": "synthetic-envelope-1",
+  "occurredAt": "2026-10-15T09:00:00+06:00",
+  "correlationId": "synthetic-subject-209",
+  "subject": {
+    "id": "synthetic-subject-209",
+    "type": "synthetic_subject"
+  },
+  "payload": {
+    "scenario": "Intake-only synthetic example",
+    "details": {}
+  }
+}

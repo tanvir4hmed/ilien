@@ -1,0 +1,16 @@
+{
+  "contractVersion": "1.0",
+  "eventId": "synthetic-107",
+  "eventType": "ie.ob_revision_cascade",
+  "payloadVersion": "synthetic-envelope-1",
+  "occurredAt": "2026-10-15T09:00:00+06:00",
+  "correlationId": "synthetic-subject-107",
+  "subject": {
+    "id": "synthetic-subject-107",
+    "type": "synthetic_subject"
+  },
+  "payload": {
+    "scenario": "Intake-only synthetic example",
+    "details": {}
+  }
+}

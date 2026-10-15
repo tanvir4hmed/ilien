@@ -1,0 +1,16 @@
+{
+  "contractVersion": "1.0",
+  "eventId": "synthetic-174",
+  "eventType": "platform.integration_updated",
+  "payloadVersion": "synthetic-envelope-1",
+  "occurredAt": "2026-10-15T09:00:00+06:00",
+  "correlationId": "synthetic-subject-174",
+  "subject": {
+    "id": "synthetic-subject-174",
+    "type": "synthetic_subject"
+  },
+  "payload": {
+    "scenario": "Intake-only synthetic example",
+    "details": {}
+  }
+}

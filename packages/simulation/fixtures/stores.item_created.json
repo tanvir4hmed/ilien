@@ -1,0 +1,16 @@
+{
+  "contractVersion": "1.0",
+  "eventId": "synthetic-6",
+  "eventType": "stores.item_created",
+  "payloadVersion": "synthetic-envelope-1",
+  "occurredAt": "2026-10-15T09:00:00+06:00",
+  "correlationId": "synthetic-subject-6",
+  "subject": {
+    "id": "synthetic-subject-6",
+    "type": "synthetic_subject"
+  },
+  "payload": {
+    "scenario": "Intake-only synthetic example",
+    "details": {}
+  }
+}

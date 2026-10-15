@@ -1,0 +1,12 @@
+import {readFileSync} from 'node:fs';
+import {SignatureV4} from '@smithy/signature-v4';
+import {fromNodeProviderChain} from '@aws-sdk/credential-providers';
+import {Sha256} from '@aws-crypto/sha256-js';
+const url=new URL('/v1/events',process.env.ILIEN_API_URL);
+if(url.protocol!=='https:')throw new Error('HTTPS API endpoint required');
+const body=readFileSync(process.argv[2]??'packages/contracts/examples/material-readiness.event.json','utf8');
+const signer=new SignatureV4({service:'execute-api',region:process.env.AWS_REGION??'us-east-1',credentials:fromNodeProviderChain(),sha256:Sha256});
+const signed=await signer.sign({method:'POST',protocol:url.protocol,hostname:url.hostname,path:url.pathname,headers:{host:url.host,'content-type':'application/json'},body});
+const response=await fetch(url,{method:'POST',headers:signed.headers,body});
+console.log(response.status,await response.text());
+if(!response.ok)process.exitCode=1;

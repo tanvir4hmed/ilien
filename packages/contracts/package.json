@@ -1,0 +1,6 @@
+{
+  "type": "module",
+  "private": true,
+  "name": "@ilien/contracts",
+  "version": "0.1.0"
+}

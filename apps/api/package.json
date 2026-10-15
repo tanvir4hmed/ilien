@@ -1,0 +1,6 @@
+{
+  "type": "module",
+  "private": true,
+  "name": "@ilien/api",
+  "version": "0.1.0"
+}

@@ -1,0 +1,85 @@
+name: Foundation delivery
+on:
+  push:
+    branches: [main]
+    paths: ['apps/**', 'packages/**', 'infra/**', 'scripts/**', 'package*.json', 'tsconfig.json', '.github/workflows/**']
+  pull_request:
+    paths: ['apps/**', 'packages/**', 'infra/**', 'scripts/**', 'package*.json', 'tsconfig.json', '.github/workflows/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: foundation-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run publication:check
+      - run: npm run build
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd
+        with:
+          terraform_version: '1.15.8'
+      - run: terraform fmt -check -recursive infra
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    environment: demo
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_IN_AUTOMATION: 'true'
+      TF_VAR_demo_principal_arn: ${{ vars.DEMO_PRINCIPAL_ARN }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts && npm run build
+      - name: Package explicit Lambda outputs
+        run: |
+          for name in api relay intake migrate; do
+            (cd "dist/$name" && zip -q "../$name.zip" index.cjs)
+          done
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd
+        with:
+          terraform_version: '1.15.8'
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@ff717079ee2060e4bcee96c4779b553acc87447c
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Initialize deployment state
+        working-directory: infra/environments/demo
+        env:
+          STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+        run: terraform init -input=false -lockfile=readonly -backend-config="bucket=$STATE_BUCKET"
+      - name: Plan and guard destructive changes
+        working-directory: infra/environments/demo
+        run: |
+          terraform plan -input=false -out=deployment.tfplan > plan.log
+          terraform show -json deployment.tfplan > deployment.json
+          node ../../../scripts/plan-guard.mjs deployment.json
+      - name: Apply exact plan
+        working-directory: infra/environments/demo
+        run: terraform apply -input=false deployment.tfplan
+      - name: Apply database migration
+        run: |
+          aws lambda invoke --function-name ilien-demo-migrate --cli-read-timeout 150 --payload '{}' migration.json > invocation.json
+          node -e 'const fs=require("fs");const meta=JSON.parse(fs.readFileSync("invocation.json"));const result=JSON.parse(fs.readFileSync("migration.json"));if(meta.FunctionError||result.schemaVersion!==1){console.error("Migration failed; inspect protected runtime logs.");process.exit(1)}'
+      - name: Publish endpoint and release identity
+        working-directory: infra/environments/demo
+        run: |
+          URL=$(terraform output -raw api_url)
+          curl --fail --retry 3 "$URL/health"
+          printf '### Foundation deployment\nCommit: `%s`\nAPI: %s\n' "$GITHUB_SHA" "$URL" >> "$GITHUB_STEP_SUMMARY"

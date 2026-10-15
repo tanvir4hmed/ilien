@@ -1,0 +1,6 @@
+{
+  "type": "module",
+  "private": true,
+  "name": "@ilien/persistence",
+  "version": "0.1.0"
+}

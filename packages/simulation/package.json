@@ -1,0 +1,6 @@
+{
+  "type": "module",
+  "private": true,
+  "name": "@ilien/simulation",
+  "version": "0.1.0"
+}

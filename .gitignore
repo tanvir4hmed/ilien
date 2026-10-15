@@ -17,6 +17,10 @@ coverage/
 *.tfstate.*
 *.tfplan
 crash.log
+plan.log
+deployment.json
+migration.json
+invocation.json
 *.tfvars
 !*.example.tfvars
 *.pem
