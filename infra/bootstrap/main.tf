@@ -44,7 +44,7 @@ resource "aws_s3_bucket_policy" "state" {
 resource "aws_iam_policy" "runtime_boundary" {
   name = "ilien-runtime-boundary"
   policy = jsonencode({ Version = "2012-10-17", Statement = [
-    { Effect = "Allow", Action = ["logs:CreateLogStream", "logs:PutLogEvents"], Resource = "arn:aws:logs:us-east-1:${local.account}:log-group:/aws/lambda/ilien-demo-*:*" },
+    { Effect = "Allow", Action = ["logs:CreateLogStream", "logs:PutLogEvents"], Resource = "arn:aws:logs:us-east-1:${local.account}:log-group:/aws/lambda/ilien-demo-*" },
     { Effect = "Allow", Action = ["rds-data:*"], Resource = "arn:aws:rds:us-east-1:${local.account}:cluster:ilien-demo" },
     { Effect = "Allow", Action = ["secretsmanager:GetSecretValue", "secretsmanager:PutSecretValue"], Resource = ["arn:aws:secretsmanager:us-east-1:${local.account}:secret:ilien-demo-*", "arn:aws:secretsmanager:us-east-1:${local.account}:secret:rds!cluster-*"] },
     { Effect = "Allow", Action = ["sqs:SendMessage", "sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], Resource = "arn:aws:sqs:us-east-1:${local.account}:ilien-demo-*" },
@@ -66,7 +66,7 @@ resource "aws_iam_role_policy" "deploy" {
     { Effect = "Allow", Action = ["iam:PassRole"], Resource = "arn:aws:iam::${local.account}:role/ilien-demo-*", Condition = { StringEquals = { "iam:PassedToService" = "lambda.amazonaws.com" } } },
     { Effect = "Allow", Action = ["lambda:*"], Resource = ["arn:aws:lambda:us-east-1:${local.account}:function:ilien-demo-*", "arn:aws:lambda:us-east-1:${local.account}:event-source-mapping:*"] },
     { Effect = "Allow", Action = ["lambda:ListEventSourceMappings", "lambda:CreateEventSourceMapping"], Resource = "*", Condition = { StringEquals = { "aws:RequestedRegion" = "us-east-1" } } },
-    { Effect = "Allow", Action = ["logs:CreateLogGroup", "logs:DeleteLogGroup", "logs:PutRetentionPolicy", "logs:TagResource", "logs:UntagResource", "logs:ListTagsForResource"], Resource = "arn:aws:logs:us-east-1:${local.account}:log-group:/aws/lambda/ilien-demo-*:*" },
+    { Effect = "Allow", Action = ["logs:CreateLogGroup", "logs:DeleteLogGroup", "logs:PutRetentionPolicy", "logs:TagResource", "logs:UntagResource", "logs:ListTagsForResource"], Resource = "arn:aws:logs:us-east-1:${local.account}:log-group:/aws/lambda/ilien-demo-*" },
     { Effect = "Allow", Action = ["logs:DescribeLogGroups"], Resource = "*" },
     { Effect = "Allow", Action = ["sqs:*"], Resource = "arn:aws:sqs:us-east-1:${local.account}:ilien-demo-*" },
     { Effect = "Allow", Action = ["rds:Describe*", "rds:ListTagsForResource"], Resource = "*" },
@@ -74,10 +74,11 @@ resource "aws_iam_role_policy" "deploy" {
     { Effect = "Allow", Action = ["secretsmanager:CreateSecret", "secretsmanager:DescribeSecret", "secretsmanager:TagResource", "secretsmanager:UntagResource", "secretsmanager:UpdateSecret", "secretsmanager:DeleteSecret", "secretsmanager:GetResourcePolicy"], Resource = ["arn:aws:secretsmanager:us-east-1:${local.account}:secret:ilien-demo-*", "arn:aws:secretsmanager:us-east-1:${local.account}:secret:rds!cluster-*"] },
     { Effect = "Allow", Action = ["kms:DescribeKey"], Resource = "*" },
     { Effect = "Allow", Action = ["ec2:Describe*"], Resource = "*" },
+    { Effect = "Allow", Action = ["ec2:CreateSubnet", "ec2:CreateSecurityGroup"], Resource = "arn:aws:ec2:us-east-1:${local.account}:vpc/*", Condition = { StringEquals = { "aws:ResourceTag/Project" = "ilien" } } },
     { Effect = "Allow", Action = ["ec2:CreateVpc", "ec2:CreateSubnet", "ec2:CreateSecurityGroup"], Resource = "*", Condition = { StringEquals = { "aws:RequestTag/Project" = "ilien" } } },
     { Effect = "Allow", Action = ["ec2:CreateTags"], Resource = "arn:aws:ec2:us-east-1:${local.account}:*/*", Condition = { StringEquals = { "aws:RequestTag/Project" = "ilien" } } },
     { Effect = "Allow", Action = ["ec2:ModifyVpcAttribute", "ec2:DeleteVpc", "ec2:DeleteSubnet", "ec2:DeleteSecurityGroup", "ec2:RevokeSecurityGroupEgress", "ec2:AuthorizeSecurityGroupEgress"], Resource = "*", Condition = { StringEquals = { "aws:ResourceTag/Project" = "ilien" } } },
-    { Effect = "Allow", Action = ["apigateway:GET", "apigateway:POST", "apigateway:PUT", "apigateway:PATCH", "apigateway:DELETE"], Resource = "arn:aws:apigateway:us-east-1::/apis*" }
+    { Effect = "Allow", Action = ["apigateway:GET", "apigateway:POST", "apigateway:PUT", "apigateway:PATCH", "apigateway:DELETE"], Resource = ["arn:aws:apigateway:us-east-1::/apis*", "arn:aws:apigateway:us-east-1::/tags/*"] }
   ] })
 }
 output "state_bucket" {

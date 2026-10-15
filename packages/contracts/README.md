@@ -1,6 +1,6 @@
 # ILIEN contracts v1
 
-`src/index.ts` defines initial source-event, trusted-intake, mission, amendment, result and acknowledgement interfaces. These are integration contracts, not a running API or a runtime validator. Runtime schemas and adapters will be delivered with the application foundation.
+`src/index.ts` defines source-event, trusted-intake, mission, amendment, result and acknowledgement interfaces. `src/validation.ts` implements strict source-event runtime validation used by the foundation API. Mission/decision/result runtime schemas will be implemented with coordination; TypeScript interfaces alone are not runtime validation.
 
 ## Trust and admission
 
