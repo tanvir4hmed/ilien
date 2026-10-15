@@ -1,0 +1,24 @@
+# Local planning, research and portable working context are never submission assets.
+/.private/
+/AGENTS.md
+/PROJECT_CONTEXT.md
+/research/
+/docs/*PLAN*.md
+/docs/*RESEARCH*.md
+*.private.zip
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+coverage/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+*.tfvars
+!*.example.tfvars
+*.pem
+*.key
+# Commit provider lock files; never commit state, secrets or saved plans.

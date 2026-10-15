@@ -1,0 +1,13 @@
+.git
+.private
+*.private.zip
+AGENTS.md
+PROJECT_CONTEXT.md
+research
+.env
+.env.*
+**/.terraform
+**/*.tfstate*
+**/*.tfplan
+**/*.tfvars
+node_modules
