@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
@@ -31,7 +31,7 @@ jobs:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: build
     environment: demo
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       id-token: write
@@ -82,9 +82,7 @@ jobs:
         working-directory: infra/environments/demo
         run: terraform apply -input=false deployment.tfplan
       - name: Apply database migration
-        run: |
-          aws lambda invoke --function-name ilien-demo-migrate --cli-read-timeout 150 --payload '{}' migration.json > invocation.json
-          node -e 'const fs=require("fs");const meta=JSON.parse(fs.readFileSync("invocation.json"));const result=JSON.parse(fs.readFileSync("migration.json"));if(meta.FunctionError||result.schemaVersion!==1){console.error("Migration failed; inspect protected runtime logs.");process.exit(1)}'
+        run: node scripts/migrate.mjs
       - name: Publish endpoint and release identity
         working-directory: infra/environments/demo
         run: |
