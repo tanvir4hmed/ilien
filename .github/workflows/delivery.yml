@@ -48,7 +48,7 @@ jobs:
       - run: npm ci --ignore-scripts && npm run build
       - name: Package explicit Lambda outputs
         run: |
-          for name in api relay intake migrate; do
+          for name in api relay intake migrate coordination; do
             (cd "dist/$name" && zip -q "../$name.zip" index.cjs)
           done
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e
@@ -63,7 +63,7 @@ jobs:
         env:
           ARTIFACT_BUCKET: ${{ vars.TF_STATE_BUCKET }}
         run: |
-          for name in api relay intake migrate; do
+          for name in api relay intake migrate coordination; do
             HASH=$(sha256sum "dist/$name.zip" | cut -d " " -f 1)
             aws s3 cp "dist/$name.zip" "s3://$ARTIFACT_BUCKET/demo/artifacts/$HASH.zip" --sse AES256 --only-show-errors
           done

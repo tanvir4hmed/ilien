@@ -36,14 +36,19 @@ module "queue" {
   source = "../../modules/queue"
   name   = local.name
 }
+module "coordination_queue" {
+  source = "../../modules/queue"
+  name   = "${local.name}-coordination"
+}
 module "relay" {
   source          = "../../modules/compute"
   name            = "${local.name}-relay"
+  timeout         = 120
   boundary_arn    = local.boundary
   artifact_bucket = "ilien-terraform-${local.account}-us-east-1"
   zip_path        = "../../../dist/relay.zip"
-  environment     = merge(local.common, { QUEUE_URL = module.queue.url })
-  policy          = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:SendMessage"], Resource = module.queue.arn }]) })
+  environment     = merge(local.common, { QUEUE_URL = module.queue.url, COORDINATION_QUEUE_URL = module.coordination_queue.url })
+  policy          = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:SendMessage"], Resource = [module.queue.arn, module.coordination_queue.arn] }]) })
 }
 module "api" {
   source          = "../../modules/compute"
@@ -60,8 +65,26 @@ module "intake" {
   boundary_arn    = local.boundary
   artifact_bucket = "ilien-terraform-${local.account}-us-east-1"
   zip_path        = "../../../dist/intake.zip"
-  environment     = local.common
-  policy          = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], Resource = module.queue.arn }]) })
+  environment     = merge(local.common, { RELAY_FUNCTION = module.relay.name })
+  timeout         = 60
+  policy          = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], Resource = module.queue.arn }, { Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = module.relay.arn }]) })
+}
+module "coordination" {
+  source          = "../../modules/compute"
+  name            = "${local.name}-coordination"
+  boundary_arn    = local.boundary
+  artifact_bucket = "ilien-terraform-${local.account}-us-east-1"
+  zip_path        = "../../../dist/coordination.zip"
+  timeout         = 60
+  environment     = merge(local.common, { RELAY_FUNCTION = module.relay.name })
+  policy          = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], Resource = module.coordination_queue.arn }, { Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = module.relay.arn }]) })
+}
+resource "aws_lambda_event_source_mapping" "coordination" {
+  event_source_arn        = module.coordination_queue.arn
+  function_name           = module.coordination.arn
+  batch_size              = 1
+  function_response_types = ["ReportBatchItemFailures"]
+  scaling_config { maximum_concurrency = 2 }
 }
 module "migrate" {
   source          = "../../modules/compute"
@@ -76,7 +99,7 @@ module "migrate" {
 resource "aws_lambda_event_source_mapping" "intake" {
   event_source_arn        = module.queue.arn
   function_name           = module.intake.arn
-  batch_size              = 5
+  batch_size              = 1
   function_response_types = ["ReportBatchItemFailures"]
   scaling_config { maximum_concurrency = 2 }
 }
@@ -92,7 +115,7 @@ resource "aws_apigatewayv2_integration" "api" {
   payload_format_version = "2.0"
 }
 resource "aws_apigatewayv2_route" "events" {
-  for_each           = toset(["GET /v1/events", "POST /v1/events"])
+  for_each           = toset(["GET /v1/events", "POST /v1/events", "GET /v1/cases", "GET /v1/cases/{caseId}", "GET /v1/cases/{caseId}/{section}", "GET /v1/cases/{caseId}/evidence/{evidenceId}", "POST /v1/cases/{caseId}/commands", "POST /v1/cases/{caseId}/acknowledgements"])
   api_id             = aws_apigatewayv2_api.api.id
   route_key          = each.value
   authorization_type = "AWS_IAM"

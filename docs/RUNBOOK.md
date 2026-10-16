@@ -1,6 +1,6 @@
 # Setup and operation
 
-The foundation contains an API, outbox relay, intake worker and privileged migration worker. It has no agent, channel sender or browser console yet.
+The foundation contains an API, outbox relay, intake worker, coordination timer worker and privileged migration worker. It has no AI agent, channel sender or browser console yet. See [coordination API](COORDINATION.md) for command and result contracts.
 
 ## Local build
 
@@ -32,13 +32,15 @@ npm run simulate
 npm run simulate -- packages/simulation/fixtures/planning.upstream_supply_shifted.json
 ```
 
-Choose an actual filename from `packages/simulation/catalog.json` if using another fixture. API requests are SigV4 signed. `POST /v1/events` accepts strict versioned envelopes; `GET /v1/events` lists the caller's latest 50 events. `GET /health` is public and reports process health only. Return 202 means durable intake; the worker moves events to `awaiting_coordination`, not resolved. No source authority comes from client JSON.
+Choose an actual filename from `packages/simulation/catalog.json` if using another fixture. API requests are SigV4 signed. `POST /v1/events` accepts strict versioned envelopes; `GET /v1/events` lists the caller's latest 50 events. `GET /health` is public and reports process health only. Return 202 means durable intake; the worker creates a configured coordination case and marks the event `coordinating`, or leaves unsupported payloads in `awaiting_coordination` with `triage` disposition. No source authority comes from client JSON.
 
 Exact byte retries return the same intake identity; different content under the same source/event ID yields 409. Database/application errors return 503 so a client can retry with the original bytes. Database resume can delay the first request.
 
+Event envelopes are limited to 24 KiB so original evidence remains retrievable through Data API record limits. Commands are limited to 16 KiB; case snapshots to 30,000 serialized bytes.
+
 ## Recovery and operations
 
-Outbox intents commit with original evidence and intake. A failed wake leaves a recoverable pending job. Until scheduled reconciliation is added, an authorized operator invokes `ilien-demo-relay` with a registered tenant UUID; a later accepted event also wakes that tenant's relay. Each invocation handles at most 25 jobs; repeat for backlog. Leases expire after two minutes. Never grant arbitrary callers direct Lambda invoke permissions; the API's trust boundary assumes invocation by its configured gateway or a trusted administrator.
+Outbox intents commit with original evidence and intake. A failed wake leaves a recoverable pending job. Until scheduled reconciliation is added, an authorized operator invokes `ilien-demo-relay` with a registered tenant UUID; a later accepted event also wakes that tenant's relay. Each invocation handles at most 25 intake jobs and 25 coordination timers; repeat for backlog. Intake leases expire after two minutes, coordination leases after three. Timer delays above 15 minutes are continued by the queue worker, with the same case revision and durable database intent. Never grant arbitrary callers direct Lambda invoke permissions; the API's trust boundary assumes invocation by its configured gateway or a trusted administrator.
 
 SQS retains failed work in a dead-letter queue after five receives; inspect failure cause before redrive. No message sends exist yet, so this phase only reconciles ingestion work. Runtime role cannot update/delete original evidence or bypass RLS. Migration credentials are isolated from runtime; app credential values are generated directly in Secrets Manager, outside Terraform state. Migration failures require a failed deployment status, never silent success.
 
@@ -53,4 +55,4 @@ AWS messaging requires configured identities and authorized recipients. Receivin
 The release must distinguish synthetic events/operational actions from actual communication delivery and disclose measured limits. Runtime claims and commands will be added only when the relevant components are available.
 
 
-Lambda delivery uploads only the four explicit ZIP bundles to the encrypted, private Terraform bucket under the separate demo/artifacts/ prefix. Keys are SHA-256 content addresses; Terraform references these objects when deploying Lambda. State remains under its own key. Artifact retention currently requires deliberate operator cleanup; do not remove packages referenced by an active or rollback release.
+Lambda delivery uploads only the five explicit ZIP bundles to the encrypted, private Terraform bucket under the separate demo/artifacts/ prefix. Keys are SHA-256 content addresses; Terraform references these objects when deploying Lambda. State remains under its own key. Artifact retention currently requires deliberate operator cleanup; do not remove packages referenced by an active or rollback release.
