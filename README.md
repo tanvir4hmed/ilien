@@ -25,3 +25,5 @@ Use Node.js 24 and Terraform 1.15.8. Run `npm ci --ignore-scripts` and `npm run 
 ## License
 
 Original ILIEN material is available under the [MIT License](LICENSE). Third-party material retains its own license.
+
+Deployment evidence and verification limits: [foundation deployment record](docs/DEPLOYMENT.md).
