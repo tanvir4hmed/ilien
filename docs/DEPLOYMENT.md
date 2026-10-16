@@ -1,6 +1,21 @@
-# Foundation deployment record
+# Deployment record
 
-Deployed commit: `d198bed` (16 October 2026).
+## Phase 2 deployment — 16 October 2026
+
+[Successful coordination deployment](https://github.com/tanvir4hmed/ilien/actions/runs/38845959603), commit `83a1331`:
+
+- Build and publication guard completed.
+- Terraform applied 13 additions and 8 changes, with zero resources destroyed.
+- Aurora returned `DatabaseResumingException` on the first migration attempt; the bounded deployment retry completed schema version 2.
+- Process health returned `phase: coordination`, version `0.2.0`.
+
+This confirms infrastructure delivery and migration, not application correctness. No event-flow test, simulated participant command, live channel message or AI inference was run. See [coordination API](COORDINATION.md) for implementation scope and known limits. Phase 1 remains historical evidence below; its schema version is superseded.
+
+Latest code commit: `080c50f`. Its [delivery run](https://github.com/tanvir4hmed/ilien/actions/runs/38846201545) also completed successfully, including migration and health gates.
+
+## Phase 1 historical deployment
+
+Historical commit: `d198bed` (16 October 2026).
 
 [Successful delivery run](https://github.com/tanvir4hmed/ilien/actions/runs/38840035146)
 
@@ -17,13 +32,3 @@ Implemented infrastructure: private Aurora PostgreSQL with Data API, SQS and dea
 
 Coordination workflows, operator interface, live CDS adapters and bounded AI planning remain subsequent work. This deployment alone is not a complete hackathon demonstration.
 
-## Phase 2 deployment — 16 October 2026
-
-[Successful coordination deployment](https://github.com/tanvir4hmed/ilien/actions/runs/38845959603), commit `83a1331`:
-
-- Build and publication guard completed.
-- Terraform applied 13 additions and 8 changes, with zero resources destroyed.
-- Aurora returned `DatabaseResumingException` on the first migration attempt; the bounded deployment retry completed schema version 2.
-- Process health returned `phase: coordination`, version `0.2.0`.
-
-This confirms infrastructure delivery and migration, not application correctness. No event-flow test, simulated participant command, live channel message or AI inference was run. See [coordination API](COORDINATION.md) for implementation scope and known limits. Phase 1 remains historical evidence below; its schema version is superseded.
