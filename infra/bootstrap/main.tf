@@ -65,7 +65,7 @@ resource "aws_iam_role_policy" "deploy" {
     { Effect = "Allow", Action = ["iam:GetRole", "iam:GetRolePolicy", "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:DeleteRole", "iam:ListRolePolicies", "iam:ListAttachedRolePolicies", "iam:ListInstanceProfilesForRole", "iam:TagRole", "iam:UntagRole", "iam:UpdateAssumeRolePolicy"], Resource = "arn:aws:iam::${local.account}:role/ilien-*" },
     { Effect = "Allow", Action = ["iam:PassRole"], Resource = "arn:aws:iam::${local.account}:role/ilien-*", Condition = { StringEquals = { "iam:PassedToService" = "lambda.amazonaws.com" } } },
     { Effect = "Allow", Action = ["lambda:*"], Resource = ["arn:aws:lambda:us-east-1:${local.account}:function:ilien-*", "arn:aws:lambda:us-east-1:${local.account}:event-source-mapping:*"] },
-    { Effect = "Allow", Action = ["lambda:ListEventSourceMappings", "lambda:CreateEventSourceMapping"], Resource = "*", Condition = { StringEquals = { "aws:RequestedRegion" = "us-east-1" } } },
+    { Effect = "Allow", Action = ["lambda:ListEventSourceMappings", "lambda:GetEventSourceMapping", "lambda:CreateEventSourceMapping"], Resource = "*", Condition = { StringEquals = { "aws:RequestedRegion" = "us-east-1" } } },
     { Effect = "Allow", Action = ["logs:CreateLogGroup", "logs:DeleteLogGroup", "logs:PutRetentionPolicy", "logs:TagResource", "logs:UntagResource", "logs:ListTagsForResource"], Resource = "arn:aws:logs:us-east-1:${local.account}:log-group:/aws/lambda/ilien-*" },
     { Effect = "Allow", Action = ["logs:DescribeLogGroups"], Resource = "*" },
     { Effect = "Allow", Action = ["sqs:*"], Resource = "arn:aws:sqs:us-east-1:${local.account}:ilien-*" },
