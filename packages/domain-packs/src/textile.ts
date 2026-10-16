@@ -2,7 +2,7 @@ import type { Policy, CaseState } from "../../coordination/src/types.js";
 import type { SourceEvent } from "../../contracts/src/index.js";
 import { z } from "zod";
 export const textilePolicy: Policy = {
-  version: "textile-demo-v1",
+  version: "textile-v1",
   groups: [
     "stores",
     "quality",
@@ -55,7 +55,7 @@ export const textilePolicy: Policy = {
   evidenceAgeSeconds: 3600,
 };
 const materialPayload = z.object({
-  siteId: z.literal("demo-site-001"),
+  siteId: z.literal("sample-site-001"),
   materialLotId: z.string().min(1).max(160),
   requiredQuantity: z.object({
     value: z.string().regex(/^\d+(\.\d+)?$/),
@@ -122,7 +122,7 @@ export function template(
   }
   if (
     event.eventType === "plm.techpack_approved" &&
-    event.payload.siteId === "demo-site-001"
+    event.payload.siteId === "sample-site-001"
   )
     return {
       workflow: "revision-acknowledgement-v1",

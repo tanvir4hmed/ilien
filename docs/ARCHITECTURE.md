@@ -24,7 +24,7 @@ flowchart LR
   MIG --> DB
 ```
 
-Source identity is resolved from trusted IAM context. PostgreSQL RLS uses transaction-local tenant context and a non-owner runtime login. The migration worker alone uses the managed database administrator secret. Demo role-play is authorized only by a server-configured simulated connection; choosing an actor ID is not production user authentication.
+Source identity is resolved from trusted IAM context. PostgreSQL RLS uses transaction-local tenant context and a non-owner runtime login. The migration worker alone uses the managed database administrator secret. Simulated role-play is authorized only by a server-configured simulated connection; choosing an actor ID is not production user authentication.
 
 `packages/coordination` separates deterministic graph transitions from transactional persistence. `packages/domain-packs` defines textile templates; it does not own provider credentials. One case row serializes concurrent transitions. Expected revisions reject stale changes; immutable command/evidence records preserve provenance. Relational obligation/dependency projections, result records and delayed-work intents commit together. Separate queue/compute modules allow intake and coordination capacity to change independently, although they share database capacity.
 
@@ -32,4 +32,4 @@ Only validated versioned payloads activate configured workflows. Unknown or mini
 
 Future AI will propose bounded next steps through the same authority/version/evidence gates. Future channel adapters need real identity binding, recipient-scoped rendering, provider receipts and reconciliation before any live messaging claim. Existing simulation role-play must not be reused as production authorization.
 
-Infrastructure is modular Terraform delivered by GitHub Actions with short-lived OIDC credentials and content-addressed private Lambda artifacts. Aurora is private and encrypted; Data API avoids permanent app connection pools. There is one configured demo tenant, one database writer and no automatic regional failover. No production scalability, security certification or tested tenant-isolation claim is made.
+Infrastructure is modular Terraform delivered by GitHub Actions with short-lived OIDC credentials and content-addressed private Lambda artifacts. Aurora is private and encrypted; Data API avoids permanent app connection pools. There is one configured tenant, one database writer and no automatic regional failover. No production scalability, security certification or tested tenant-isolation claim is made.

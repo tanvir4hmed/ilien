@@ -42,7 +42,7 @@ resource "aws_lambda_function" "runtime" {
   architectures    = ["arm64"]
   handler          = "index.handler"
   s3_bucket        = var.artifact_bucket
-  s3_key           = "demo/artifacts/${filesha256(var.zip_path)}.zip"
+  s3_key           = "ilien/artifacts/${filesha256(var.zip_path)}.zip"
   source_code_hash = filebase64sha256(var.zip_path)
   timeout          = var.timeout
   memory_size      = 256

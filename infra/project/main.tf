@@ -2,7 +2,7 @@ terraform {
   required_version = "= 1.15.8"
   required_providers { aws = { source = "hashicorp/aws", version = "~> 6.0" } }
   backend "s3" {
-    key          = "demo/terraform.tfstate"
+    key          = "ilien/terraform.tfstate"
     region       = "us-east-1"
     encrypt      = true
     use_lockfile = true
@@ -14,67 +14,67 @@ provider "aws" {
 data "aws_caller_identity" "current" {
 
 }
-variable "demo_principal_arn" {
+variable "source_principal_arn" {
   type = string
 }
 locals {
-  name             = "ilien-demo"
+  name             = "ilien"
   account          = data.aws_caller_identity.current.account_id
   boundary         = "arn:aws:iam::${local.account}:policy/ilien-runtime-boundary"
   common           = { DB_CLUSTER_ARN = module.data.cluster_arn, DB_SECRET_ARN = module.data.app_secret_arn }
-  log_statement    = { Effect = "Allow", Action = ["logs:CreateLogStream", "logs:PutLogEvents"], Resource = "arn:aws:logs:us-east-1:${local.account}:log-group:/aws/lambda/ilien-demo-*:*" }
+  log_statement    = { Effect = "Allow", Action = ["logs:CreateLogStream", "logs:PutLogEvents"], Resource = "arn:aws:logs:us-east-1:${local.account}:log-group:/aws/lambda/ilien-*:*" }
   data_statement   = { Effect = "Allow", Action = ["rds-data:BeginTransaction", "rds-data:CommitTransaction", "rds-data:RollbackTransaction", "rds-data:ExecuteStatement"], Resource = module.data.cluster_arn }
   secret_statement = { Effect = "Allow", Action = ["secretsmanager:GetSecretValue"], Resource = module.data.app_secret_arn }
   base_statements  = [local.log_statement, local.data_statement, local.secret_statement]
 }
 module "data" {
-  source         = "../../modules/data"
+  source         = "../modules/data"
   name           = local.name
   engine_version = "16.11"
 }
 module "queue" {
-  source = "../../modules/queue"
+  source = "../modules/queue"
   name   = local.name
 }
 module "coordination_queue" {
-  source = "../../modules/queue"
+  source = "../modules/queue"
   name   = "${local.name}-coordination"
 }
 module "relay" {
-  source          = "../../modules/compute"
+  source          = "../modules/compute"
   name            = "${local.name}-relay"
   timeout         = 120
   boundary_arn    = local.boundary
   artifact_bucket = "ilien-terraform-${local.account}-us-east-1"
-  zip_path        = "../../../dist/relay.zip"
+  zip_path        = "../../dist/relay.zip"
   environment     = merge(local.common, { QUEUE_URL = module.queue.url, COORDINATION_QUEUE_URL = module.coordination_queue.url })
   policy          = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:SendMessage"], Resource = [module.queue.arn, module.coordination_queue.arn] }]) })
 }
 module "api" {
-  source          = "../../modules/compute"
+  source          = "../modules/compute"
   name            = "${local.name}-api"
   boundary_arn    = local.boundary
   artifact_bucket = "ilien-terraform-${local.account}-us-east-1"
-  zip_path        = "../../../dist/api.zip"
+  zip_path        = "../../dist/api.zip"
   environment     = merge(local.common, { RELAY_FUNCTION = module.relay.name })
   policy          = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = module.relay.arn }]) })
 }
 module "intake" {
-  source          = "../../modules/compute"
+  source          = "../modules/compute"
   name            = "${local.name}-intake"
   boundary_arn    = local.boundary
   artifact_bucket = "ilien-terraform-${local.account}-us-east-1"
-  zip_path        = "../../../dist/intake.zip"
+  zip_path        = "../../dist/intake.zip"
   environment     = merge(local.common, { RELAY_FUNCTION = module.relay.name })
   timeout         = 60
   policy          = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], Resource = module.queue.arn }, { Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = module.relay.arn }]) })
 }
 module "coordination" {
-  source          = "../../modules/compute"
+  source          = "../modules/compute"
   name            = "${local.name}-coordination"
   boundary_arn    = local.boundary
   artifact_bucket = "ilien-terraform-${local.account}-us-east-1"
-  zip_path        = "../../../dist/coordination.zip"
+  zip_path        = "../../dist/coordination.zip"
   timeout         = 60
   environment     = merge(local.common, { RELAY_FUNCTION = module.relay.name })
   policy          = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], Resource = module.coordination_queue.arn }, { Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = module.relay.arn }]) })
@@ -87,13 +87,13 @@ resource "aws_lambda_event_source_mapping" "coordination" {
   scaling_config { maximum_concurrency = 2 }
 }
 module "migrate" {
-  source          = "../../modules/compute"
+  source          = "../modules/compute"
   name            = "${local.name}-migrate"
   boundary_arn    = local.boundary
   artifact_bucket = "ilien-terraform-${local.account}-us-east-1"
-  zip_path        = "../../../dist/migrate.zip"
+  zip_path        = "../../dist/migrate.zip"
   timeout         = 120
-  environment     = { DB_CLUSTER_ARN = module.data.cluster_arn, DB_SECRET_ARN = module.data.master_secret_arn, APP_SECRET_ARN = module.data.app_secret_arn, DEMO_TENANT_ID = "00000000-0000-4000-8000-000000000001", DEMO_SOURCE_ID = "00000000-0000-4000-8000-000000000002", DEMO_PRINCIPAL_ARN = var.demo_principal_arn }
+  environment     = { DB_CLUSTER_ARN = module.data.cluster_arn, DB_SECRET_ARN = module.data.master_secret_arn, APP_SECRET_ARN = module.data.app_secret_arn, TENANT_ID = "00000000-0000-4000-8000-000000000001", SOURCE_ID = "00000000-0000-4000-8000-000000000002", SOURCE_PRINCIPAL_ARN = var.source_principal_arn }
   policy          = jsonencode({ Version = "2012-10-17", Statement = [local.log_statement, local.data_statement, { Effect = "Allow", Action = ["secretsmanager:GetSecretValue"], Resource = [module.data.master_secret_arn, module.data.app_secret_arn] }, { Effect = "Allow", Action = ["secretsmanager:PutSecretValue"], Resource = module.data.app_secret_arn }] })
 }
 resource "aws_lambda_event_source_mapping" "intake" {

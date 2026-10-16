@@ -447,7 +447,7 @@ export async function caseView(source: Source, id: string, section: string) {
       } as Record<string, string>
     )[section];
     if (!table) throw new CoordinationError("not_found", 404);
-    // Keyset pagination can be added before expanding the bounded demo history.
+    // Keyset pagination can be added before expanding the bounded case history.
     if (section === "results")
       return rows(
         await query(

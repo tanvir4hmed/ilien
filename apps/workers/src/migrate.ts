@@ -75,24 +75,24 @@ export async function handler() {
       for (const statement of coordinationMigration.split("-- statement"))
         await query(statement.trim(), [], tx);
     await query(
-      "INSERT INTO tenants(id,name) VALUES(CAST(:tenant AS uuid),'Synthetic textile demo') ON CONFLICT(id) DO NOTHING",
-      [param("tenant", process.env.DEMO_TENANT_ID!)],
+      "INSERT INTO tenants(id,name) VALUES(CAST(:tenant AS uuid),'Synthetic textile workspace') ON CONFLICT(id) DO NOTHING",
+      [param("tenant", process.env.TENANT_ID!)],
       tx,
     );
     await query(
       "INSERT INTO source_connections(tenant_id,id,principal_arn,origin) VALUES(CAST(:tenant AS uuid),CAST(:source AS uuid),:principal,'simulated') ON CONFLICT(tenant_id,id) DO UPDATE SET principal_arn=EXCLUDED.principal_arn",
       [
-        param("tenant", process.env.DEMO_TENANT_ID!),
-        param("source", process.env.DEMO_SOURCE_ID!),
-        param("principal", process.env.DEMO_PRINCIPAL_ARN!),
+        param("tenant", process.env.TENANT_ID!),
+        param("source", process.env.SOURCE_ID!),
+        param("principal", process.env.SOURCE_PRINCIPAL_ARN!),
       ],
       tx,
     );
     await query(
       "INSERT INTO coordination_policies(tenant_id,connection_id,version,policy,simulation_enabled) VALUES(CAST(:tenant AS uuid),CAST(:source AS uuid),:version,CAST(:policy AS jsonb),true) ON CONFLICT(tenant_id,connection_id) DO NOTHING",
       [
-        param("tenant", process.env.DEMO_TENANT_ID!),
-        param("source", process.env.DEMO_SOURCE_ID!),
+        param("tenant", process.env.TENANT_ID!),
+        param("source", process.env.SOURCE_ID!),
         param("version", textilePolicy.version),
         param("policy", JSON.stringify(textilePolicy)),
       ],

@@ -2,7 +2,7 @@ import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 const client = new LambdaClient({ maxAttempts: 3 });
 for (let attempt = 1; attempt <= 4; attempt++) {
   const response = await client.send(new InvokeCommand({
-    FunctionName: 'ilien-demo-migrate', Payload: Buffer.from('{}'),
+    FunctionName: 'ilien-migrate', Payload: Buffer.from('{}'),
   }));
   const result = JSON.parse(Buffer.from(response.Payload ?? []).toString('utf8'));
   if (!response.FunctionError && result.schemaVersion === 2) {

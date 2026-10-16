@@ -9,8 +9,8 @@ resource "aws_sns_topic_policy" "cost" {
     Condition = { StringEquals = { "aws:SourceAccount" = local.account } }
   }] })
 }
-resource "aws_budgets_budget" "demo" {
-  name         = "ilien-demo-advisory"
+resource "aws_budgets_budget" "ilien" {
+  name         = "ilien-advisory"
   budget_type  = "COST"
   limit_amount = "100"
   limit_unit   = "USD"

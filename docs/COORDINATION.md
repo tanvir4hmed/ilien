@@ -1,16 +1,16 @@
 # Deterministic coordination API
 
-This release implements coordination without a model or live communication provider. Every participant is a **simulated role**, selected by the authenticated demo source. This is a simulator capability, not production human authentication, delegation or proof of a real person's identity. Only a server-configured, enabled simulated connection with a coordination policy can use it. Never enable this capability for an untrusted client.
+This release implements coordination without a model or live communication provider. Every participant is a **simulated role**, selected by the authenticated configured source. This is a simulator capability, not production human authentication, delegation or proof of a real person's identity. Only a server-configured, enabled simulated connection with a coordination policy can use it. Never enable this capability for an untrusted client.
 
 ## Activation and scope
 
 Submit `packages/contracts/examples/material-readiness.event.json` through the existing signed event endpoint. A validated `1.0` payload activates four required branches: stores, quality, planning and procurement. Each begins with a simulated ask. `revision-acknowledgement.event.json` activates production and quality acknowledgement branches for an exact revision. The `planning.upstream_supply_shifted` alias requires the same material payload contract. Minimal catalogue payloads, missing revisions and unknown events remain triage; they do not create guessed workflows. Newly created events activate workflows; historical processed intake is not replayed automatically.
 
-The configured source/site is a synthetic demo. Domain templates live in `packages/domain-packs`; generic state transitions live in `packages/coordination`. `coordination_policies` stores server-owned settings, actor eligibility and bounds. No caller can publish a policy through the API. Configuration version mismatch requires review; it is not silently adopted by an active case.
+The configured source/site is a synthetic sample. Domain templates live in `packages/domain-packs`; generic state transitions live in `packages/coordination`. `coordination_policies` stores server-owned settings, actor eligibility and bounds. No caller can publish a policy through the API. Configuration version mismatch requires review; it is not silently adopted by an active case.
 
 ## Access and CLI
 
-Use the configured AWS IAM demo source and set `ILIEN_API_URL` and `AWS_REGION`. `scripts/coordinate.mjs` signs requests; it does not embed credentials.
+Use the configured AWS IAM configured source and set `ILIEN_API_URL` and `AWS_REGION`. `scripts/coordinate.mjs` signs requests; it does not embed credentials.
 
 ```sh
 node scripts/coordinate.mjs GET /v1/cases
@@ -82,7 +82,7 @@ One accepted/rejected acknowledgement is stored per result, independently from c
 
 ## Time, cost and failure behavior
 
-Defaults: one-hour deadline, five-minute contact interval, one reminder followed by one eligible fallback escalation, 64 total contacts, 32 obligations, depth five and one-hour evidence validity. Statements/questions are limited to 1000 characters. Case snapshots are limited to 30,000 serialized bytes; larger changes require handoff rather than silent truncation. A 500-revision budget stops further ordinary mutations; the timer hands off and records an outcome. These are bounded demo defaults, not measured production capacity.
+Defaults: one-hour deadline, five-minute contact interval, one reminder followed by one eligible fallback escalation, 64 total contacts, 32 obligations, depth five and one-hour evidence validity. Statements/questions are limited to 1000 characters. Case snapshots are limited to 30,000 serialized bytes; larger changes require handoff rather than silent truncation. A 500-revision budget stops further ordinary mutations; the timer hands off and records an outcome. These are bounded initial defaults, not measured production capacity.
 
 Timers use a separate SQS queue/worker and durable `coordination_jobs`. A worker wake checks the current case revision; obsolete wakes do nothing. Delays above SQS's 15-minute per-message limit are continued as fresh durable jobs. No model runs while waiting. No active cases means no timer loop. Long-lived active cases still incur queue/Lambda/database costs and can reduce Aurora auto-pause savings.
 

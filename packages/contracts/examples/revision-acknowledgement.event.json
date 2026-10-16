@@ -1,10 +1,10 @@
 {
   "contractVersion": "1.0",
-  "eventId": "demo-revision-001",
+  "eventId": "sample-revision-001",
   "eventType": "plm.techpack_approved",
   "payloadVersion": "1.0",
   "occurredAt": "2026-10-16T10:00:00+06:00",
-  "correlationId": "demo-techpack-001",
-  "subject": {"type":"techpack","id":"demo-techpack-001","revision":"3"},
-  "payload": {"siteId":"demo-site-001"}
+  "correlationId": "sample-techpack-001",
+  "subject": {"type":"techpack","id":"sample-techpack-001","revision":"3"},
+  "payload": {"siteId":"sample-site-001"}
 }
