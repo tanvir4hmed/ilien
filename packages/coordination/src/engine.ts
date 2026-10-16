@@ -68,13 +68,17 @@ function invalidateParents(state: CaseState, id: string, now: string) {
 function graphGuard(state: CaseState, policy: Policy) {
   if (state.obligations.length > policy.maxNodes)
     fail("dependency_fanout_limit");
+  const depths = new Map<string, number>();
   function depth(id: string, path: Set<string>): number {
     if (path.has(id)) fail("dependency_cycle");
+    const known = depths.get(id);
+    if (known !== undefined) return known;
     const next = new Set(path).add(id);
-    return (
+    const value =
       1 +
-      Math.max(0, ...node(state, id).dependencies.map((d) => depth(d, next)))
-    );
+      Math.max(0, ...node(state, id).dependencies.map((d) => depth(d, next)));
+    depths.set(id, value);
+    return value;
   }
   for (const o of state.obligations)
     if (depth(o.id, new Set()) > policy.maxDepth)
