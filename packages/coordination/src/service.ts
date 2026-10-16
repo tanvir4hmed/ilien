@@ -18,6 +18,7 @@ import {
   type Outcome,
   type Policy,
 } from "./types.js";
+import { createDelivery } from "../../channels/src/intents.js";
 export type Source = { tenant_id: string; id: string; origin: string };
 const digest = (raw: string) => createHash("sha256").update(raw).digest("hex");
 function decode<T>(value: T | string): T {
@@ -165,17 +166,28 @@ async function persist(
     ],
     tx,
   );
-  for (const contact of contacts)
+  for (const contact of contacts) {
+    const contactId = randomUUID();
     await query(
       "INSERT INTO coordination_contacts(tenant_id,case_id,id,case_revision,contact) VALUES(CAST(:tenant AS uuid),CAST(:case AS uuid),CAST(:id AS uuid),CAST(:revision AS integer),CAST(:contact AS jsonb))",
       [
         ...p,
-        param("id", randomUUID()),
+        param("id", contactId),
         param("revision", String(state.revision)),
-        param("contact", JSON.stringify(contact)),
+        param(
+          "contact",
+          JSON.stringify({
+            ...contact,
+            obligationRevision: state.obligations.find(
+              (o) => o.id === contact.obligationId,
+            )!.revision,
+          }),
+        ),
       ],
       tx,
     );
+    await createDelivery(tenant, state, contactId, contact, tx);
+  }
   if (result) {
     const id = randomUUID();
     await query(
@@ -198,7 +210,7 @@ async function persist(
             outcome: result.outcome,
             missionTerminal: result.terminal,
             summary:
-              "Communication outcome based on simulated participant attestations; no operational action was executed.",
+              "Communication outcome for simulated source context; individual evidence records identify participant provenance. No operational action was executed.",
             requirements: state.obligations.map((o) => ({
               requirementId: o.id,
               status:
@@ -317,67 +329,74 @@ export async function activateCase(
   );
   return true;
 }
-async function executeAccepted(source: Source, id: string, raw: string) {
+export async function applyCommand(
+  source: Source,
+  id: string,
+  raw: string,
+  tx: string,
+  externalEvidenceId?: string,
+) {
   const command = commandSchema.parse(JSON.parse(raw));
-  return transaction(source.tenant_id, async (tx) => {
-    const state = await getCase(source, id, tx, true),
-      policy = await policyFor(source, tx);
-    if (!policy) throw new CoordinationError("simulation_scope_required", 403);
-    const actor = resolveActor(policy, command.actorId);
-    const previous = rows<{ request_hash: string; case_revision: number }>(
-      await query(
-        "SELECT request_hash,case_revision FROM coordination_journal WHERE case_id=CAST(:case AS uuid) AND command_id=CAST(:command AS uuid)",
-        [param("case", id), param("command", command.commandId)],
-        tx,
-      ),
-    )[0];
-    if (previous) {
-      if (previous.request_hash !== digest(raw))
-        throw new CoordinationError("command_id_content_conflict");
-      return {
-        caseId: id,
-        revision: previous.case_revision,
-        currentRevision: state.revision,
-        duplicate: true,
-      };
-    }
-    if (state.revision !== command.expectedRevision)
-      throw new CoordinationError("stale_case_revision");
-    const evidenceId = randomUUID(),
-      now = new Date().toISOString();
-    const effect = transition(
-      state,
-      policy,
-      actor,
-      command.operation,
-      evidenceId,
-      now,
-    );
-    await storeEvidence(source.tenant_id, evidenceId, raw, tx);
-    await persist(
-      source.tenant_id,
-      effect.state,
-      policy,
-      effect.contacts,
-      effect.result,
-      command.commandId,
-      actor.id,
-      raw,
-      evidenceId,
-      now,
+  const state = await getCase(source, id, tx, true),
+    policy = await policyFor(source, tx);
+  if (!policy) throw new CoordinationError("simulation_scope_required", 403);
+  const actor = resolveActor(policy, command.actorId);
+  const previous = rows<{ request_hash: string; case_revision: number }>(
+    await query(
+      "SELECT request_hash,case_revision FROM coordination_journal WHERE case_id=CAST(:case AS uuid) AND command_id=CAST(:command AS uuid)",
+      [param("case", id), param("command", command.commandId)],
       tx,
-    );
+    ),
+  )[0];
+  if (previous) {
+    if (previous.request_hash !== digest(raw))
+      throw new CoordinationError("command_id_content_conflict");
     return {
       caseId: id,
-      revision: effect.state.revision,
-      status: effect.state.status,
-      duplicate: false,
+      revision: previous.case_revision,
+      currentRevision: state.revision,
+      duplicate: true,
     };
-  });
+  }
+  if (state.revision !== command.expectedRevision)
+    throw new CoordinationError("stale_case_revision");
+  const evidenceId = externalEvidenceId ?? randomUUID(),
+    now = new Date().toISOString();
+  const effect = transition(
+    state,
+    policy,
+    actor,
+    command.operation,
+    evidenceId,
+    now,
+  );
+  if (!externalEvidenceId)
+    await storeEvidence(source.tenant_id, evidenceId, raw, tx);
+  await persist(
+    source.tenant_id,
+    effect.state,
+    policy,
+    effect.contacts,
+    effect.result,
+    command.commandId,
+    actor.id,
+    raw,
+    evidenceId,
+    now,
+    tx,
+  );
+  return {
+    caseId: id,
+    revision: effect.state.revision,
+    status: effect.state.status,
+    duplicate: false,
+  };
 }
 export async function executeCommand(source: Source, id: string, raw: string) {
   try {
-    return await executeAccepted(source, id, raw);
+    return await transaction(source.tenant_id, (tx) =>
+      applyCommand(source, id, raw, tx),
+    );
   } catch (error) {
     if (
       error instanceof CoordinationError &&
@@ -599,7 +618,7 @@ export async function readEvidence(
     const state = await getCase(source, id, tx);
     const result = rows(
       await query(
-        "SELECT id,origin,original_text,sha256,received_at FROM evidence_items WHERE id=CAST(:evidence AS uuid) AND (id=CAST(:original AS uuid) OR EXISTS(SELECT 1 FROM coordination_journal j WHERE j.case_id=CAST(:case AS uuid) AND j.evidence_id=evidence_items.id) OR EXISTS(SELECT 1 FROM coordination_rejections r WHERE r.case_id=CAST(:case AS uuid) AND r.evidence_id=evidence_items.id))",
+        "SELECT id,origin,original_text,sha256,received_at FROM evidence_items WHERE id=CAST(:evidence AS uuid) AND (id=CAST(:original AS uuid) OR EXISTS(SELECT 1 FROM coordination_journal j WHERE j.case_id=CAST(:case AS uuid) AND j.evidence_id=evidence_items.id) OR EXISTS(SELECT 1 FROM coordination_rejections r WHERE r.case_id=CAST(:case AS uuid) AND r.evidence_id=evidence_items.id) OR EXISTS(SELECT 1 FROM channel_receipts cr WHERE cr.case_id=CAST(:case AS uuid) AND cr.evidence_id=evidence_items.id))",
         [
           param("evidence", evidenceId),
           param("original", state.sourceEvidenceId),

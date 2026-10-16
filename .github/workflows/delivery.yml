@@ -39,6 +39,9 @@ jobs:
       TF_IN_AUTOMATION: 'true'
       TF_VAR_source_principal_arn: ${{ vars.SOURCE_PRINCIPAL_ARN }}
       AWS_REGION: ${{ vars.AWS_REGION }}
+      TF_VAR_mail_domain: mail.${{ vars.APP_DOMAIN }}
+      TF_VAR_whatsapp_phone_number_id: ${{ vars.WHATSAPP_PHONE_NUMBER_ID }}
+      TF_VAR_whatsapp_waba_id: ${{ vars.WHATSAPP_WABA_ID }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
@@ -48,7 +51,7 @@ jobs:
       - run: npm ci --ignore-scripts && npm run build
       - name: Package explicit Lambda outputs
         run: |
-          for name in api relay intake migrate coordination; do
+          for name in api relay intake migrate coordination channel-send channel-receive; do
             (cd "dist/$name" && zip -q "../$name.zip" index.cjs)
           done
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e
@@ -63,7 +66,7 @@ jobs:
         env:
           ARTIFACT_BUCKET: ${{ vars.TF_STATE_BUCKET }}
         run: |
-          for name in api relay intake migrate coordination; do
+          for name in api relay intake migrate coordination channel-send channel-receive; do
             HASH=$(sha256sum "dist/$name.zip" | cut -d " " -f 1)
             aws s3 cp "dist/$name.zip" "s3://$ARTIFACT_BUCKET/ilien/artifacts/$HASH.zip" --sse AES256 --only-show-errors
           done
@@ -83,6 +86,8 @@ jobs:
         run: terraform apply -input=false deployment.tfplan
       - name: Apply database migration
         run: node scripts/migrate.mjs
+      - name: Configure existing WhatsApp destination
+        run: node scripts/configure-whatsapp.mjs
       - name: Publish endpoint and release identity
         working-directory: infra/project
         run: |

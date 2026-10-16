@@ -11,6 +11,9 @@ data "aws_caller_identity" "current" {
 variable "oidc_subject" {
   type = string
 }
+variable "mail_domain" { type = string }
+variable "whatsapp_phone_number_id" { type = string }
+variable "whatsapp_waba_id" { type = string }
 locals {
   account = data.aws_caller_identity.current.account_id
   bucket  = "ilien-terraform-${local.account}-us-east-1"
@@ -48,6 +51,9 @@ resource "aws_iam_policy" "runtime_boundary" {
     { Effect = "Allow", Action = ["rds-data:*"], Resource = "arn:aws:rds:us-east-1:${local.account}:cluster:ilien" },
     { Effect = "Allow", Action = ["secretsmanager:GetSecretValue", "secretsmanager:PutSecretValue"], Resource = ["arn:aws:secretsmanager:us-east-1:${local.account}:secret:ilien-*", "arn:aws:secretsmanager:us-east-1:${local.account}:secret:rds!cluster-*"] },
     { Effect = "Allow", Action = ["sqs:SendMessage", "sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], Resource = "arn:aws:sqs:us-east-1:${local.account}:ilien-*" },
+    { Effect = "Allow", Action = ["s3:GetObject"], Resource = "arn:aws:s3:::ilien-channel-evidence-${local.account}-us-east-1/raw/*" },
+    { Effect = "Allow", Action = ["ses:SendEmail"], Resource = ["arn:aws:ses:us-east-1:${local.account}:identity/${var.mail_domain}", "arn:aws:ses:us-east-1:${local.account}:configuration-set/ilien"] },
+    { Effect = "Allow", Action = ["social-messaging:SendWhatsAppMessage"], Resource = "arn:aws:social-messaging:us-east-1:${local.account}:phone-number-id/${trimprefix(var.whatsapp_phone_number_id, "phone-number-id-")}" },
     { Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = "arn:aws:lambda:us-east-1:${local.account}:function:ilien-relay" }
   ] })
 }
@@ -90,4 +96,20 @@ output "deploy_role_arn" {
 }
 output "runtime_boundary_arn" {
   value = aws_iam_policy.runtime_boundary.arn
+}
+
+resource "aws_iam_role_policy" "channel_deploy" {
+  name = "ilien-channel-provisioning"
+  role = aws_iam_role.deploy.id
+  policy = jsonencode({ Version = "2012-10-17", Statement = [
+    { Effect = "Allow", Action = ["sns:CreateTopic", "sns:DeleteTopic", "sns:GetTopicAttributes", "sns:SetTopicAttributes", "sns:TagResource", "sns:UntagResource", "sns:ListTagsForResource", "sns:Subscribe"], Resource = "arn:aws:sns:us-east-1:${local.account}:ilien-*" },
+    { Effect = "Allow", Action = ["sns:GetSubscriptionAttributes", "sns:SetSubscriptionAttributes", "sns:Unsubscribe"], Resource = "arn:aws:sns:us-east-1:${local.account}:ilien-*:*" },
+    { Effect = "Allow", Action = ["s3:CreateBucket", "s3:DeleteBucket", "s3:Get*", "s3:ListBucket", "s3:PutBucketPolicy", "s3:PutBucketPublicAccessBlock", "s3:PutEncryptionConfiguration", "s3:PutLifecycleConfiguration", "s3:PutBucketTagging"], Resource = "arn:aws:s3:::ilien-channel-evidence-${local.account}-us-east-1" },
+    { Effect = "Allow", Action = ["ses:VerifyDomainIdentity", "ses:VerifyDomainDkim", "ses:GetIdentityVerificationAttributes", "ses:GetIdentityDkimAttributes", "ses:GetIdentityMailFromDomainAttributes", "ses:GetIdentityNotificationAttributes", "ses:SetIdentityMailFromDomain", "ses:DeleteIdentity", "ses:CreateReceiptRuleSet", "ses:DeleteReceiptRuleSet", "ses:DescribeReceiptRuleSet", "ses:DescribeActiveReceiptRuleSet", "ses:CreateReceiptRule", "ses:UpdateReceiptRule", "ses:DeleteReceiptRule", "ses:DescribeReceiptRule", "ses:SetActiveReceiptRuleSet", "ses:CreateConfigurationSet", "ses:DeleteConfigurationSet", "ses:GetConfigurationSet", "ses:PutConfigurationSetSuppressionOptions", "ses:CreateConfigurationSetEventDestination", "ses:UpdateConfigurationSetEventDestination", "ses:DeleteConfigurationSetEventDestination", "ses:GetConfigurationSetEventDestinations", "ses:TagResource", "ses:UntagResource", "ses:ListTagsForResource"], Resource = "*", Condition = { StringEquals = { "aws:RequestedRegion" = "us-east-1" } } },
+    { Effect = "Allow", Action = ["kms:CreateKey"], Resource = "*", Condition = { StringEquals = { "aws:RequestTag/Project" = "ilien" } } },
+    { Effect = "Allow", Action = ["kms:DescribeKey", "kms:GetKeyPolicy", "kms:GetKeyRotationStatus", "kms:ListResourceTags", "kms:PutKeyPolicy", "kms:EnableKeyRotation", "kms:DisableKeyRotation", "kms:TagResource", "kms:UntagResource", "kms:ScheduleKeyDeletion", "kms:UpdateKeyDescription"], Resource = "arn:aws:kms:us-east-1:${local.account}:key/*", Condition = { StringEquals = { "aws:ResourceTag/Project" = "ilien" } } },
+    { Effect = "Allow", Action = ["kms:CreateAlias", "kms:DeleteAlias", "kms:UpdateAlias"], Resource = ["arn:aws:kms:us-east-1:${local.account}:alias/ilien-*", "arn:aws:kms:us-east-1:${local.account}:key/*"] },
+    { Effect = "Allow", Action = ["kms:ListAliases"], Resource = "*" },
+    { Effect = "Allow", Action = ["social-messaging:GetLinkedWhatsAppBusinessAccount", "social-messaging:PutWhatsAppBusinessAccountEventDestinations"], Resource = "arn:aws:social-messaging:us-east-1:${local.account}:waba/${trimprefix(var.whatsapp_waba_id, "waba-")}" }
+  ] })
 }

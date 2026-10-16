@@ -4,9 +4,9 @@ Evidence-backed communication and coordination for people and AI-enabled applica
 
 ILIEN is being built to receive a request, contact authorized participants, collect information and decisions across channels, manage dependent replies and return a traceable result. The initial demonstration domain is textile and apparel manufacturing.
 
-**Status:** deterministic coordination implementation: authenticated event intake, tenant-scoped persistence, immutable evidence, versioned cases/dependencies, independent reply verification, bounded reminders/escalation, durable timer work and source result acknowledgement. Participant interaction is explicitly simulated through an authenticated CLI. AI and live messaging are not implemented. Application verification is deferred; check the latest Actions run for deployment status.
+**Status:** channel integration and deterministic coordination implementation: authenticated event intake, tenant-scoped persistence, immutable evidence, versioned cases/dependencies, independent reply verification, bounded reminders/escalation, durable timer work and source result acknowledgement. WhatsApp and SES adapters, participant bindings, cross-channel correlation and delivery records are implemented. DNS, recipient consent/readiness and real communication acceptance remain release gates. AI is not implemented. Application verification is deferred; check the latest Actions run for deployment status.
 
-The demonstration uses synthetic manufacturing events. Future channel integrations will use real AWS communication services. Source applications retain responsibility for business analysis and operational changes. No current fixture sends messages or controls factory systems.
+The demonstration uses synthetic manufacturing events. Channel adapters call AWS End User Messaging Social and SES. Source applications retain responsibility for business analysis and operational changes. With consented channel bindings enabled, configured workflow events can trigger real messages. No fixture controls factory systems.
 
 ## Build
 
@@ -15,6 +15,7 @@ Use Node.js 24 and Terraform 1.15.8. Run `npm ci --ignore-scripts` and `npm run 
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
+- [Channels, identity and setup](docs/CHANNELS.md)
 - [Coordination API and limits](docs/COORDINATION.md)
 - [Integration contracts](packages/contracts/README.md)
 - [Configuration and credentials](docs/CONFIGURATION.md)

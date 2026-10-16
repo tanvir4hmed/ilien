@@ -17,6 +17,13 @@ data "aws_caller_identity" "current" {
 variable "source_principal_arn" {
   type = string
 }
+variable "mail_domain" { type = string }
+variable "whatsapp_waba_id" { type = string }
+variable "whatsapp_phone_number_id" { type = string }
+variable "whatsapp_meta_api_version" {
+  type    = string
+  default = "v23.0"
+}
 locals {
   name             = "ilien"
   account          = data.aws_caller_identity.current.account_id
@@ -25,6 +32,9 @@ locals {
   log_statement    = { Effect = "Allow", Action = ["logs:CreateLogStream", "logs:PutLogEvents"], Resource = "arn:aws:logs:us-east-1:${local.account}:log-group:/aws/lambda/ilien-*:*" }
   data_statement   = { Effect = "Allow", Action = ["rds-data:BeginTransaction", "rds-data:CommitTransaction", "rds-data:RollbackTransaction", "rds-data:ExecuteStatement"], Resource = module.data.cluster_arn }
   secret_statement = { Effect = "Allow", Action = ["secretsmanager:GetSecretValue"], Resource = module.data.app_secret_arn }
+  waba_arn         = "arn:aws:social-messaging:us-east-1:${local.account}:waba/${trimprefix(var.whatsapp_waba_id, "waba-")}"
+  phone_arn        = "arn:aws:social-messaging:us-east-1:${local.account}:phone-number-id/${trimprefix(var.whatsapp_phone_number_id, "phone-number-id-")}"
+  channel_env      = { TENANT_ID = "00000000-0000-4000-8000-000000000001", SOURCE_ID = "00000000-0000-4000-8000-000000000002", AWS_ACCOUNT_ID = local.account, WHATSAPP_WABA_ARN = local.waba_arn, WHATSAPP_PHONE_ARN = local.phone_arn, WHATSAPP_PHONE_NUMBER_ID = var.whatsapp_phone_number_id, WHATSAPP_META_API_VERSION = var.whatsapp_meta_api_version, MAIL_DOMAIN = var.mail_domain, CHANNEL_BUCKET = module.channels.bucket, WHATSAPP_TOPIC_ARN = module.channels.topics.whatsapp, EMAIL_TOPIC_ARN = module.channels.topics.email, EMAIL_EVENTS_TOPIC_ARN = module.channels.topics["email-events"] }
   base_statements  = [local.log_statement, local.data_statement, local.secret_statement]
 }
 module "data" {
@@ -47,8 +57,8 @@ module "relay" {
   boundary_arn    = local.boundary
   artifact_bucket = "ilien-terraform-${local.account}-us-east-1"
   zip_path        = "../../dist/relay.zip"
-  environment     = merge(local.common, { QUEUE_URL = module.queue.url, COORDINATION_QUEUE_URL = module.coordination_queue.url })
-  policy          = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:SendMessage"], Resource = [module.queue.arn, module.coordination_queue.arn] }]) })
+  environment     = merge(local.common, { QUEUE_URL = module.queue.url, COORDINATION_QUEUE_URL = module.coordination_queue.url, CHANNEL_QUEUE_URL = module.channels.outbound_url })
+  policy          = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:SendMessage"], Resource = [module.queue.arn, module.coordination_queue.arn, module.channels.outbound_arn] }]) })
 }
 module "api" {
   source          = "../modules/compute"
@@ -115,7 +125,7 @@ resource "aws_apigatewayv2_integration" "api" {
   payload_format_version = "2.0"
 }
 resource "aws_apigatewayv2_route" "events" {
-  for_each           = toset(["GET /v1/events", "POST /v1/events", "GET /v1/cases", "GET /v1/cases/{caseId}", "GET /v1/cases/{caseId}/{section}", "GET /v1/cases/{caseId}/evidence/{evidenceId}", "POST /v1/cases/{caseId}/commands", "POST /v1/cases/{caseId}/acknowledgements"])
+  for_each           = toset(["GET /v1/events", "POST /v1/events", "GET /v1/cases", "GET /v1/cases/{caseId}", "GET /v1/cases/{caseId}/{section}", "GET /v1/cases/{caseId}/evidence/{evidenceId}", "POST /v1/cases/{caseId}/commands", "POST /v1/cases/{caseId}/acknowledgements", "GET /v1/channels/{section}", "POST /v1/channels/{section}"])
   api_id             = aws_apigatewayv2_api.api.id
   route_key          = each.value
   authorization_type = "AWS_IAM"
@@ -148,3 +158,54 @@ output "api_url" {
 output "migrate_function" {
   value = module.migrate.name
 }
+
+module "channels" {
+  source      = "../modules/channels"
+  name        = local.name
+  mail_domain = var.mail_domain
+  waba_arn    = local.waba_arn
+}
+module "channel_send" {
+  source          = "../modules/compute"
+  name            = "ilien-channel-send"
+  boundary_arn    = local.boundary
+  artifact_bucket = "ilien-terraform-${local.account}-us-east-1"
+  zip_path        = "../../dist/channel-send.zip"
+  timeout         = 60
+  environment     = merge(local.common, local.channel_env, { CHANNEL_QUEUE_URL = module.channels.outbound_url })
+  policy = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [
+    { Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes", "sqs:SendMessage"], Resource = module.channels.outbound_arn },
+    { Effect = "Allow", Action = ["social-messaging:SendWhatsAppMessage"], Resource = local.phone_arn },
+    { Effect = "Allow", Action = ["ses:SendEmail"], Resource = ["arn:aws:ses:us-east-1:${local.account}:identity/${var.mail_domain}", "arn:aws:ses:us-east-1:${local.account}:configuration-set/ilien"] }
+  ]) })
+}
+module "channel_receive" {
+  source          = "../modules/compute"
+  name            = "ilien-channel-receive"
+  boundary_arn    = local.boundary
+  artifact_bucket = "ilien-terraform-${local.account}-us-east-1"
+  zip_path        = "../../dist/channel-receive.zip"
+  timeout         = 60
+  environment     = merge(local.common, local.channel_env, { RELAY_FUNCTION = module.relay.name })
+  policy = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [
+    { Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], Resource = module.channels.inbound_arn },
+    { Effect = "Allow", Action = ["s3:GetObject"], Resource = "${module.channels.bucket_arn}/raw/*" },
+    { Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = module.relay.arn }
+  ]) })
+}
+resource "aws_lambda_event_source_mapping" "channel_send" {
+  event_source_arn = module.channels.outbound_arn
+  function_name    = module.channel_send.arn
+  scaling_config { maximum_concurrency = 2 }
+  batch_size              = 1
+  function_response_types = ["ReportBatchItemFailures"]
+}
+resource "aws_lambda_event_source_mapping" "channel_receive" {
+  event_source_arn        = module.channels.inbound_arn
+  function_name           = module.channel_receive.arn
+  batch_size              = 1
+  function_response_types = ["ReportBatchItemFailures"]
+  scaling_config { maximum_concurrency = 2 }
+}
+output "channel_dns_records" { value = module.channels.dns_records }
+output "whatsapp_topic_arn" { value = module.channels.topics.whatsapp }

@@ -17,6 +17,11 @@ import {
   readEvidence,
 } from "../../../packages/coordination/src/service.js";
 import { CoordinationError } from "../../../packages/coordination/src/types.js";
+import {
+  saveBinding,
+  dispatchContact,
+  channelView,
+} from "../../../packages/channels/src/admin.js";
 const lambda = new LambdaClient({ maxAttempts: 2 });
 const response = (statusCode: number, body: unknown) => ({
   statusCode,
@@ -28,8 +33,8 @@ export async function handler(event: APIGatewayProxyEventV2WithIAMAuthorizer) {
   if (event.rawPath === "/health")
     return response(200, {
       service: "ilien",
-      phase: "coordination",
-      version: "0.2.0",
+      phase: "channels",
+      version: "0.3.0",
     });
   const principal = event.requestContext.authorizer?.iam?.userArn;
   if (!principal) return response(401, { error: "authentication_required" });
@@ -41,6 +46,43 @@ export async function handler(event: APIGatewayProxyEventV2WithIAMAuthorizer) {
     )[0];
     if (!source) return response(403, { error: "source_not_authorized" });
     const method = event.requestContext.http.method;
+    const channelRoute =
+      /^\/v1\/channels\/(bindings|deliveries|receipts|delivery-events|dispatch)$/.exec(
+        event.rawPath,
+      );
+    if (channelRoute) {
+      const section = channelRoute[1]!;
+      if (method === "GET" && section !== "dispatch")
+        return response(200, { items: await channelView(source, section) });
+      if (method === "POST" && ["bindings", "dispatch"].includes(section)) {
+        const raw = event.isBase64Encoded
+          ? Buffer.from(event.body ?? "", "base64").toString("utf8")
+          : (event.body ?? "");
+        if (Buffer.byteLength(raw) > 4096)
+          return response(413, { error: "channel_request_too_large" });
+        const result =
+          section === "bindings"
+            ? await saveBinding(source, raw)
+            : await dispatchContact(source, raw);
+        await lambda
+          .send(
+            new InvokeCommand({
+              FunctionName: process.env.RELAY_FUNCTION,
+              InvocationType: "Event",
+              Payload: Buffer.from(
+                JSON.stringify({ tenantId: source.tenant_id }),
+              ),
+            }),
+          )
+          .catch(() =>
+            console.error(
+              JSON.stringify({ code: "channel_relay_wake_failed" }),
+            ),
+          );
+        return response(200, result);
+      }
+      return response(404, { error: "not_found" });
+    }
     if (method === "GET" && event.rawPath === "/v1/cases")
       return response(200, { items: await listCases(source) });
     const evidenceRoute =

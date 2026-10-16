@@ -1,8 +1,39 @@
 {
-  "name": "ilien", "version": "0.1.0", "private": true,
-  "type": "module", "engines": { "node": ">=24 <25" },
-  "workspaces": ["packages/*", "apps/*"],
-  "scripts": { "build": "tsc --noEmit && node scripts/build.mjs", "publication:check": "node scripts/publication-check.mjs", "simulate": "node scripts/simulate.mjs" },
-  "dependencies": { "@aws-sdk/client-rds-data": "3.1152.0", "@aws-sdk/client-secrets-manager": "3.1152.0", "@aws-sdk/client-sqs": "3.1152.0", "@aws-sdk/client-lambda": "3.1152.0", "@aws-sdk/credential-providers": "3.1152.0", "@smithy/signature-v4": "5.7.4", "@aws-crypto/sha256-js": "5.2.0", "zod": "4.6.7" },
-  "devDependencies": { "typescript": "7.0.2", "esbuild": "0.28.2", "@types/node": "^24.0.0", "@types/aws-lambda": "^8.10.0" }
+  "name": "ilien",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "tsc --noEmit && node scripts/build.mjs",
+    "publication:check": "node scripts/publication-check.mjs",
+    "simulate": "node scripts/simulate.mjs"
+  },
+  "dependencies": {
+    "@aws-crypto/sha256-js": "5.2.0",
+    "@aws-sdk/client-lambda": "3.1152.0",
+    "@aws-sdk/client-rds-data": "3.1152.0",
+    "@aws-sdk/client-s3": "3.1152.0",
+    "@aws-sdk/client-secrets-manager": "3.1152.0",
+    "@aws-sdk/client-sesv2": "3.1152.0",
+    "@aws-sdk/client-socialmessaging": "3.1152.0",
+    "@aws-sdk/client-sqs": "3.1152.0",
+    "@aws-sdk/credential-providers": "3.1152.0",
+    "@smithy/signature-v4": "5.7.4",
+    "mailparser": "3.9.39",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.0",
+    "@types/mailparser": "3.9.0",
+    "@types/node": "^24.0.0",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2"
+  }
 }

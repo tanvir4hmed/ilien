@@ -5,8 +5,8 @@ for (let attempt = 1; attempt <= 4; attempt++) {
     FunctionName: 'ilien-migrate', Payload: Buffer.from('{}'),
   }));
   const result = JSON.parse(Buffer.from(response.Payload ?? []).toString('utf8'));
-  if (!response.FunctionError && result.schemaVersion === 2) {
-    console.log('Database schema version 2 applied.');
+  if (!response.FunctionError && result.schemaVersion === 3) {
+    console.log('Database schema version 3 applied.');
     break;
   }
   // Never print error messages, SQL, credentials, or raw Lambda payloads.

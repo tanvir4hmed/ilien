@@ -68,5 +68,25 @@ export async function handler(event: unknown) {
       ),
     );
   }
-  return { dispatched: jobs.length, timers: timers.length };
+  const deliveries = await transaction(tenantId, async (tx) =>
+    rows<{ id: string }>(
+      await query(
+        "WITH candidates AS (SELECT id FROM channel_deliveries WHERE status='pending' AND (queued_at IS NULL OR queued_at<now()-interval '5 minutes') ORDER BY created_at LIMIT 100 FOR UPDATE SKIP LOCKED) UPDATE channel_deliveries d SET queued_at=now() FROM candidates c WHERE d.id=c.id RETURNING d.id",
+        [],
+        tx,
+      ),
+    ),
+  );
+  for (const delivery of deliveries)
+    await sqs.send(
+      new SendMessageCommand({
+        QueueUrl: process.env.CHANNEL_QUEUE_URL,
+        MessageBody: JSON.stringify({ tenantId, deliveryId: delivery.id }),
+      }),
+    );
+  return {
+    dispatched: jobs.length,
+    timers: timers.length,
+    deliveries: deliveries.length,
+  };
 }

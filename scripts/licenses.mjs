@@ -9,4 +9,4 @@ for(const [path,entry] of Object.entries(lock.packages??{})){
  sections.push(`## ${meta.name} ${meta.version}\n\nDeclared license: ${meta.license??entry.license??'See upstream package'}\n`);
  for(const name of names){ sections.push(`### ${name}\n\n\x60\x60\x60text\n${readFileSync(join(path,name),'utf8')}\n\x60\x60\x60\n`); }
 }
-writeFileSync('docs/DEPENDENCY_LICENSES.md',sections.join('\n'));
+writeFileSync('docs/DEPENDENCY_LICENSES.md',sections.join('\n').replace(/[ \t]+$/gm,''));

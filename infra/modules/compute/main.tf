@@ -20,6 +20,10 @@ variable "timeout" {
   type    = number
   default = 30
 }
+variable "reserved_concurrency" {
+  type    = number
+  default = -1
+}
 resource "aws_iam_role" "runtime" {
   name                 = var.name
   permissions_boundary = var.boundary_arn
@@ -36,16 +40,17 @@ resource "aws_cloudwatch_log_group" "runtime" {
   tags              = { Project = "ilien" }
 }
 resource "aws_lambda_function" "runtime" {
-  function_name    = var.name
-  role             = aws_iam_role.runtime.arn
-  runtime          = "nodejs24.x"
-  architectures    = ["arm64"]
-  handler          = "index.handler"
-  s3_bucket        = var.artifact_bucket
-  s3_key           = "ilien/artifacts/${filesha256(var.zip_path)}.zip"
-  source_code_hash = filebase64sha256(var.zip_path)
-  timeout          = var.timeout
-  memory_size      = 256
+  function_name                  = var.name
+  role                           = aws_iam_role.runtime.arn
+  runtime                        = "nodejs24.x"
+  architectures                  = ["arm64"]
+  handler                        = "index.handler"
+  s3_bucket                      = var.artifact_bucket
+  s3_key                         = "ilien/artifacts/${filesha256(var.zip_path)}.zip"
+  source_code_hash               = filebase64sha256(var.zip_path)
+  timeout                        = var.timeout
+  memory_size                    = 256
+  reserved_concurrent_executions = var.reserved_concurrency
   environment { variables = var.environment }
   depends_on = [aws_iam_role_policy.runtime, aws_cloudwatch_log_group.runtime]
   tags       = { Project = "ilien" }

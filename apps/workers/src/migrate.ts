@@ -12,6 +12,7 @@ import {
 } from "../../../packages/persistence/src/database.js";
 import migration from "../../../packages/persistence/migrations/001_foundation.sql";
 import coordinationMigration from "../../../packages/persistence/migrations/002_coordination.sql";
+import channelMigration from "../../../packages/persistence/migrations/003_channels.sql";
 import { textilePolicy } from "../../../packages/domain-packs/src/textile.js";
 const secrets = new SecretsManagerClient({ maxAttempts: 3 });
 export async function handler() {
@@ -69,10 +70,13 @@ export async function handler() {
         tx,
       ),
     )[0]?.version;
-    if (version !== 1 && version !== 2)
+    if (version !== 1 && version !== 2 && version !== 3)
       throw new Error("Unsupported database migration version");
     if (version === 1)
       for (const statement of coordinationMigration.split("-- statement"))
+        await query(statement.trim(), [], tx);
+    if (version! < 3)
+      for (const statement of channelMigration.split("-- statement"))
         await query(statement.trim(), [], tx);
     await query(
       "INSERT INTO tenants(id,name) VALUES(CAST(:tenant AS uuid),'Synthetic textile workspace') ON CONFLICT(id) DO NOTHING",
@@ -99,5 +103,5 @@ export async function handler() {
       tx,
     );
   });
-  return { schemaVersion: 2 };
+  return { schemaVersion: 3 };
 }

@@ -3,8 +3,8 @@ import { SignatureV4 } from "@smithy/signature-v4";
 import { fromNodeProviderChain } from "@aws-sdk/credential-providers";
 import { Sha256 } from "@aws-crypto/sha256-js";
 const [method = "GET", path = "/v1/cases", file] = process.argv.slice(2);
-if (!["GET", "POST"].includes(method) || !/^\/v1\/cases(?:\/|$)/.test(path))
-  throw new Error("Use GET/POST /v1/cases routes");
+if (!["GET", "POST"].includes(method) || !/^\/v1\/(?:cases|channels)(?:\/|$)/.test(path))
+  throw new Error("Use GET/POST /v1/cases or /v1/channels routes");
 const base = new URL(process.env.ILIEN_API_URL);
 const url = new URL(path, base);
 if (

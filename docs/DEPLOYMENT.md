@@ -11,7 +11,7 @@
 
 This confirms infrastructure delivery and migration, not application correctness. No event-flow test, simulated participant command, live channel message or AI inference was run. See [coordination API](COORDINATION.md) for implementation scope and known limits. Phase 1 remains historical evidence below; its schema version is superseded.
 
-Latest code commit: `080c50f`. Its [delivery run](https://github.com/tanvir4hmed/ilien/actions/runs/38846201545) also completed successfully, including migration and health gates.
+Phase 2 code commit: `080c50f`. Its [delivery run](https://github.com/tanvir4hmed/ilien/actions/runs/38846201545) also completed successfully, including migration and health gates.
 
 ## Phase 1 historical deployment
 
