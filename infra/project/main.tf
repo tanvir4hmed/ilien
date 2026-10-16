@@ -190,6 +190,7 @@ module "channel_receive" {
   policy = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [
     { Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], Resource = module.channels.inbound_arn },
     { Effect = "Allow", Action = ["s3:GetObject"], Resource = "${module.channels.bucket_arn}/raw/*" },
+    { Effect = "Allow", Action = ["s3:PutObject"], Resource = "${module.channels.bucket_arn}/notifications/*", Condition = { StringEquals = { "s3:if-none-match" = "*" } } },
     { Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = module.relay.arn }
   ]) })
 }

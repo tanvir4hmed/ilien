@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import { simpleParser } from "mailparser";
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  GetObjectCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
 import { z } from "zod";
 const s3 = new S3Client({ maxAttempts: 3 });
 const str = z.string().max(2048);
@@ -242,4 +246,41 @@ export async function normalize(
     ];
   }
   throw new Error("UntrustedTopic");
+}
+
+export async function boundedEvidence(item: Incoming): Promise<Incoming> {
+  if (Buffer.byteLength(item.raw) > 30000) {
+    const digest = hash(item.raw),
+      key = `notifications/${digest}.json`;
+    try {
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: process.env.CHANNEL_BUCKET!,
+          Key: key,
+          Body: item.raw,
+          ContentType: "application/json",
+          IfNoneMatch: "*",
+        }),
+      );
+    } catch (error) {
+      if (
+        (error as { $metadata?: { httpStatusCode?: number } })?.$metadata
+          ?.httpStatusCode !== 412
+      )
+        throw error;
+    }
+    item.raw = JSON.stringify({
+      storage: "s3",
+      bucket: process.env.CHANNEL_BUCKET,
+      key,
+      sha256: digest,
+      representation: "original_provider_notification",
+    });
+  }
+  if (Buffer.byteLength(JSON.stringify({ ...item, raw: undefined })) > 30000) {
+    item.text = "";
+    item.media = [];
+    item.blockedReason = "normalized_view_limit_original_retained";
+  }
+  return item;
 }

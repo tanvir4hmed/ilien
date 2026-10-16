@@ -32,10 +32,7 @@ export async function receive(
       tx,
     );
     const evidence = randomUUID();
-    const raw = JSON.stringify({
-      notification: item.raw,
-      ...(item.object ? { object: item.object } : {}),
-    });
+    const raw = item.raw;
     if (item.eventType) {
       const key = hash(
         `${item.channel}/${item.providerId}/${item.eventType}/${item.timestamp}`,

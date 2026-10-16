@@ -1,7 +1,10 @@
 import type { SQSEvent, SQSBatchResponse } from "aws-lambda";
 import { z } from "zod";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
-import { normalize } from "../../../packages/channels/src/normalize.js";
+import {
+  normalize,
+  boundedEvidence,
+} from "../../../packages/channels/src/normalize.js";
 import { receive } from "../../../packages/channels/src/inbound.js";
 const lambda = new LambdaClient({ maxAttempts: 2 });
 export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
@@ -17,7 +20,11 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
         .parse(JSON.parse(record.body));
       const items = await normalize(sns.TopicArn, sns.Message);
       for (const item of items)
-        await receive(process.env.TENANT_ID!, process.env.SOURCE_ID!, item);
+        await receive(
+          process.env.TENANT_ID!,
+          process.env.SOURCE_ID!,
+          await boundedEvidence(item),
+        );
       if (items.length)
         await lambda.send(
           new InvokeCommand({
