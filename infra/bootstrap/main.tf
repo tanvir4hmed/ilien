@@ -77,6 +77,7 @@ resource "aws_iam_role_policy" "deploy" {
     { Effect = "Allow", Action = ["ec2:CreateSubnet", "ec2:CreateSecurityGroup"], Resource = "arn:aws:ec2:us-east-1:${local.account}:vpc/*", Condition = { StringEquals = { "aws:ResourceTag/Project" = "ilien" } } },
     { Effect = "Allow", Action = ["ec2:CreateVpc", "ec2:CreateSubnet", "ec2:CreateSecurityGroup"], Resource = "*", Condition = { StringEquals = { "aws:RequestTag/Project" = "ilien" } } },
     { Effect = "Allow", Action = ["ec2:CreateTags"], Resource = "arn:aws:ec2:us-east-1:${local.account}:*/*", Condition = { StringEquals = { "aws:RequestTag/Project" = "ilien" } } },
+    { Effect = "Allow", Action = ["ec2:CreateTags"], Resource = "arn:aws:ec2:us-east-1:${local.account}:*/*", Condition = { StringEquals = { "aws:ResourceTag/Project" = "ilien" } } },
     { Effect = "Allow", Action = ["ec2:ModifyVpcAttribute", "ec2:DeleteVpc", "ec2:DeleteSubnet", "ec2:DeleteSecurityGroup", "ec2:RevokeSecurityGroupEgress", "ec2:AuthorizeSecurityGroupEgress"], Resource = "*", Condition = { StringEquals = { "aws:ResourceTag/Project" = "ilien" } } },
     { Effect = "Allow", Action = ["apigateway:GET", "apigateway:POST", "apigateway:PUT", "apigateway:PATCH", "apigateway:DELETE"], Resource = ["arn:aws:apigateway:us-east-1::/apis*", "arn:aws:apigateway:us-east-1::/tags/*"] }
   ] })
