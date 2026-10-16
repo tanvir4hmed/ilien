@@ -28,7 +28,7 @@ export async function handler(event: APIGatewayProxyEventV2WithIAMAuthorizer) {
     const hash = createHash("sha256").update(raw).digest("hex");
     const accepted = await transaction(source.tenant_id, async tx => {
       // Serialize equal source/event keys, including concurrent first arrivals.
-      await query("SELECT pg_advisory_xact_lock(hashtextextended(:key,0))", [param("key", `${source.tenant_id}/${source.id}/${envelope.eventId}`)], tx);
+      await query("SELECT pg_advisory_xact_lock(hashtextextended(:key,0))::text", [param("key", `${source.tenant_id}/${source.id}/${envelope.eventId}`)], tx);
       const existing = rows<{ id: string; content_hash: string }>(await query("SELECT id,content_hash FROM inbox_events WHERE connection_id=CAST(:connection AS uuid) AND external_id=:external", [param("connection", source.id),param("external",envelope.eventId)],tx))[0];
       if (existing) return { id: existing.id, duplicate: true, conflict: existing.content_hash !== hash };
       const id = randomUUID(), evidence = randomUUID();

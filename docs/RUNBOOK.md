@@ -52,3 +52,5 @@ AWS messaging requires configured identities and authorized recipients. Receivin
 
 The release must distinguish synthetic events/operational actions from actual communication delivery and disclose measured limits. Runtime claims and commands will be added only when the relevant components are available.
 
+
+Lambda delivery uploads only the four explicit ZIP bundles to the encrypted, private Terraform bucket under the separate demo/artifacts/ prefix. Keys are SHA-256 content addresses; Terraform references these objects when deploying Lambda. State remains under its own key. Artifact retention currently requires deliberate operator cleanup; do not remove packages referenced by an active or rollback release.

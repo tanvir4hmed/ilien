@@ -37,37 +37,41 @@ module "queue" {
   name   = local.name
 }
 module "relay" {
-  source       = "../../modules/compute"
-  name         = "${local.name}-relay"
-  boundary_arn = local.boundary
-  zip_path     = "../../../dist/relay.zip"
-  environment  = merge(local.common, { QUEUE_URL = module.queue.url })
-  policy       = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:SendMessage"], Resource = module.queue.arn }]) })
+  source          = "../../modules/compute"
+  name            = "${local.name}-relay"
+  boundary_arn    = local.boundary
+  artifact_bucket = "ilien-terraform-${local.account}-us-east-1"
+  zip_path        = "../../../dist/relay.zip"
+  environment     = merge(local.common, { QUEUE_URL = module.queue.url })
+  policy          = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:SendMessage"], Resource = module.queue.arn }]) })
 }
 module "api" {
-  source       = "../../modules/compute"
-  name         = "${local.name}-api"
-  boundary_arn = local.boundary
-  zip_path     = "../../../dist/api.zip"
-  environment  = merge(local.common, { RELAY_FUNCTION = module.relay.name })
-  policy       = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = module.relay.arn }]) })
+  source          = "../../modules/compute"
+  name            = "${local.name}-api"
+  boundary_arn    = local.boundary
+  artifact_bucket = "ilien-terraform-${local.account}-us-east-1"
+  zip_path        = "../../../dist/api.zip"
+  environment     = merge(local.common, { RELAY_FUNCTION = module.relay.name })
+  policy          = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = module.relay.arn }]) })
 }
 module "intake" {
-  source       = "../../modules/compute"
-  name         = "${local.name}-intake"
-  boundary_arn = local.boundary
-  zip_path     = "../../../dist/intake.zip"
-  environment  = local.common
-  policy       = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], Resource = module.queue.arn }]) })
+  source          = "../../modules/compute"
+  name            = "${local.name}-intake"
+  boundary_arn    = local.boundary
+  artifact_bucket = "ilien-terraform-${local.account}-us-east-1"
+  zip_path        = "../../../dist/intake.zip"
+  environment     = local.common
+  policy          = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], Resource = module.queue.arn }]) })
 }
 module "migrate" {
-  source       = "../../modules/compute"
-  name         = "${local.name}-migrate"
-  boundary_arn = local.boundary
-  zip_path     = "../../../dist/migrate.zip"
-  timeout      = 120
-  environment  = { DB_CLUSTER_ARN = module.data.cluster_arn, DB_SECRET_ARN = module.data.master_secret_arn, APP_SECRET_ARN = module.data.app_secret_arn, DEMO_TENANT_ID = "00000000-0000-4000-8000-000000000001", DEMO_SOURCE_ID = "00000000-0000-4000-8000-000000000002", DEMO_PRINCIPAL_ARN = var.demo_principal_arn }
-  policy       = jsonencode({ Version = "2012-10-17", Statement = [local.log_statement, local.data_statement, { Effect = "Allow", Action = ["secretsmanager:GetSecretValue"], Resource = [module.data.master_secret_arn, module.data.app_secret_arn] }, { Effect = "Allow", Action = ["secretsmanager:PutSecretValue"], Resource = module.data.app_secret_arn }] })
+  source          = "../../modules/compute"
+  name            = "${local.name}-migrate"
+  boundary_arn    = local.boundary
+  artifact_bucket = "ilien-terraform-${local.account}-us-east-1"
+  zip_path        = "../../../dist/migrate.zip"
+  timeout         = 120
+  environment     = { DB_CLUSTER_ARN = module.data.cluster_arn, DB_SECRET_ARN = module.data.master_secret_arn, APP_SECRET_ARN = module.data.app_secret_arn, DEMO_TENANT_ID = "00000000-0000-4000-8000-000000000001", DEMO_SOURCE_ID = "00000000-0000-4000-8000-000000000002", DEMO_PRINCIPAL_ARN = var.demo_principal_arn }
+  policy          = jsonencode({ Version = "2012-10-17", Statement = [local.log_statement, local.data_statement, { Effect = "Allow", Action = ["secretsmanager:GetSecretValue"], Resource = [module.data.master_secret_arn, module.data.app_secret_arn] }, { Effect = "Allow", Action = ["secretsmanager:PutSecretValue"], Resource = module.data.app_secret_arn }] })
 }
 resource "aws_lambda_event_source_mapping" "intake" {
   event_source_arn        = module.queue.arn

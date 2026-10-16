@@ -14,7 +14,7 @@ export async function handler() {
   }
   if (credentials.username !== "ilien_app" || !/^[a-f0-9]{72}$/.test(credentials.password)) throw new Error("Unexpected application credential format");
   await transaction(null, async tx => {
-    await query("SELECT pg_advisory_xact_lock(117001)",[],tx);
+    await query("SELECT pg_advisory_xact_lock(117001)::text",[],tx);
     const role = rows(await query("SELECT 1 FROM pg_roles WHERE rolname='ilien_app'",[],tx));
     if (!role.length) await query(`CREATE ROLE ilien_app LOGIN PASSWORD '${credentials.password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS`,[],tx);
     const exists = rows<{name:string|null}>(await query("SELECT to_regclass('public.schema_migrations')::text AS name",[],tx))[0]?.name;

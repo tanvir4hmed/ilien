@@ -7,6 +7,9 @@ variable "boundary_arn" {
 variable "zip_path" {
   type = string
 }
+variable "artifact_bucket" {
+  type = string
+}
 variable "environment" {
   type = map(string)
 }
@@ -38,7 +41,8 @@ resource "aws_lambda_function" "runtime" {
   runtime          = "nodejs24.x"
   architectures    = ["arm64"]
   handler          = "index.handler"
-  filename         = var.zip_path
+  s3_bucket        = var.artifact_bucket
+  s3_key           = "demo/artifacts/${filesha256(var.zip_path)}.zip"
   source_code_hash = filebase64sha256(var.zip_path)
   timeout          = var.timeout
   memory_size      = 256

@@ -59,6 +59,14 @@ jobs:
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
+      - name: Upload content-addressed Lambda packages
+        env:
+          ARTIFACT_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+        run: |
+          for name in api relay intake migrate; do
+            HASH=$(sha256sum "dist/$name.zip" | cut -d " " -f 1)
+            aws s3 cp "dist/$name.zip" "s3://$ARTIFACT_BUCKET/demo/artifacts/$HASH.zip" --sse AES256 --only-show-errors
+          done
       - name: Initialize deployment state
         working-directory: infra/environments/demo
         env:
