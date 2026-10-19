@@ -1,5 +1,16 @@
 # Deployment record
 
+## Phase 3 deployment — 16 October 2026
+
+Deployed code: `81864f7`. [Successful channel delivery](https://github.com/tanvir4hmed/ilien/actions/runs/38878076274), with its job results rechecked on 19 October 2026.
+
+- Build, publication guard and Terraform delivery completed.
+- The final apply changed 9 resources and destroyed none. Database schema version 3 applied; WhatsApp event destination was configured without sending a message; process health returned `channels`, version `0.3.0`.
+- WhatsApp and SES adapters, separate inbound/outbound queues, immutable receipt evidence, consented identity bindings and revision-aware reply correlation are deployed.
+- The initial deployment encountered an SNS subscription-read IAM error. The topic-scoped permission was corrected before this successful delivery.
+
+This is delivery evidence, not end-to-end application acceptance. No live participant message, channel-switching exercise or AI inference was performed. DNS installation and SES verification, sandbox recipient readiness, participant consent/bindings and live channel acceptance remain outstanding. WhatsApp initiation outside an active service window requires the still-pending approved-template capability. Natural-language replies are preserved for review; bounded AI interpretation belongs to the next phase. See [channel setup and limits](CHANNELS.md).
+
 ## Phase 2 deployment — 16 October 2026
 
 [Successful coordination deployment](https://github.com/tanvir4hmed/ilien/actions/runs/38845959603), commit `83a1331`:
