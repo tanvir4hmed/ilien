@@ -17,18 +17,20 @@ import {
   type Binding,
   type Delivery,
 } from "./intents.js";
+import { configurationFor } from "../../product/src/configuration.js";
+import { approvedTemplate } from "./templates.js";
 const social = new SocialMessagingClient({ maxAttempts: 1 });
 const email = new SESv2Client({ maxAttempts: 1 });
 
 function render(d: Delivery) {
   const r = d.request;
-  return `ILIEN ${d.token}\nRequest: ${r.contact.question}\nSubject: ${r.subject.type} / ${r.subject.id} / revision ${r.subject.revision}\nObligation: ${d.obligation_id} / revision ${d.obligation_revision}\nDeadline: ${r.deadline}\n${r.claim ? `Reported claim (unverified): ${JSON.stringify(r.claim)}\n` : ""}Source context is synthetic. Reply with ILIEN ${d.token} followed by a JSON reply, verify, or add_child operation. Free text is retained for review. STOP withdraws this channel's consent. This request authorizes no operational action.`;
+  return `ILIEN ${d.token}\nRequest: ${r.contact.question}\nSubject: ${r.subject.type} / ${r.subject.id} / revision ${r.subject.revision}\nObligation: ${d.obligation_id} / revision ${d.obligation_revision}\nDeadline: ${r.deadline}\n${r.proposal ? `Decision proposal (requires explicit response; no action authorized): ${JSON.stringify(r.proposal)}\n` : ""}${r.claim ? `Reported claim (unverified): ${JSON.stringify(r.claim)}\n` : ""}Source context is synthetic. Reply with ILIEN ${d.token} followed by a JSON reply, verify, or add_child operation. Free text is retained for review. STOP withdraws this channel's consent. This request authorizes no operational action.`;
 }
 export async function sendDelivery(tenant: string, id: string) {
   const prepared = await transaction(tenant, async (tx) => {
     const candidate = rows<Delivery>(
       await query(
-        "SELECT * FROM channel_deliveries WHERE id=CAST(:id AS uuid) AND attempt_at<now()-interval '2 minutes'",
+        "SELECT * FROM channel_deliveries WHERE id=CAST(:id AS uuid)",
         [param("id", id)],
         tx,
       ),
@@ -73,6 +75,7 @@ export async function sendDelivery(tenant: string, id: string) {
       ),
     )[0];
     let reason: string | undefined;
+    let template: Awaited<ReturnType<typeof approvedTemplate>> = null;
     if (
       !binding?.enabled ||
       binding.address !== d.address ||
@@ -80,14 +83,28 @@ export async function sendDelivery(tenant: string, id: string) {
       !decode(p.policy).actors.some((a) => a.enabled && a.id === d.actor_id)
     )
       reason = "identity_or_consent_unavailable";
-    else if (!c || !contactCurrent(decode(c.snapshot), d))
+    else if (
+      !c ||
+      decode(c.snapshot).configurationVersion !== decode(p.policy).version ||
+      !contactCurrent(decode(c.snapshot), d)
+    )
       reason = "stale_contact";
     else if (
       d.channel === "whatsapp" &&
       (!binding.last_inbound_at ||
         Date.parse(binding.last_inbound_at) < Date.now() - 23.9 * 3600000)
-    )
-      reason = "whatsapp_session_required";
+    ) {
+      try {
+        template = await approvedTemplate(
+          d,
+          (await configurationFor(d.connection_id, tx)).configuration,
+        );
+      } catch {
+        reason = "template_verification_unavailable";
+      }
+      if (!template && !reason)
+        reason = "whatsapp_session_or_approved_template_required";
+    }
     await query(
       "SELECT pg_advisory_xact_lock(hashtextextended(:key,0))::text",
       [param("key", `${tenant}/channel-send-budget`)],
@@ -107,7 +124,7 @@ export async function sendDelivery(tenant: string, id: string) {
     )
       return { retryAfter: 2 as const };
     if (usage.count >= 100) reason = "daily_contact_budget";
-    const body = render(d);
+    const body = template?.body ?? render(d);
     if (Buffer.byteLength(body) > 4000) reason = "message_size_limit";
     if (reason) {
       await query(
@@ -118,19 +135,20 @@ export async function sendDelivery(tenant: string, id: string) {
       return null;
     }
     await query(
-      "UPDATE channel_deliveries SET status='sending',attempt_at=now(),rendered_text=:body,rendered_sha256=:hash WHERE id=CAST(:id AS uuid)",
+      "UPDATE channel_deliveries SET status='sending',attempt_at=now(),rendered_text=:body,rendered_sha256=:hash,template_snapshot=CAST(:template AS jsonb) WHERE id=CAST(:id AS uuid)",
       [
         param("id", id),
         param("body", body),
+        param("template", JSON.stringify(template)),
         param("hash", createHash("sha256").update(body).digest("hex")),
       ],
       tx,
     );
-    return { d, body };
+    return { d, body, template };
   });
   if (!prepared) return;
   if ("retryAfter" in prepared) return prepared.retryAfter;
-  const { d, body } = prepared;
+  const { d, body, template } = prepared;
   let providerId: string | undefined;
   try {
     if (d.channel === "whatsapp") {
@@ -143,8 +161,16 @@ export async function sendDelivery(tenant: string, id: string) {
               messaging_product: "whatsapp",
               recipient_type: "individual",
               to: d.address,
-              type: "text",
-              text: { preview_url: false, body },
+              ...(template
+                ? {
+                    type: "template",
+                    template: {
+                      name: template.name,
+                      language: template.language,
+                      components: template.components,
+                    },
+                  }
+                : { type: "text", text: { preview_url: false, body } }),
             }),
           ),
         }),

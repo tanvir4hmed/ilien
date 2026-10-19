@@ -1,0 +1,24 @@
+{
+  "contractVersion": "1.0",
+  "eventId": "sample-maintenance-001",
+  "eventType": "maintenance.breakdown_logged",
+  "payloadVersion": "1.0",
+  "occurredAt": "2026-10-19T09:00:00+06:00",
+  "correlationId": "sample-machine-001",
+  "subject": {
+    "type": "machine",
+    "id": "sample-machine-001",
+    "revision": "1"
+  },
+  "payload": {
+    "siteId": "sample-site-001",
+    "machineId": "sample-machine-001",
+    "faultCode": "synthetic-stop",
+    "requestedInformation": [
+      "inspection",
+      "parts_availability",
+      "delivery_impact"
+    ],
+    "simulationNotice": "Synthetic maintenance communication request; no machine action authorized."
+  }
+}

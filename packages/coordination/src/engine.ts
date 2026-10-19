@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   CoordinationError,
   type Actor,
@@ -47,6 +48,7 @@ function invalidate(
   const o = node(state, id);
   o.status = "waiting";
   delete o.reply;
+  delete o.decision;
   delete o.verification;
   delete o.verificationRequested;
   o.revision++;
@@ -272,7 +274,23 @@ export function transition(
   now: string,
 ) {
   const state = structuredClone(input);
-  if (state.configurationVersion !== policy.version)
+  if (
+    operation.type === "tick" &&
+    ["completed", "cancelled", "handed_off"].includes(state.status)
+  )
+    return { state, contacts: [] as Contact[] };
+  if (
+    operation.type === "tick" &&
+    state.configurationVersion !== policy.version
+  ) {
+    state.status = "paused";
+    state.revision++;
+    return { state, contacts: [] as Contact[], result: outcome(state, false) };
+  }
+  if (
+    state.configurationVersion !== policy.version &&
+    !["adopt_configuration", "cancel", "handoff"].includes(operation.type)
+  )
     fail("configuration_changed_review_required");
   if (state.revision >= 500 && operation.type === "tick") {
     state.revision++;
@@ -305,13 +323,105 @@ export function transition(
       fail("terminal_case");
     if (
       Date.parse(state.deadline) <= Date.parse(now) &&
-      !["cancel", "handoff", "report"].includes(op.type)
+      !["cancel", "handoff", "report", "adopt_configuration"].includes(op.type)
     )
       fail("case_deadline_elapsed");
     switch (op.type) {
+      case "adopt_configuration": {
+        coordinator(actor!);
+        if (op.version !== policy.version)
+          fail("configuration_version_mismatch");
+        for (const o of state.obligations) {
+          if (!policy.groups.includes(o.group))
+            fail("existing_group_outside_scope");
+          const assigned =
+            policy.actors.find(
+              (a) =>
+                a.enabled &&
+                a.group === o.group &&
+                a.role === "respondent" &&
+                a.id === o.assignee,
+            ) ??
+            policy.actors.find(
+              (a) =>
+                a.enabled && a.group === o.group && a.role === "respondent",
+            );
+          if (
+            !assigned ||
+            !policy.actors.some(
+              (a) => a.enabled && a.group === o.group && a.role === "verifier",
+            )
+          )
+            fail("existing_authority_unavailable");
+          o.assignee = assigned!.id;
+        }
+        graphGuard(state, policy);
+        const seen = new Set<string>();
+        for (const o of state.obligations) invalidate(state, o.id, now, seen);
+        state.configurationVersion = policy.version;
+        break;
+      }
+      case "amend_subject": {
+        coordinator(actor!);
+        if (op.subjectRevision === state.subject.revision)
+          fail("new_subject_revision_required");
+        state.subject.revision = op.subjectRevision;
+        state.goal = op.goal;
+        state.missionRevision = (state.missionRevision ?? 1) + 1;
+        state.amendmentEvidenceIds = [
+          ...(state.amendmentEvidenceIds ?? []),
+          evidenceId,
+        ];
+        const seen = new Set<string>();
+        for (const o of state.obligations) invalidate(state, o.id, now, seen);
+        break;
+      }
+      case "attach_proposal": {
+        coordinator(actor!);
+        const o = node(state, op.obligationId);
+        if (o.kind !== "decision") fail("decision_obligation_required");
+        if (
+          o.proposal &&
+          (o.proposal.id !== op.proposalId ||
+            op.proposalRevision <= o.proposal.revision)
+        )
+          fail("new_proposal_revision_required");
+        invalidate(state, o.id, now);
+        const subjectRevision = state.subject.revision;
+        const sha256 = createHash("sha256")
+          .update(
+            JSON.stringify({
+              id: op.proposalId,
+              revision: op.proposalRevision,
+              statement: op.statement,
+              subjectRevision,
+            }),
+          )
+          .digest("hex");
+        o.proposal = {
+          id: op.proposalId,
+          revision: op.proposalRevision,
+          statement: op.statement,
+          subjectRevision,
+          sha256,
+          evidenceId,
+        };
+        break;
+      }
+      case "decide":
       case "reply": {
         const o = node(state, op.obligationId);
         canRespond(actor!, o);
+        if (op.type === "reply" && o.kind === "decision")
+          fail("bound_decision_required");
+        if (
+          op.type === "decide" &&
+          (o.kind !== "decision" ||
+            !o.proposal ||
+            o.proposal.sha256 !== op.proposalHash ||
+            o.proposal.subjectRevision !== state.subject.revision)
+        )
+          fail("current_proposal_required");
         if (o.revision !== op.expectedObligationRevision)
           fail("stale_obligation");
         if (op.subjectRevision !== state.subject.revision)
@@ -331,11 +441,20 @@ export function transition(
           revision: o.revision,
           evidenceId,
           actorId: actor!.id,
-          statement: op.statement,
+          statement:
+            op.type === "decide" ? `${op.choice}: ${op.reason}` : op.statement,
           observedAt: op.observedAt,
           validUntil: op.validUntil,
           subjectRevision: op.subjectRevision,
         };
+        if (op.type === "decide")
+          o.decision = {
+            proposalHash: op.proposalHash,
+            choice: op.choice,
+            reason: op.reason,
+            actorId: actor!.id,
+            evidenceId,
+          };
         delete o.verification;
         delete o.verificationRequested;
         o.status = "answered";
@@ -460,6 +579,7 @@ export function nextWake(
   policy: Policy,
   now: string,
 ): string | null {
+  if (state.configurationVersion !== policy.version) return null;
   if (
     ["completed", "cancelled", "handed_off"].includes(state.status) ||
     Date.parse(state.deadline) <= Date.parse(now)

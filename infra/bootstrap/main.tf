@@ -47,6 +47,7 @@ resource "aws_s3_bucket_policy" "state" {
 resource "aws_iam_policy" "runtime_boundary" {
   name = "ilien-runtime-boundary"
   policy = jsonencode({ Version = "2012-10-17", Statement = [
+    { Effect = "Allow", Action = ["sns:Publish"], Resource = "arn:aws:sns:us-east-1:${local.account}:ilien-source-results" },
     { Effect = "Allow", Action = ["bedrock:InvokeModel"], Resource = "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0" },
     { Effect = "Allow", Action = ["logs:CreateLogStream", "logs:PutLogEvents"], Resource = "arn:aws:logs:us-east-1:${local.account}:log-group:/aws/lambda/ilien-*" },
     { Effect = "Allow", Action = ["rds-data:*"], Resource = "arn:aws:rds:us-east-1:${local.account}:cluster:ilien" },
@@ -55,6 +56,7 @@ resource "aws_iam_policy" "runtime_boundary" {
     { Effect = "Allow", Action = ["s3:GetObject"], Resource = "arn:aws:s3:::ilien-channel-evidence-${local.account}-us-east-1/raw/*" },
     { Effect = "Allow", Action = ["s3:PutObject"], Resource = "arn:aws:s3:::ilien-channel-evidence-${local.account}-us-east-1/notifications/*", Condition = { StringEquals = { "s3:if-none-match" = "*" } } },
     { Effect = "Allow", Action = ["ses:SendEmail"], Resource = ["arn:aws:ses:us-east-1:${local.account}:identity/${var.mail_domain}", "arn:aws:ses:us-east-1:${local.account}:configuration-set/ilien"] },
+    { Effect = "Allow", Action = ["social-messaging:GetWhatsAppMessageTemplate"], Resource = "arn:aws:social-messaging:us-east-1:${local.account}:waba/${trimprefix(var.whatsapp_waba_id, "waba-")}" },
     { Effect = "Allow", Action = ["social-messaging:SendWhatsAppMessage"], Resource = "arn:aws:social-messaging:us-east-1:${local.account}:phone-number-id/${trimprefix(var.whatsapp_phone_number_id, "phone-number-id-")}" },
     { Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = "arn:aws:lambda:us-east-1:${local.account}:function:ilien-relay" }
   ] })

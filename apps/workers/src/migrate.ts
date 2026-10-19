@@ -15,8 +15,15 @@ import coordinationMigration from "../../../packages/persistence/migrations/002_
 import channelMigration from "../../../packages/persistence/migrations/003_channels.sql";
 import aiMigration from "../../../packages/persistence/migrations/004_ai.sql";
 import { textilePolicy } from "../../../packages/domain-packs/src/textile.js";
+import productMigration from "../../../packages/persistence/migrations/005_product.sql";
+import { z } from "zod";
 const secrets = new SecretsManagerClient({ maxAttempts: 3 });
-export async function handler() {
+export async function handler(event: unknown = {}) {
+  const input = z
+    .strictObject({
+      operator: z.strictObject({ subject: z.uuid() }).optional(),
+    })
+    .parse(event);
   const secretId = process.env.APP_SECRET_ARN!;
   let credentials: { username: string; password: string };
   try {
@@ -71,7 +78,13 @@ export async function handler() {
         tx,
       ),
     )[0]?.version;
-    if (version !== 1 && version !== 2 && version !== 3 && version !== 4)
+    if (
+      version !== 1 &&
+      version !== 2 &&
+      version !== 3 &&
+      version !== 4 &&
+      version !== 5
+    )
       throw new Error("Unsupported database migration version");
     if (version === 1)
       for (const statement of coordinationMigration.split("-- statement"))
@@ -81,6 +94,9 @@ export async function handler() {
         await query(statement.trim(), [], tx);
     if (version! < 4)
       for (const statement of aiMigration.split("-- statement"))
+        await query(statement.trim(), [], tx);
+    if (version! < 5)
+      for (const statement of productMigration.split("-- statement"))
         await query(statement.trim(), [], tx);
     await query(
       "INSERT INTO tenants(id,name) VALUES(CAST(:tenant AS uuid),'Synthetic textile workspace') ON CONFLICT(id) DO NOTHING",
@@ -114,6 +130,36 @@ export async function handler() {
       ],
       tx,
     );
+    await query(
+      "INSERT INTO product_settings(tenant_id,connection_id) VALUES(CAST(:tenant AS uuid),CAST(:source AS uuid)) ON CONFLICT DO NOTHING",
+      [
+        param("tenant", process.env.TENANT_ID!),
+        param("source", process.env.SOURCE_ID!),
+      ],
+      tx,
+    );
+    if (input.operator) {
+      const existing = rows(
+        await query(
+          "SELECT subject FROM operator_memberships WHERE tenant_id=CAST(:tenant AS uuid)",
+          [param("tenant", process.env.TENANT_ID!)],
+          tx,
+        ),
+      );
+      if (existing.length)
+        throw new Error(
+          "Initial operator already provisioned; use membership administration",
+        );
+      await query(
+        "INSERT INTO operator_memberships(tenant_id,connection_id,subject,role) VALUES(CAST(:tenant AS uuid),CAST(:source AS uuid),CAST(:subject AS uuid),'admin')",
+        [
+          param("tenant", process.env.TENANT_ID!),
+          param("source", process.env.SOURCE_ID!),
+          param("subject", input.operator.subject),
+        ],
+        tx,
+      );
+    }
   });
-  return { schemaVersion: 4 };
+  return { schemaVersion: 5 };
 }

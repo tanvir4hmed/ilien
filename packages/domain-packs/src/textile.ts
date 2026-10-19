@@ -1,5 +1,6 @@
 import type { Policy, CaseState } from "../../coordination/src/types.js";
 import type { SourceEvent } from "../../contracts/src/index.js";
+import type { ProductConfiguration } from "../../product/src/configuration.js";
 import { z } from "zod";
 export const textilePolicy: Policy = {
   version: "textile-v1",
@@ -73,9 +74,7 @@ const materialPayload = z.object({
     )
     .min(1),
 });
-export function template(
-  event: SourceEvent,
-): {
+export function template(event: SourceEvent): {
   workflow: string;
   goal: string;
   branches: { group: string; kind: string; question: string }[];
@@ -141,9 +140,35 @@ export function seedCase(
   input: Pick<CaseState, "id" | "inboxId" | "sourceId" | "sourceEvidenceId">,
   policy: Policy,
   now: string,
+  configuration?: ProductConfiguration,
 ): CaseState | null {
-  const definition = template(event);
+  const configured = configuration?.workflows.find(
+    (w) => w.eventType === event.eventType,
+  );
+  if (
+    configured &&
+    (!event.subject.revision ||
+      event.payloadVersion !== "1.0" ||
+      configured.requiredPayloadKeys.some(
+        (k) => event.payload[k] === undefined || event.payload[k] === null,
+      ))
+  )
+    return null;
+  const definition = configured ?? template(event);
   if (!definition) return null;
+  if (
+    definition.branches.some(
+      (b) =>
+        !policy.groups.includes(b.group) ||
+        !policy.actors.some(
+          (a) => a.enabled && a.group === b.group && a.role === "respondent",
+        ) ||
+        !policy.actors.some(
+          (a) => a.enabled && a.group === b.group && a.role === "verifier",
+        ),
+    )
+  )
+    return null;
   return {
     ...input,
     revision: 1,
@@ -163,7 +188,9 @@ export function seedCase(
       id: `root_${i + 1}`,
       required: true,
       dependencies: [],
-      assignee: `${branch.group}_owner`,
+      assignee: policy.actors.find(
+        (a) => a.enabled && a.group === branch.group && a.role === "respondent",
+      )!.id,
       revision: 1,
       status: "waiting",
       reminders: 0,

@@ -194,10 +194,10 @@ export async function receive(
               .split(/\r?\n(?:>|On .+wrote:)/)[0]!
               .trim();
             const op = operationSchema.parse(JSON.parse(body));
-            if (!["reply", "verify", "add_child"].includes(op.type))
+            if (!["reply", "decide", "verify", "add_child"].includes(op.type))
               throw new CoordinationError("channel_operation_not_allowed", 403);
             if (
-              op.type === "reply" &&
+              (op.type === "reply" || op.type === "decide") &&
               (op.obligationId !== d.obligation_id ||
                 op.expectedObligationRevision !== d.obligation_revision ||
                 op.subjectRevision !== d.request.subject.revision)

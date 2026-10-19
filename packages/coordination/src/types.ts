@@ -7,6 +7,36 @@ const id = z
 const text = z.string().min(1).max(1000);
 export const operationSchema = z.discriminatedUnion("type", [
   z.strictObject({
+    type: z.literal("attach_proposal"),
+    obligationId: id,
+    proposalId: id,
+    proposalRevision: z.number().int().positive(),
+    statement: text,
+    reason: text,
+  }),
+  z.strictObject({
+    type: z.literal("decide"),
+    obligationId: id,
+    expectedObligationRevision: z.number().int().positive(),
+    proposalHash: z.string().regex(/^[a-f0-9]{64}$/),
+    choice: z.enum(["approve", "reject"]),
+    reason: text,
+    subjectRevision: z.string().min(1).max(160),
+    observedAt: z.iso.datetime({ offset: true }),
+    validUntil: z.iso.datetime({ offset: true }),
+  }),
+  z.strictObject({
+    type: z.literal("adopt_configuration"),
+    version: text,
+    reason: text,
+  }),
+  z.strictObject({
+    type: z.literal("amend_subject"),
+    subjectRevision: z.string().min(1).max(160),
+    goal: text,
+    reason: text,
+  }),
+  z.strictObject({
     type: z.literal("reply"),
     obligationId: id,
     expectedObligationRevision: z.number().int().positive(),
@@ -106,6 +136,21 @@ export interface Obligation {
   assignee: string;
   revision: number;
   status: "waiting" | "answered" | "verified" | "disputed" | "blocked";
+  proposal?: {
+    id: string;
+    revision: number;
+    statement: string;
+    subjectRevision: string;
+    sha256: string;
+    evidenceId: string;
+  };
+  decision?: {
+    proposalHash: string;
+    choice: "approve" | "reject";
+    reason: string;
+    actorId: string;
+    evidenceId: string;
+  };
   reply?: Reply;
   verification?: {
     actorId: string;
@@ -123,6 +168,8 @@ export interface CaseState {
   revision: number;
   inboxId: string;
   sourceEvidenceId: string;
+  missionRevision?: number;
+  amendmentEvidenceIds?: string[];
   sourceId: string;
   subject: { type: string; id: string; revision: string };
   workflow: string;

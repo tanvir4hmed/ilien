@@ -1,6 +1,6 @@
 # Setup and operation
 
-The foundation contains an API, outbox relay, intake worker, coordination timer worker and privileged migration worker. It now includes separate channel send/receive workers. A separate bounded AI worker proposes reviewed actions; no browser console exists yet. See [AI operation and limits](AI.md). See [channel setup](CHANNELS.md) for identity, DNS, consent, limits and deferred acceptance. See [coordination API](COORDINATION.md) for command and result contracts.
+The foundation contains an API, outbox relay, intake worker, coordination timer worker and privileged migration worker. It now includes separate channel send/receive workers. A separate bounded AI worker proposes reviewed actions; a Cognito-authenticated operator console is now included. See [AI operation and limits](AI.md). See [channel setup](CHANNELS.md) for identity, DNS, consent, limits and deferred acceptance. See [coordination API](COORDINATION.md) for command and result contracts.
 
 ## Local build
 

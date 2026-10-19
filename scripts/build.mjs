@@ -1,5 +1,5 @@
 import { build } from "esbuild";
-import { mkdir } from "node:fs/promises";
+import { mkdir, cp } from "node:fs/promises";
 await mkdir("dist", { recursive: true });
 for (const [name, entry] of Object.entries({
   api: "apps/api/src/handler.ts",
@@ -10,6 +10,7 @@ for (const [name, entry] of Object.entries({
   "channel-send": "apps/workers/src/channel-send.ts",
   "channel-receive": "apps/workers/src/channel-receive.ts",
   agent: "apps/workers/src/agent.ts",
+  result: "apps/workers/src/result.ts",
 })) {
   await build({
     entryPoints: [entry],
@@ -22,3 +23,22 @@ for (const [name, entry] of Object.entries({
     sourcemap: false,
   });
 }
+
+await mkdir("dist/console", { recursive: true });
+await build({
+  entryPoints: ["apps/console/src/app.ts"],
+  outfile: "dist/console/app.js",
+  bundle: true,
+  platform: "browser",
+  target: "es2022",
+  format: "esm",
+  minify: true,
+});
+for (const [from, to] of [
+  ["apps/console/index.html", "index.html"],
+  ["apps/console/src/app.css", "app.css"],
+  ["packages/simulation/catalog.json", "catalog.json"],
+  ["packages/simulation/fixtures", "fixtures"],
+  ["packages/contracts/examples", "examples"],
+])
+  await cp(from, `dist/console/${to}`, { recursive: true });

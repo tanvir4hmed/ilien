@@ -72,3 +72,19 @@ The initial inbound account mapping is one configured tenant/source/phone for th
 Infrastructure adds request-driven workers/queues/topics, retained S3 evidence and one rotating KMS key for SNS encryption. No new always-on compute/database is introduced. Provider message charges and the KMS key/storage have separate costs. Full channel, isolation, duplicate, outage and end-to-end acceptance remains pending.
 
 References checked 16 October 2026: [AWS WhatsApp API](https://docs.aws.amazon.com/social-messaging/latest/APIReference/API_SendWhatsAppMessage.html), [AWS event format](https://docs.aws.amazon.com/social-messaging/latest/userguide/managing-event-destination-dlrs.html), [SNS destination permissions](https://docs.aws.amazon.com/social-messaging/latest/userguide/managing-event-destinations-add.html), [SES receipt notifications](https://docs.aws.amazon.com/ses/latest/dg/receiving-email-notifications-examples.html).
+
+## Approved-template initiation and fallback
+
+Outside the WhatsApp customer-service window, configuration may select an approved utility template. The sender reads the selected definition using AWS `GetWhatsAppMessageTemplate` before sending. It requires APPROVED, exact configured name/language, UTILITY category and one BODY component with this exact text:
+
+```text
+ILIEN {{1}}. Request: {{2}}. Subject: {{3}} / {{4}} / revision {{5}}. Deadline: {{6}}. Reported information (unverified): {{7}}. Source context is synthetic. Reply to this message with your response. This request authorizes no operational action.
+```
+
+Parameters are generated from the canonical contact, subject, deadline and optional claim/proposal, never a caller-supplied message. The rendered text, template definition hash, approval reference and parameters are persisted with the delivery. No template is submitted for approval automatically. A Meta-approved template matching this contract and explicit settings enablement are still required; missing/unreadable/mismatched definitions block the WhatsApp path. Inside the allowed session window the sender uses the existing text path.
+
+`automaticFallback` is off by default. When enabled, a definitive provider rejection or unavailable session/template can create one intent on the same actor's other consented channel. It rechecks source policy version, actor, contact revision, case state and deadline; uniqueness prevents more than one attempt per contact/channel. Pending, accepted, sending or uncertain delivery is never a fallback trigger. A successful provider acceptance is not a business acknowledgement. Uncertain sends require later reconciliation; do not silently retry them.
+
+The pending-send selection no longer filters out rows with a null `attempt_at`; only stale in-progress sends use that age threshold. Actual send verification remains deferred.
+
+Reference: [AWS GetWhatsAppMessageTemplate](https://docs.aws.amazon.com/social-messaging/latest/APIReference/API_GetWhatsAppMessageTemplate.html).

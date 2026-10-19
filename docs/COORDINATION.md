@@ -21,7 +21,7 @@ node scripts/coordinate.mjs GET /v1/cases/CASE_UUID/results
 node scripts/coordinate.mjs POST /v1/cases/CASE_UUID/acknowledgements acknowledgement.json
 ```
 
-Other read sections: `contacts`, `claims`, `journal`, `rejections`. `GET /v1/cases/CASE_UUID/evidence/EVIDENCE_UUID` returns original content and hash only when evidence is linked to that source's case. Case and source ownership are checked in addition to transaction-local tenant RLS. Lists return the latest 50 records; full retained history currently requires authorized database access. No browser UI is included.
+Other read sections: `contacts`, `claims`, `journal`, `rejections`. `GET /v1/cases/CASE_UUID/evidence/EVIDENCE_UUID` returns original content and hash only when evidence is linked to that source's case. Case and source ownership are checked in addition to transaction-local tenant RLS. Lists return the latest 50 records; full retained history currently requires authorized database access. The [operator workspace](OPERATOR_WORKSPACE.md) exposes these records and synthetic role-play commands.
 
 ## Commands
 

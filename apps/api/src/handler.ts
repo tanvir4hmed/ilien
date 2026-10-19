@@ -1,4 +1,7 @@
-import type { APIGatewayProxyEventV2WithIAMAuthorizer } from "aws-lambda";
+import type {
+  APIGatewayProxyEventV2WithIAMAuthorizer,
+  APIGatewayProxyEventV2WithJWTAuthorizer,
+} from "aws-lambda";
 import { createHash, randomUUID } from "node:crypto";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import { sourceEventSchema } from "../../../packages/contracts/src/validation.js";
@@ -22,6 +25,12 @@ import {
   dispatchContact,
   channelView,
 } from "../../../packages/channels/src/admin.js";
+import {
+  audit,
+  readConfiguration,
+  publishConfiguration,
+  members,
+} from "../../../packages/product/src/configuration.js";
 const lambda = new LambdaClient({ maxAttempts: 2 });
 import {
   enqueueAgent,
@@ -36,23 +45,104 @@ const response = (statusCode: number, body: unknown) => ({
   body: JSON.stringify(body),
 });
 type Source = { tenant_id: string; id: string; origin: string };
-export async function handler(event: APIGatewayProxyEventV2WithIAMAuthorizer) {
+export async function handler(
+  event:
+    | APIGatewayProxyEventV2WithIAMAuthorizer
+    | APIGatewayProxyEventV2WithJWTAuthorizer,
+) {
   if (event.rawPath === "/health")
     return response(200, {
       service: "ilien",
-      phase: "ai",
-      version: "0.4.0",
+      phase: "product",
+      version: "0.5.0",
     });
-  const principal = event.requestContext.authorizer?.iam?.userArn;
+  const consoleRequest = event.rawPath.startsWith("/console/");
+  const authorization = event.requestContext.authorizer;
+  const claims =
+    authorization && "jwt" in authorization
+      ? authorization.jwt.claims
+      : undefined;
+  let principal =
+    authorization && "iam" in authorization
+      ? authorization.iam.userArn
+      : undefined;
+  if (consoleRequest) {
+    if (
+      !claims ||
+      claims.token_use !== "access" ||
+      claims.client_id !== process.env.OPERATOR_CLIENT_ID ||
+      claims.iss !== process.env.OPERATOR_ISSUER ||
+      typeof claims.sub !== "string" ||
+      !z.uuid().safeParse(claims.sub).success ||
+      !String(claims.scope ?? "")
+        .split(" ")
+        .includes("openid")
+    )
+      return response(401, { error: "invalid_operator_token" });
+    principal = claims.sub;
+    event = { ...event, rawPath: event.rawPath.slice("/console".length) };
+  }
   if (!principal) return response(401, { error: "authentication_required" });
   try {
-    const source = rows<Source>(
-      await query("SELECT * FROM resolve_source(:principal)", [
-        param("principal", principal),
-      ]),
+    const source = rows<Source & { role?: string }>(
+      await query(
+        consoleRequest
+          ? "SELECT * FROM resolve_operator(CAST(:principal AS uuid))"
+          : "SELECT * FROM resolve_source(:principal)",
+        [param("principal", principal)],
+      ),
     )[0];
     if (!source) return response(403, { error: "source_not_authorized" });
     const method = event.requestContext.http.method;
+    const rawBody = event.isBase64Encoded
+      ? Buffer.from(event.body ?? "", "base64").toString("utf8")
+      : (event.body ?? "");
+    if (Buffer.byteLength(rawBody) > 24576)
+      return response(413, { error: "request_too_large" });
+    if (consoleRequest) {
+      if (
+        method !== "GET" &&
+        (source.role === "viewer" ||
+          !["admin", "operator"].includes(source.role ?? ""))
+      )
+        return response(403, { error: "operator_role_required" });
+      if (
+        method !== "GET" &&
+        /^\/v1\/(configuration|members|ai\/(settings|knowledge)|channels\/bindings)$/.test(
+          event.rawPath,
+        ) &&
+        source.role !== "admin"
+      )
+        return response(403, { error: "admin_required" });
+      if (event.rawPath === "/v1/members" && source.role !== "admin")
+        return response(403, { error: "admin_required" });
+      if (method !== "GET")
+        await audit(source, principal, `${method} ${event.rawPath}`, rawBody);
+    }
+    if (method === "GET" && event.rawPath === "/v1/me")
+      return response(200, {
+        subject: principal,
+        role: source.role ?? "source",
+        sourceId: source.id,
+        origin: source.origin,
+      });
+    if (event.rawPath === "/v1/configuration") {
+      if (method === "GET")
+        return response(200, await readConfiguration(source));
+      if (method === "POST")
+        return response(
+          200,
+          await publishConfiguration(source, rawBody, principal),
+        );
+    }
+    if (event.rawPath === "/v1/members") {
+      if (method === "GET")
+        return response(200, { items: await members(source) });
+      if (method === "POST")
+        return response(200, {
+          items: await members(source, rawBody, principal),
+        });
+    }
     const aiCase = /^\/v1\/cases\/([0-9a-f-]{36})\/agent$/.exec(event.rawPath);
     const aiRun = /^\/v1\/ai\/runs\/([0-9a-f-]{36})(?:\/(review))?$/.exec(
       event.rawPath,

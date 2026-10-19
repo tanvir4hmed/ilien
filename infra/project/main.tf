@@ -57,8 +57,8 @@ module "relay" {
   boundary_arn    = local.boundary
   artifact_bucket = "ilien-terraform-${local.account}-us-east-1"
   zip_path        = "../../dist/relay.zip"
-  environment     = merge(local.common, { QUEUE_URL = module.queue.url, COORDINATION_QUEUE_URL = module.coordination_queue.url, CHANNEL_QUEUE_URL = module.channels.outbound_url, AGENT_QUEUE_URL = module.agent_queue.url })
-  policy          = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:SendMessage"], Resource = [module.queue.arn, module.coordination_queue.arn, module.channels.outbound_arn, module.agent_queue.arn] }]) })
+  environment     = merge(local.common, { QUEUE_URL = module.queue.url, COORDINATION_QUEUE_URL = module.coordination_queue.url, CHANNEL_QUEUE_URL = module.channels.outbound_url, AGENT_QUEUE_URL = module.agent_queue.url, RESULT_QUEUE_URL = module.result_queue.url })
+  policy          = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:SendMessage"], Resource = [module.queue.arn, module.coordination_queue.arn, module.channels.outbound_arn, module.agent_queue.arn, module.result_queue.arn] }]) })
 }
 module "api" {
   source          = "../modules/compute"
@@ -66,7 +66,7 @@ module "api" {
   boundary_arn    = local.boundary
   artifact_bucket = "ilien-terraform-${local.account}-us-east-1"
   zip_path        = "../../dist/api.zip"
-  environment     = merge(local.common, { RELAY_FUNCTION = module.relay.name })
+  environment     = merge(local.common, { RELAY_FUNCTION = module.relay.name, OPERATOR_CLIENT_ID = module.console.client_id, OPERATOR_ISSUER = module.console.issuer })
   policy          = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = module.relay.arn }]) })
 }
 module "intake" {
@@ -116,7 +116,13 @@ resource "aws_lambda_event_source_mapping" "intake" {
 resource "aws_apigatewayv2_api" "api" {
   name          = local.name
   protocol_type = "HTTP"
-  tags          = { Project = "ilien" }
+  cors_configuration {
+    allow_origins = [module.console.url]
+    allow_methods = ["GET", "POST", "OPTIONS"]
+    allow_headers = ["authorization", "content-type"]
+    max_age       = 300
+  }
+  tags = { Project = "ilien" }
 }
 resource "aws_apigatewayv2_integration" "api" {
   api_id                 = aws_apigatewayv2_api.api.id
@@ -175,6 +181,7 @@ module "channel_send" {
   environment     = merge(local.common, local.channel_env, { CHANNEL_QUEUE_URL = module.channels.outbound_url })
   policy = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [
     { Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes", "sqs:SendMessage"], Resource = module.channels.outbound_arn },
+    { Effect = "Allow", Action = ["social-messaging:GetWhatsAppMessageTemplate"], Resource = local.waba_arn },
     { Effect = "Allow", Action = ["social-messaging:SendWhatsAppMessage"], Resource = local.phone_arn },
     { Effect = "Allow", Action = ["ses:SendEmail"], Resource = ["arn:aws:ses:us-east-1:${local.account}:identity/${var.mail_domain}", "arn:aws:ses:us-east-1:${local.account}:configuration-set/ilien"] }
   ]) })

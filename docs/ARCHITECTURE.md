@@ -30,7 +30,7 @@ flowchart LR
   MIG --> DB
 ```
 
-Source identity is resolved from trusted IAM context. PostgreSQL RLS uses transaction-local tenant context and a non-owner runtime login. The migration worker alone uses the managed database administrator secret. Simulated role-play is authorized only by a server-configured simulated connection; choosing an actor ID is not production user authentication.
+Machine source identity is resolved from trusted IAM context. Browser operators use Cognito access tokens validated by API Gateway and a server-owned membership mapping; role enforcement occurs before application handlers. PostgreSQL RLS uses transaction-local tenant context and a non-owner runtime login. The migration worker alone uses the managed database administrator secret. Simulated role-play is authorized only by a server-configured simulated connection; choosing an actor ID is not production user authentication.
 
 `packages/coordination` separates deterministic graph transitions from transactional persistence. `packages/domain-packs` defines textile templates; it does not own provider credentials. One case row serializes concurrent transitions. Expected revisions reject stale changes; immutable command/evidence records preserve provenance. Relational obligation/dependency projections, result records and delayed-work intents commit together. Separate queue/compute modules allow intake and coordination capacity to change independently, although they share database capacity.
 

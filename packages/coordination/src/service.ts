@@ -7,6 +7,7 @@ import {
   transaction,
 } from "../../persistence/src/database.js";
 import { sourceEventSchema } from "../../contracts/src/validation.js";
+import { configurationFor } from "../../product/src/configuration.js";
 import { seedCase } from "../../domain-packs/src/textile.js";
 import { initialize, nextWake, resolveActor, transition } from "./engine.js";
 import {
@@ -28,14 +29,19 @@ const parameters = (tenant: string, id: string) => [
   param("tenant", tenant),
   param("case", id),
 ];
-const policySchema = z.object({
-  version: z.string(),
-  groups: z.array(z.string()).max(32),
+const policyId = z
+  .string()
+  .min(1)
+  .max(80)
+  .regex(/^[A-Za-z0-9_-]+$/);
+export const policySchema = z.strictObject({
+  version: policyId,
+  groups: z.array(policyId).max(32),
   actors: z
     .array(
-      z.object({
-        id: z.string(),
-        group: z.string(),
+      z.strictObject({
+        id: policyId,
+        group: policyId,
         role: z.enum(["respondent", "verifier", "coordinator"]),
         enabled: z.boolean(),
       }),
@@ -49,7 +55,10 @@ const policySchema = z.object({
   maxDepth: z.number().int().min(1).max(8),
   evidenceAgeSeconds: z.number().int().min(60).max(604800),
 });
-export async function policyFor(source: Source, tx: string): Promise<Policy | null> {
+export async function policyFor(
+  source: Source,
+  tx: string,
+): Promise<Policy | null> {
   if (source.origin !== "simulated") return null;
   const p = rows<{ policy: Policy | string; simulation_enabled: boolean }>(
     await query(
@@ -203,9 +212,13 @@ async function persist(
             resultId: id,
             resultRevision: state.revision,
             missionId: state.id,
-            missionRevision: 1,
+            missionRevision: state.missionRevision ?? 1,
             caseId: state.id,
             caseRevision: state.revision,
+            subject: state.subject,
+            goal: state.goal,
+            sourceEvidenceId: state.sourceEvidenceId,
+            amendmentEvidenceIds: state.amendmentEvidenceIds ?? [],
             generatedAt: now,
             outcome: result.outcome,
             missionTerminal: result.terminal,
@@ -225,7 +238,23 @@ async function persist(
               reasonCode: o.status,
             })),
             unresolvedObligationIds: result.unresolvedObligationIds,
-            decisionRefs: [],
+            decisionRefs: state.obligations
+              .filter(
+                (o) =>
+                  o.decision &&
+                  o.proposal &&
+                  o.reply &&
+                  o.status === "verified",
+              )
+              .map((o) => ({
+                decisionId: o.decision!.evidenceId,
+                proposalId: o.proposal!.id,
+                proposalRevision: o.proposal!.revision,
+                authorizedActorId: o.decision!.actorId,
+                validUntil: o.reply!.validUntil,
+                proposalHash: o.proposal!.sha256,
+                choice: o.decision!.choice,
+              })),
             origin: "simulated",
             scope: "communication_only",
           }),
@@ -234,6 +263,16 @@ async function persist(
       tx,
     );
   }
+  if (result)
+    await query(
+      "INSERT INTO result_dispatches(tenant_id,connection_id,case_id,result_id) SELECT tenant_id,CAST(:source AS uuid),case_id,id FROM coordination_results WHERE case_id=CAST(:case AS uuid) AND case_revision=CAST(:revision AS int) ON CONFLICT DO NOTHING",
+      [
+        ...p,
+        param("source", state.sourceId),
+        param("revision", String(state.revision)),
+      ],
+      tx,
+    );
   const wake = nextWake(state, policy, now);
   if (wake) await enqueue(tenant, state, wake, tx);
 }
@@ -292,6 +331,7 @@ export async function activateCase(
     },
     policy,
     now,
+    (await configurationFor(source.id, tx)).configuration,
   );
   if (!state) return false;
   const existing = rows(

@@ -86,6 +86,7 @@ export async function handler(event: unknown) {
     );
   return {
     agentRuns: await dispatchAgents(tenantId),
+    results: await dispatchResults(tenantId),
     dispatched: jobs.length,
     timers: timers.length,
     deliveries: deliveries.length,
@@ -110,4 +111,24 @@ async function dispatchAgents(tenantId: string) {
       }),
     );
   return runs.length;
+}
+
+async function dispatchResults(tenantId: string) {
+  const jobs = await transaction(tenantId, async (tx) =>
+    rows<{ result_id: string }>(
+      await query(
+        "WITH candidates AS (SELECT result_id FROM result_dispatches WHERE state IN ('pending','publishing') AND (queued_at IS NULL OR queued_at<now()-interval '5 minutes') ORDER BY created_at LIMIT 25 FOR UPDATE SKIP LOCKED) UPDATE result_dispatches d SET queued_at=now() FROM candidates c WHERE d.result_id=c.result_id RETURNING d.result_id",
+        [],
+        tx,
+      ),
+    ),
+  );
+  for (const job of jobs)
+    await sqs.send(
+      new SendMessageCommand({
+        QueueUrl: process.env.RESULT_QUEUE_URL,
+        MessageBody: JSON.stringify({ tenantId, resultId: job.result_id }),
+      }),
+    );
+  return jobs.length;
 }
