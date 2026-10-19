@@ -59,7 +59,7 @@ resource "aws_iam_policy" "runtime_boundary" {
     { Effect = "Allow", Action = ["ses:SendEmail"], Resource = ["arn:aws:ses:us-east-1:${local.account}:identity/${var.mail_domain}", "arn:aws:ses:us-east-1:${local.account}:configuration-set/ilien"] },
     { Effect = "Allow", Action = ["social-messaging:GetWhatsAppMessageTemplate"], Resource = "arn:aws:social-messaging:us-east-1:${local.account}:waba/${trimprefix(var.whatsapp_waba_id, "waba-")}" },
     { Effect = "Allow", Action = ["social-messaging:SendWhatsAppMessage"], Resource = "arn:aws:social-messaging:us-east-1:${local.account}:phone-number-id/${trimprefix(var.whatsapp_phone_number_id, "phone-number-id-")}" },
-    { Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = "arn:aws:lambda:us-east-1:${local.account}:function:ilien-relay" }
+    { Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = ["arn:aws:lambda:us-east-1:${local.account}:function:ilien-relay", "arn:aws:lambda:us-east-1:${local.account}:function:ilien-reconcile"] }
   ] })
 }
 resource "aws_iam_role" "deploy" {

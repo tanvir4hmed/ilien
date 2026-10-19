@@ -51,15 +51,16 @@ module "coordination_queue" {
   name   = "${local.name}-coordination"
 }
 module "relay" {
-  source            = "../modules/compute"
-  name              = "${local.name}-relay"
-  timeout           = 120
-  async_failure_arn = aws_sqs_queue.runtime_failures.arn
-  boundary_arn      = local.boundary
-  artifact_bucket   = "ilien-terraform-${local.account}-us-east-1"
-  zip_path          = "../../dist/relay.zip"
-  environment       = merge(local.common, { QUEUE_URL = module.queue.url, COORDINATION_QUEUE_URL = module.coordination_queue.url, CHANNEL_QUEUE_URL = module.channels.outbound_url, AGENT_QUEUE_URL = module.agent_queue.url, RESULT_QUEUE_URL = module.result_queue.url })
-  policy            = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:SendMessage"], Resource = [module.queue.arn, module.coordination_queue.arn, module.channels.outbound_arn, module.agent_queue.arn, module.result_queue.arn] }]) })
+  source               = "../modules/compute"
+  name                 = "${local.name}-relay"
+  timeout              = 120
+  enable_async_failure = true
+  async_failure_arn    = aws_sqs_queue.runtime_failures.arn
+  boundary_arn         = local.boundary
+  artifact_bucket      = "ilien-terraform-${local.account}-us-east-1"
+  zip_path             = "../../dist/relay.zip"
+  environment          = merge(local.common, { QUEUE_URL = module.queue.url, COORDINATION_QUEUE_URL = module.coordination_queue.url, CHANNEL_QUEUE_URL = module.channels.outbound_url, AGENT_QUEUE_URL = module.agent_queue.url, RESULT_QUEUE_URL = module.result_queue.url })
+  policy               = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:SendMessage"], Resource = [module.queue.arn, module.coordination_queue.arn, module.channels.outbound_arn, module.agent_queue.arn, module.result_queue.arn] }]) })
 }
 module "api" {
   source          = "../modules/compute"
@@ -71,26 +72,28 @@ module "api" {
   policy          = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = [module.relay.arn, module.reconcile.arn] }, { Effect = "Allow", Action = ["sqs:GetQueueAttributes"], Resource = concat([for v in local.work_queues : v.arn], [for v in local.dead_queues : v.arn]) }]) })
 }
 module "intake" {
-  source            = "../modules/compute"
-  name              = "${local.name}-intake"
-  async_failure_arn = aws_sqs_queue.runtime_failures.arn
-  boundary_arn      = local.boundary
-  artifact_bucket   = "ilien-terraform-${local.account}-us-east-1"
-  zip_path          = "../../dist/intake.zip"
-  environment       = merge(local.common, { RELAY_FUNCTION = module.relay.name })
-  timeout           = 60
-  policy            = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], Resource = module.queue.arn }, { Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = module.relay.arn }]) })
+  source               = "../modules/compute"
+  name                 = "${local.name}-intake"
+  enable_async_failure = true
+  async_failure_arn    = aws_sqs_queue.runtime_failures.arn
+  boundary_arn         = local.boundary
+  artifact_bucket      = "ilien-terraform-${local.account}-us-east-1"
+  zip_path             = "../../dist/intake.zip"
+  environment          = merge(local.common, { RELAY_FUNCTION = module.relay.name })
+  timeout              = 60
+  policy               = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], Resource = module.queue.arn }, { Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = module.relay.arn }]) })
 }
 module "coordination" {
-  source            = "../modules/compute"
-  name              = "${local.name}-coordination"
-  async_failure_arn = aws_sqs_queue.runtime_failures.arn
-  boundary_arn      = local.boundary
-  artifact_bucket   = "ilien-terraform-${local.account}-us-east-1"
-  zip_path          = "../../dist/coordination.zip"
-  timeout           = 60
-  environment       = merge(local.common, { RELAY_FUNCTION = module.relay.name })
-  policy            = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], Resource = module.coordination_queue.arn }, { Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = module.relay.arn }]) })
+  source               = "../modules/compute"
+  name                 = "${local.name}-coordination"
+  enable_async_failure = true
+  async_failure_arn    = aws_sqs_queue.runtime_failures.arn
+  boundary_arn         = local.boundary
+  artifact_bucket      = "ilien-terraform-${local.account}-us-east-1"
+  zip_path             = "../../dist/coordination.zip"
+  timeout              = 60
+  environment          = merge(local.common, { RELAY_FUNCTION = module.relay.name })
+  policy               = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], Resource = module.coordination_queue.arn }, { Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = module.relay.arn }]) })
 }
 resource "aws_lambda_event_source_mapping" "coordination" {
   event_source_arn        = module.coordination_queue.arn
@@ -179,14 +182,15 @@ module "channels" {
   waba_arn    = local.waba_arn
 }
 module "channel_send" {
-  source            = "../modules/compute"
-  name              = "ilien-channel-send"
-  async_failure_arn = aws_sqs_queue.runtime_failures.arn
-  boundary_arn      = local.boundary
-  artifact_bucket   = "ilien-terraform-${local.account}-us-east-1"
-  zip_path          = "../../dist/channel-send.zip"
-  timeout           = 60
-  environment       = merge(local.common, local.channel_env, { CHANNEL_QUEUE_URL = module.channels.outbound_url })
+  source               = "../modules/compute"
+  name                 = "ilien-channel-send"
+  enable_async_failure = true
+  async_failure_arn    = aws_sqs_queue.runtime_failures.arn
+  boundary_arn         = local.boundary
+  artifact_bucket      = "ilien-terraform-${local.account}-us-east-1"
+  zip_path             = "../../dist/channel-send.zip"
+  timeout              = 60
+  environment          = merge(local.common, local.channel_env, { CHANNEL_QUEUE_URL = module.channels.outbound_url })
   policy = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [
     { Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes", "sqs:SendMessage"], Resource = module.channels.outbound_arn },
     { Effect = "Allow", Action = ["social-messaging:GetWhatsAppMessageTemplate"], Resource = local.waba_arn },
@@ -195,14 +199,15 @@ module "channel_send" {
   ]) })
 }
 module "channel_receive" {
-  source            = "../modules/compute"
-  name              = "ilien-channel-receive"
-  async_failure_arn = aws_sqs_queue.runtime_failures.arn
-  boundary_arn      = local.boundary
-  artifact_bucket   = "ilien-terraform-${local.account}-us-east-1"
-  zip_path          = "../../dist/channel-receive.zip"
-  timeout           = 60
-  environment       = merge(local.common, local.channel_env, { RELAY_FUNCTION = module.relay.name })
+  source               = "../modules/compute"
+  name                 = "ilien-channel-receive"
+  enable_async_failure = true
+  async_failure_arn    = aws_sqs_queue.runtime_failures.arn
+  boundary_arn         = local.boundary
+  artifact_bucket      = "ilien-terraform-${local.account}-us-east-1"
+  zip_path             = "../../dist/channel-receive.zip"
+  timeout              = 60
+  environment          = merge(local.common, local.channel_env, { RELAY_FUNCTION = module.relay.name })
   policy = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [
     { Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], Resource = module.channels.inbound_arn },
     { Effect = "Allow", Action = ["s3:GetObject"], Resource = "${module.channels.bucket_arn}/raw/*" },
@@ -233,14 +238,15 @@ module "agent_queue" {
   visibility_timeout = 720
 }
 module "agent" {
-  source            = "../modules/compute"
-  name              = "ilien-agent"
-  async_failure_arn = aws_sqs_queue.runtime_failures.arn
-  boundary_arn      = local.boundary
-  artifact_bucket   = "ilien-terraform-${local.account}-us-east-1"
-  zip_path          = "../../dist/agent.zip"
-  timeout           = 120
-  environment       = local.common
+  source               = "../modules/compute"
+  name                 = "ilien-agent"
+  enable_async_failure = true
+  async_failure_arn    = aws_sqs_queue.runtime_failures.arn
+  boundary_arn         = local.boundary
+  artifact_bucket      = "ilien-terraform-${local.account}-us-east-1"
+  zip_path             = "../../dist/agent.zip"
+  timeout              = 120
+  environment          = local.common
   policy = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [
     { Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], Resource = module.agent_queue.arn },
     { Effect = "Allow", Action = ["bedrock:InvokeModel"], Resource = "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0" }
