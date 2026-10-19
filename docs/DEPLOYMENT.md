@@ -1,5 +1,20 @@
 # Deployment record
 
+## Product workspace delivery — 19 October 2026
+
+Deployed runtime/configuration commit: `9e30ac2`. [Successful delivery](https://github.com/tanvir4hmed/ilien/actions/runs/39263850309).
+
+- Cognito operator console, source membership/roles, simulation, evidence and AI review screens.
+- Configuration history/adoption, maintenance mapping preset, source amendments and proposal-bound decisions.
+- Approved-template WhatsApp path, opt-in conservative fallback and independent encrypted SNS result handback.
+- Initial rollout created 259 resources (mostly static fixture objects), changed 11 and destroyed none. Subsequent fixes and encryption updates completed without replacement.
+- Schema 5 migration and process health `product` / `0.5.0` succeeded.
+- Initial operator identity and membership provisioned with invitations suppressed. First sign-in/password change/MFA enrollment is owner-managed. Credentials are not repository assets.
+
+Implementation fixes during delivery: source membership serialization now locks an update-authorized settings row; Cognito subjects accept hexadecimal GUID form without assuming RFC UUID variant bits. No application, browser interaction, inference or live-channel test ran. See [operator workspace](OPERATOR_WORKSPACE.md) for feature boundaries, custom-hostname setup, template readiness and source subscriber requirements.
+
+The historical deployment sections below describe their own releases; their future-work statements are superseded by subsequent sections.
+
 ## Phase 4 deployment — 19 October 2026
 
 Deployed code: `6f9c623` (AI implementation `5da6a27`). [Successful AI delivery](https://github.com/tanvir4hmed/ilien/actions/runs/39190215362).
