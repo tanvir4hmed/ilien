@@ -1,6 +1,7 @@
 import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 const client = new LambdaClient({ maxAttempts: 3 });
-for (let attempt = 1; attempt <= 4; attempt++) {
+const maxAttempts = 10;
+for (let attempt = 1; attempt <= maxAttempts; attempt++) {
   const response = await client.send(new InvokeCommand({
     FunctionName: 'ilien-migrate', Payload: Buffer.from('{}'),
   }));
@@ -13,8 +14,8 @@ for (let attempt = 1; attempt <= 4; attempt++) {
   const type = typeof result.errorType === 'string' && /^[A-Za-z0-9_.]{1,100}$/.test(result.errorType)
     ? result.errorType : 'UnknownMigrationFailure';
   console.error(`Migration attempt ${attempt}: ${type}`);
-  if (attempt < 4 && ['DatabaseResumingException', 'DatabaseUnavailableException'].includes(type)) {
-    await new Promise(resolve => setTimeout(resolve, 15000));
+  if (attempt < maxAttempts && ['DatabaseResumingException', 'DatabaseUnavailableException'].includes(type)) {
+    await new Promise(resolve => setTimeout(resolve, 30000));
     continue;
   }
   process.exitCode = 1;

@@ -56,3 +56,6 @@ The release must distinguish synthetic events/operational actions from actual co
 
 
 Lambda delivery uploads only the eight explicit ZIP bundles to the encrypted, private Terraform bucket under the separate ilien/artifacts/ prefix. Keys are SHA-256 content addresses; Terraform references these objects when deploying Lambda. State remains under its own key. Artifact retention currently requires deliberate operator cleanup; do not remove packages referenced by an active or rollback release.
+
+
+Migration delivery retries only DatabaseResumingException/DatabaseUnavailableException, up to 10 attempts with 30-second spacing. Other migration errors fail immediately. This bounded cold-resume allowance preserves Aurora auto-pause; it is not a periodic database keepalive or application recovery test.
