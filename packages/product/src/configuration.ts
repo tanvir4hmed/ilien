@@ -235,7 +235,7 @@ export async function members(source: Source, raw?: string, caller?: string) {
     if (raw) {
       const input = z
         .strictObject({
-          subject: z.uuid(),
+          subject: z.guid(),
           role: z.enum(["admin", "operator", "viewer"]),
           enabled: z.boolean(),
         })

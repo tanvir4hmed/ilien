@@ -73,7 +73,7 @@ export async function handler(
       claims.client_id !== process.env.OPERATOR_CLIENT_ID ||
       claims.iss !== process.env.OPERATOR_ISSUER ||
       typeof claims.sub !== "string" ||
-      !z.uuid().safeParse(claims.sub).success ||
+      !z.guid().safeParse(claims.sub).success ||
       !String(claims.scope ?? "")
         .split(" ")
         .includes("openid")

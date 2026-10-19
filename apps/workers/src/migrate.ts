@@ -21,7 +21,7 @@ const secrets = new SecretsManagerClient({ maxAttempts: 3 });
 export async function handler(event: unknown = {}) {
   const input = z
     .strictObject({
-      operator: z.strictObject({ subject: z.uuid() }).optional(),
+      operator: z.strictObject({ subject: z.guid() }).optional(),
     })
     .parse(event);
   const secretId = process.env.APP_SECRET_ARN!;
