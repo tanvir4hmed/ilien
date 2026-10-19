@@ -35,7 +35,7 @@ A decision obligation requires coordinator `attach_proposal` with a stable propo
 
 ## Source handback
 
-Case outcomes write `result_dispatches` in the same database transaction. The relay sends IDs to a separate SQS queue; an independently scalable result worker publishes to the installation's source-specific SNS topic. No human subscription or external endpoint is added automatically. The source can subscribe an authorized consumer or read the existing result API; the console can role-play source acknowledgement.
+Case outcomes write `result_dispatches` in the same database transaction. The relay sends IDs to a separate SQS queue; an independently scalable result worker publishes to the installation's source-specific SNS topic, encrypted with the existing channel notification KMS key. Publisher key permissions are restricted to SNS use. No human subscription or external endpoint is added automatically. The source can subscribe an authorized consumer or read the existing result API; the console can role-play source acknowledgement.
 
 Publication is **at least once**, not exactly once. Consumers deduplicate `resultId`, compare case/result revisions, and separately acknowledge through the source API. A published result may be superseded while in transit; publication is not proof that the source read, accepted or acted on it. The worker checks enabled source, configured tenant/source, current revision, bounded message size and durable dispatch state. It never executes source actions. Missed wakes and broader recovery automation remain subsequent reliability work.
 
@@ -50,3 +50,5 @@ References: [API Gateway JWT authorizers](https://docs.aws.amazon.com/apigateway
 ## First operator provisioning
 
 After delivery, an authorized administrator runs `node scripts/bootstrap-operator.mjs APPROVED_EMAIL` with local AWS administrative access and initialized Terraform outputs. The script suppresses invitations, creates a temporary password locally, and binds the initial Cognito subject through the privileged migration function. It refuses a second initial membership. It does not sign in or send a message. First sign-in requires a new password and authenticator enrollment. `.private/operator-first-login.txt` and `.private/operator-bootstrap.json` contain credentials; never publish or package either file. Remove them after successful sign-in. For an uncertain create/bind result, inspect the account and private result first rather than resetting credentials blindly.
+
+Encryption reference: [SNS key management and publisher permissions](https://docs.aws.amazon.com/sns/latest/dg/sns-key-management.html).

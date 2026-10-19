@@ -3,8 +3,9 @@ module "result_queue" {
   name   = "ilien-results"
 }
 resource "aws_sns_topic" "results" {
-  name = "ilien-source-results"
-  tags = { Project = "ilien" }
+  name              = "ilien-source-results"
+  kms_master_key_id = module.channels.notification_key_arn
+  tags              = { Project = "ilien" }
 }
 module "result_worker" {
   source          = "../modules/compute"
@@ -16,7 +17,8 @@ module "result_worker" {
   environment     = merge(local.common, { TENANT_ID = local.channel_env.TENANT_ID, SOURCE_ID = local.channel_env.SOURCE_ID, RESULT_TOPIC_ARN = aws_sns_topic.results.arn })
   policy = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [
     { Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], Resource = module.result_queue.arn },
-    { Effect = "Allow", Action = ["sns:Publish"], Resource = aws_sns_topic.results.arn }
+    { Effect = "Allow", Action = ["sns:Publish"], Resource = aws_sns_topic.results.arn },
+    { Effect = "Allow", Action = ["kms:GenerateDataKey", "kms:Decrypt"], Resource = module.channels.notification_key_arn, Condition = { StringEquals = { "kms:ViaService" = "sns.us-east-1.amazonaws.com" } } }
   ]) })
 }
 resource "aws_lambda_event_source_mapping" "results" {

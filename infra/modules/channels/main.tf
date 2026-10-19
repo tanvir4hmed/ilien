@@ -141,3 +141,5 @@ output "dns_records" {
     { type = "TXT", name = "_dmarc.${var.mail_domain}", value = "v=DMARC1; p=reject; adkim=s; aspf=r" }
   ], [for token in aws_ses_domain_dkim.mail.dkim_tokens : { type = "CNAME", name = "${token}._domainkey.${var.mail_domain}", value = "${token}.dkim.amazonses.com" }])
 }
+
+output "notification_key_arn" { value = aws_kms_key.notifications.arn }

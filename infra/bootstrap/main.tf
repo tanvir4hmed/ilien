@@ -47,6 +47,7 @@ resource "aws_s3_bucket_policy" "state" {
 resource "aws_iam_policy" "runtime_boundary" {
   name = "ilien-runtime-boundary"
   policy = jsonencode({ Version = "2012-10-17", Statement = [
+    { Effect = "Allow", Action = ["kms:GenerateDataKey", "kms:Decrypt"], Resource = "arn:aws:kms:us-east-1:${local.account}:key/*", Condition = { StringEquals = { "kms:ViaService" = "sns.us-east-1.amazonaws.com", "aws:ResourceTag/Project" = "ilien" } } },
     { Effect = "Allow", Action = ["sns:Publish"], Resource = "arn:aws:sns:us-east-1:${local.account}:ilien-source-results" },
     { Effect = "Allow", Action = ["bedrock:InvokeModel"], Resource = "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0" },
     { Effect = "Allow", Action = ["logs:CreateLogStream", "logs:PutLogEvents"], Resource = "arn:aws:logs:us-east-1:${local.account}:log-group:/aws/lambda/ilien-*" },
