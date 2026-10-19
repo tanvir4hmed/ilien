@@ -17,6 +17,8 @@ import {
   type Context,
 } from "./contracts.js";
 import { plan } from "./planner.js";
+import { caseHeld } from "../../operations/src/supervision.js";
+import { pausedFor } from "../../operations/src/controls.js";
 export async function processRun(tenant: string, id: string) {
   const lease = randomUUID();
   const claimed = await transaction(tenant, async (tx) => {
@@ -34,6 +36,11 @@ export async function processRun(tenant: string, id: string) {
       origin: "simulated",
     };
     await getCase(source, initial.case_id, tx, true);
+    if (
+      (await pausedFor(source, "agent", tx)) ||
+      (await caseHeld(initial.case_id, tx))
+    )
+      return null;
     const run = rows<Run>(
       await query(
         "SELECT * FROM ai_runs WHERE id=CAST(:id AS uuid) FOR UPDATE",
@@ -82,6 +89,8 @@ export async function processRun(tenant: string, id: string) {
   const { source, run, context } = claimed;
   const current = () =>
     transaction(tenant, async (tx) => {
+      if (await pausedFor(source, "agent", tx))
+        throw new CoordinationError("agent_processing_paused");
       const fresh = await buildContext(source, run, tx);
       if (fresh.policyHash !== context.policyHash)
         throw new CoordinationError("ai_policy_changed");
@@ -123,6 +132,8 @@ export async function processRun(tenant: string, id: string) {
         }),
     });
     await transaction(tenant, async (tx) => {
+      if (await pausedFor(source, "agent", tx))
+        throw new CoordinationError("agent_processing_paused");
       const fresh = await buildContext(source, run, tx);
       if (fresh.policyHash !== context.policyHash)
         throw new CoordinationError("ai_policy_changed");

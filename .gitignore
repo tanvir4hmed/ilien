@@ -26,3 +26,7 @@ invocation.json
 *.pem
 *.key
 # Commit provider lock files; never commit state, secrets or saved plans.
+
+# Local drift plan output must never become repository content.
+drift.json
+drift.log

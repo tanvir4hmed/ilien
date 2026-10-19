@@ -1,0 +1,63 @@
+name: Infrastructure drift review
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 4 * * 1'
+permissions:
+  contents: read
+concurrency:
+  group: foundation-refs/heads/main
+  cancel-in-progress: false
+jobs:
+  inspect:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment: ilien
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_IN_AUTOMATION: 'true'
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      TF_VAR_reconciliation_minutes: ${{ vars.RECONCILIATION_MINUTES || '60' }}
+      TF_VAR_source_principal_arn: ${{ vars.SOURCE_PRINCIPAL_ARN }}
+      TF_VAR_mail_domain: mail.${{ vars.APP_DOMAIN }}
+      TF_VAR_whatsapp_phone_number_id: ${{ vars.WHATSAPP_PHONE_NUMBER_ID }}
+      TF_VAR_whatsapp_waba_id: ${{ vars.WHATSAPP_WABA_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts && npm run build && node scripts/package.mjs
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e
+        with:
+          terraform_version: '1.15.8'
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Initialize state
+        working-directory: infra/project
+        env:
+          STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+        run: terraform init -input=false -lockfile=readonly -backend-config="bucket=$STATE_BUCKET"
+      - name: Report remote drift without applying changes
+        working-directory: infra/project
+        run: |
+          set +e
+          terraform plan -refresh-only -input=false -detailed-exitcode -out=drift.tfplan > drift.log 2>&1
+          RESULT=$?
+          set -e
+          if [ "$RESULT" -eq 1 ]; then
+            echo 'Drift inspection failed; inspect provider access. Raw state/plan was not published.' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          terraform show -json drift.tfplan > drift.json
+          node ../../scripts/drift-report.mjs drift.json >> "$GITHUB_STEP_SUMMARY"
+          if [ "$RESULT" -eq 2 ]; then
+            echo 'Remote drift detected. Review before applying any correction.' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi

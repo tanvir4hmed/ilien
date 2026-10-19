@@ -15,6 +15,7 @@ import coordinationMigration from "../../../packages/persistence/migrations/002_
 import channelMigration from "../../../packages/persistence/migrations/003_channels.sql";
 import aiMigration from "../../../packages/persistence/migrations/004_ai.sql";
 import { textilePolicy } from "../../../packages/domain-packs/src/textile.js";
+import reliabilityMigration from "../../../packages/persistence/migrations/006_reliability.sql";
 import productMigration from "../../../packages/persistence/migrations/005_product.sql";
 import { z } from "zod";
 const secrets = new SecretsManagerClient({ maxAttempts: 3 });
@@ -83,7 +84,8 @@ export async function handler(event: unknown = {}) {
       version !== 2 &&
       version !== 3 &&
       version !== 4 &&
-      version !== 5
+      version !== 5 &&
+      version !== 6
     )
       throw new Error("Unsupported database migration version");
     if (version === 1)
@@ -97,6 +99,9 @@ export async function handler(event: unknown = {}) {
         await query(statement.trim(), [], tx);
     if (version! < 5)
       for (const statement of productMigration.split("-- statement"))
+        await query(statement.trim(), [], tx);
+    if (version! < 6)
+      for (const statement of reliabilityMigration.split("-- statement"))
         await query(statement.trim(), [], tx);
     await query(
       "INSERT INTO tenants(id,name) VALUES(CAST(:tenant AS uuid),'Synthetic textile workspace') ON CONFLICT(id) DO NOTHING",
@@ -138,6 +143,14 @@ export async function handler(event: unknown = {}) {
       ],
       tx,
     );
+    await query(
+      "INSERT INTO operations_controls(tenant_id,connection_id) VALUES(CAST(:tenant AS uuid),CAST(:source AS uuid)) ON CONFLICT DO NOTHING",
+      [
+        param("tenant", process.env.TENANT_ID!),
+        param("source", process.env.SOURCE_ID!),
+      ],
+      tx,
+    );
     if (input.operator) {
       const existing = rows(
         await query(
@@ -161,5 +174,5 @@ export async function handler(event: unknown = {}) {
       );
     }
   });
-  return { schemaVersion: 5 };
+  return { schemaVersion: 6 };
 }

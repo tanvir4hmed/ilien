@@ -8,6 +8,7 @@ import {
 } from "../../../packages/persistence/src/database.js";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import { activateCase } from "../../../packages/coordination/src/service.js";
+import { pausedFor } from "../../../packages/operations/src/controls.js";
 const lambda = new LambdaClient({ maxAttempts: 2 });
 const job = z.strictObject({
   tenantId: z.uuid(),
@@ -28,7 +29,33 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
           ),
         );
         if (!jobs[0]) throw new Error("Unknown work");
-        if (jobs[0].state === "processed") return;
+        if (["processed", "exhausted"].includes(jobs[0].state)) return;
+        const inbox = rows<{ connection_id: string }>(
+          await query(
+            "SELECT connection_id FROM inbox_events WHERE id=CAST(:inbox AS uuid)",
+            [param("inbox", item.inboxId)],
+            tx,
+          ),
+        )[0];
+        if (!inbox) throw new Error("Inbox unavailable");
+        if (
+          await pausedFor(
+            {
+              tenant_id: item.tenantId,
+              id: inbox.connection_id,
+              origin: "simulated",
+            },
+            "intake",
+            tx,
+          )
+        ) {
+          await query(
+            "UPDATE outbox_jobs SET state='pending',lease_until=NULL WHERE id=CAST(:job AS uuid)",
+            [param("job", item.jobId)],
+            tx,
+          );
+          return;
+        }
         const activated = await activateCase(item.tenantId, item.inboxId, tx);
         await query(
           "UPDATE inbox_events SET status=:status,disposition=:disposition WHERE id=CAST(:inbox AS uuid)",

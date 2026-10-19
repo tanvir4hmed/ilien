@@ -12,7 +12,7 @@ npm run build
 npm run publication:check
 ```
 
-Build produces only bundled handler files under `dist/`. GitHub packages these exact files, not the workspace. Automated application tests are not supplied in this foundation; build success is not proof of runtime isolation or semantic correctness.
+Build produces bundled handlers and static console files under `dist/`. Run `node scripts/package.mjs` to create the ten deterministic Lambda ZIPs before local Terraform planning. GitHub packages these exact files, not the workspace. Automated application tests are not supplied in this foundation; build success is not proof of runtime isolation or semantic correctness.
 
 ## Bootstrap and deployment
 
@@ -40,7 +40,7 @@ Event envelopes are limited to 24 KiB so original evidence remains retrievable t
 
 ## Recovery and operations
 
-Outbox intents commit with original evidence and intake. A failed wake leaves a recoverable pending job. Until scheduled reconciliation is added, an authorized operator invokes `ilien-relay` with a registered tenant UUID; a later accepted event also wakes that tenant's relay. Each invocation handles at most 25 intake jobs and 25 coordination timers; repeat for backlog. Intake leases expire after two minutes, coordination leases after three. Timer delays above 15 minutes are continued by the queue worker, with the same case revision and durable database intent. Never grant arbitrary callers direct Lambda invoke permissions; the API's trust boundary assumes invocation by its configured gateway or a trusted administrator.
+Outbox intents commit with original evidence and intake. Scheduled bounded reconciliation now covers missed wakes and stale dispatches, with an hourly default that preserves idle database pause opportunities. The admin Operations screen provides stage controls, case supervision and guarded recovery. See [operations, incidents and retention](OPERATIONS.md) for exact budgets, pause semantics, alert subscription requirements and deferred recovery exercises.
 
 SQS retains failed work in a dead-letter queue after five receives; inspect failure cause before redrive. Channel send work can have an ambiguous external side effect. Inspect delivery status before redrive; never blindly repeat an uncertain send. Runtime role cannot update/delete original evidence or bypass RLS. Migration credentials are isolated from runtime; app credential values are generated directly in Secrets Manager, outside Terraform state. Migration failures require a failed deployment status, never silent success.
 
@@ -55,7 +55,7 @@ AWS messaging requires configured identities and authorized recipients. Receivin
 The release must distinguish synthetic events/operational actions from actual communication delivery and disclose measured limits. Runtime claims and commands will be added only when the relevant components are available.
 
 
-Lambda delivery uploads only the eight explicit ZIP bundles to the encrypted, private Terraform bucket under the separate ilien/artifacts/ prefix. Keys are SHA-256 content addresses; Terraform references these objects when deploying Lambda. State remains under its own key. Artifact retention currently requires deliberate operator cleanup; do not remove packages referenced by an active or rollback release.
+Lambda delivery uploads only the ten explicit ZIP bundles to the encrypted, private Terraform bucket under the separate ilien/artifacts/ prefix. Keys are SHA-256 content addresses; Terraform references these objects when deploying Lambda. State remains under its own key. Artifact retention currently requires deliberate operator cleanup; do not remove packages referenced by an active or rollback release.
 
 
 Migration delivery retries only DatabaseResumingException/DatabaseUnavailableException, up to 10 attempts with 30-second spacing. Other migration errors fail immediately. This bounded cold-resume allowance preserves Aurora auto-pause; it is not a periodic database keepalive or application recovery test.

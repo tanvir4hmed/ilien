@@ -19,6 +19,8 @@ import {
 } from "./intents.js";
 import { configurationFor } from "../../product/src/configuration.js";
 import { approvedTemplate } from "./templates.js";
+import { pausedFor } from "../../operations/src/controls.js";
+import { caseHeld } from "../../operations/src/supervision.js";
 const social = new SocialMessagingClient({ maxAttempts: 1 });
 const email = new SESv2Client({ maxAttempts: 1 });
 
@@ -36,6 +38,14 @@ export async function sendDelivery(tenant: string, id: string) {
       ),
     )[0];
     if (!candidate) return null;
+    if (
+      await pausedFor(
+        { tenant_id: tenant, id: candidate.connection_id, origin: "simulated" },
+        "outbound",
+        tx,
+      )
+    )
+      return null;
     const c = rows<{ snapshot: CaseState | string }>(
       await query(
         "SELECT snapshot FROM coordination_cases WHERE id=CAST(:case AS uuid) FOR UPDATE",
@@ -75,6 +85,7 @@ export async function sendDelivery(tenant: string, id: string) {
       ),
     )[0];
     let reason: string | undefined;
+    const integrityHold = await caseHeld(candidate.case_id, tx);
     let template: Awaited<ReturnType<typeof approvedTemplate>> = null;
     if (
       !binding?.enabled ||
@@ -124,6 +135,7 @@ export async function sendDelivery(tenant: string, id: string) {
     )
       return { retryAfter: 2 as const };
     if (usage.count >= 100) reason = "daily_contact_budget";
+    if (integrityHold) reason = "case_integrity_review_required";
     const body = template?.body ?? render(d);
     if (Buffer.byteLength(body) > 4000) reason = "message_size_limit";
     if (reason) {

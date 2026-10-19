@@ -14,6 +14,7 @@ Use Node.js 24 and Terraform 1.15.8. Run `npm ci --ignore-scripts` and `npm run 
 
 ## Documentation
 
+- [Operations, recovery and retention](docs/OPERATIONS.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [AI agent, review and knowledge contracts](docs/AI.md)
 - [Channels, identity and setup](docs/CHANNELS.md)

@@ -11,6 +11,7 @@ for (const [name, entry] of Object.entries({
   "channel-receive": "apps/workers/src/channel-receive.ts",
   agent: "apps/workers/src/agent.ts",
   result: "apps/workers/src/result.ts",
+  reconcile: "apps/workers/src/reconcile.ts",
 })) {
   await build({
     entryPoints: [entry],

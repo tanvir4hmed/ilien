@@ -112,7 +112,7 @@ if (!state.bound) {
       ]),
     );
     const data = JSON.parse(readFileSync(result, "utf8"));
-    if (!response.FunctionError && data.schemaVersion === 5) {
+    if (!response.FunctionError && data.schemaVersion >= 6) {
       state.bound = true;
       save();
       break;

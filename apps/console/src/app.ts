@@ -223,6 +223,7 @@ function shell() {
     "Channels",
     "Knowledge",
     "Settings",
+    ...(role === "admin" ? ["Operations"] : []),
   ]) {
     const b = button(name, () => show(name));
     if (page === name) b.classList.add("active");
@@ -268,6 +269,7 @@ async function show(name: string) {
       Channels: channels,
       Knowledge: knowledge,
       Settings: settings,
+      Operations: operations,
     };
     content.replaceChildren();
     await tasks[name]!();
@@ -866,6 +868,118 @@ async function settings() {
       enabled: true,
     });
   }
+}
+async function operations() {
+  const data = await api<{
+    controls: Record<string, unknown>;
+    work: Row[];
+    deliveries: Row[];
+    audit: Row[];
+    retention: Row[];
+    caseChecks: Row[];
+  }>("/operations");
+  const c = card("Recovery & processing controls");
+  c.append(
+    notice(
+      "Recovery changes require an operator reason and are audited. Pausing stops new work at the next gate; in-flight provider/model calls may already have happened. Uncertain outcomes require evidence review.",
+    ),
+  );
+  details("Current controls", data.controls, c);
+  const queues = card("Queue health");
+  queues.append(
+    button("Refresh queue counts", async () => {
+      const snapshot = await api<{
+        queues: Row[];
+        dashboard?: string;
+        observedAt: string;
+      }>("/operations/queues");
+      table(
+        snapshot.queues,
+        ["name", "visible", "inFlight", "delayed", "error"],
+        queues,
+      );
+      queues.append(
+        el("p", `Approximate counts · ${snapshot.observedAt}`, "muted"),
+      );
+      if (snapshot.dashboard) {
+        const a = el("a", "Open CloudWatch dashboard");
+        a.href = snapshot.dashboard;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        queues.append(a);
+      }
+    }),
+  );
+  table(
+    data.work,
+    ["lane", "id", "state", "attempts", "created_at"],
+    card("Pending and interrupted work"),
+  );
+  table(
+    data.caseChecks,
+    ["case_id", "checked_revision", "status", "issues", "checked_at"],
+    card("Independent structural supervision"),
+  );
+  table(
+    data.deliveries,
+    ["id", "channel", "status", "reason", "queue_attempts"],
+    card("Delivery attention"),
+  );
+  const mutation = (title: string, body: Row) =>
+    jsonForm(c, title, "/operations", {
+      requestId: crypto.randomUUID(),
+      reason: "",
+      ...body,
+    });
+  mutation("Pause or resume processing", {
+    action: "controls",
+    expectedRevision: data.controls.revision,
+    intakePaused: data.controls.intake_paused,
+    agentPaused: data.controls.agent_paused,
+    outboundPaused: data.controls.outbound_paused,
+    resultsPaused: data.controls.results_paused,
+    retentionDays: data.controls.retention_days,
+    legalHold: data.controls.legal_hold,
+  });
+  mutation("Run bounded reconciliation", { action: "reconcile" });
+  mutation("Requeue eligible durable work", {
+    action: "requeue_work",
+    lane: "intake",
+    targetId: "",
+  });
+  mutation("Reconcile an uncertain provider send", {
+    action: "resolve_delivery",
+    targetId: "",
+    outcome: "not_sent",
+    evidenceRef: "",
+  });
+  mutation("Retry a definitively unsent delivery", {
+    action: "retry_delivery",
+    targetId: "",
+    evidenceRef: "",
+  });
+  const r = card("Retention review");
+  r.append(
+    el(
+      "p",
+      "Legal hold is enabled by default. No evidence is automatically deleted. This action redacts eligible finished AI traces from aged terminal cases and retains hash tombstones; it does not erase original case evidence or backups.",
+      "muted",
+    ),
+  );
+  table(data.retention, ["id", "status", "updated_at", "eligible_traces"], r);
+  jsonForm(r, "Redact eligible AI traces", "/operations", {
+    requestId: crypto.randomUUID(),
+    action: "redact_ai_traces",
+    targetId: "",
+    reason: "",
+  });
+  for (const row of data.audit)
+    details(
+      `${String(row.action)} · ${String(row.created_at)}`,
+      row,
+      card("Recovery audit"),
+    );
+  content.append(button("Refresh operations", () => show("Operations")));
 }
 async function boot() {
   config = await fetch("/config.json", { cache: "no-store" }).then((r) => {

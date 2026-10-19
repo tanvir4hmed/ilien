@@ -31,6 +31,7 @@ import {
   type Proposal,
   type Run,
 } from "./contracts.js";
+import { pausedFor } from "../../operations/src/controls.js";
 function fail(s: string): never {
   throw new CoordinationError(s);
 }
@@ -56,6 +57,7 @@ export async function enqueueAgent(
   automatic = false,
 ) {
   const state = await getCase(source, caseId, tx, true);
+  if (await pausedFor(source, "agent", tx)) return { state: "paused" };
   const config = await settings(source, tx);
   if (!config?.enabled || (automatic && !config.auto_receipts))
     return { state: "disabled" };

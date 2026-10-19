@@ -31,6 +31,13 @@ import {
   publishConfiguration,
   members,
 } from "../../../packages/product/src/configuration.js";
+import {
+  operationsView,
+  operationsWrite,
+  requestSchema as operationsRequestSchema,
+} from "../../../packages/operations/src/service.js";
+import { pausedFor } from "../../../packages/operations/src/controls.js";
+import { infrastructureView } from "../../../packages/operations/src/infrastructure.js";
 const lambda = new LambdaClient({ maxAttempts: 2 });
 import {
   enqueueAgent,
@@ -53,8 +60,8 @@ export async function handler(
   if (event.rawPath === "/health")
     return response(200, {
       service: "ilien",
-      phase: "product",
-      version: "0.5.0",
+      phase: "reliability",
+      version: "0.6.0",
     });
   const consoleRequest = event.rawPath.startsWith("/console/");
   const authorization = event.requestContext.authorizer;
@@ -142,6 +149,53 @@ export async function handler(
         return response(200, {
           items: await members(source, rawBody, principal),
         });
+    }
+    if (
+      event.rawPath === "/v1/operations" ||
+      event.rawPath === "/v1/operations/queues"
+    ) {
+      if (!consoleRequest || source.role !== "admin")
+        return response(403, { error: "admin_required" });
+      if (method === "GET")
+        return response(
+          200,
+          event.rawPath.endsWith("/queues")
+            ? await infrastructureView(source)
+            : await operationsView(source),
+        );
+      if (method === "POST" && event.rawPath === "/v1/operations") {
+        const request = operationsRequestSchema.parse(JSON.parse(rawBody));
+        const result = await operationsWrite(source, rawBody, principal);
+        if (!("duplicate" in result))
+          await lambda
+            .send(
+              new InvokeCommand({
+                FunctionName:
+                  request.action === "reconcile"
+                    ? process.env.RECONCILE_FUNCTION
+                    : process.env.RELAY_FUNCTION,
+                InvocationType: "Event",
+                Payload: Buffer.from(
+                  JSON.stringify({
+                    tenantId: source.tenant_id,
+                    ...(request.action === "reconcile"
+                      ? { sourceId: source.id }
+                      : {}),
+                  }),
+                ),
+              }),
+            )
+            .catch(() =>
+              console.error(
+                JSON.stringify({
+                  code: "operations_wake_failed",
+                  requestId: request.requestId,
+                }),
+              ),
+            );
+        return response(200, result);
+      }
+      return response(404, { error: "not_found" });
     }
     const aiCase = /^\/v1\/cases\/([0-9a-f-]{36})\/agent$/.exec(event.rawPath);
     const aiRun = /^\/v1\/ai\/runs\/([0-9a-f-]{36})(?:\/(review))?$/.exec(
@@ -336,6 +390,8 @@ export async function handler(
     const envelope = parsed.data;
     const hash = createHash("sha256").update(raw).digest("hex");
     const accepted = await transaction(source.tenant_id, async (tx) => {
+      if (await pausedFor(source, "intake", tx))
+        throw new CoordinationError("intake_paused", 503);
       // Serialize equal source/event keys, including concurrent first arrivals.
       await query(
         "SELECT pg_advisory_xact_lock(hashtextextended(:key,0))::text",

@@ -16,6 +16,7 @@ Static assets and public client configuration contain no credentials. CSP disall
 - Channels: bindings, receipts, delivery outcomes and explicit contact dispatch. Enabling a consented binding can enable real messages; recipient contacts are never auto-populated.
 - Knowledge: versioned publication and revocation.
 - Settings: AI controls, configuration preview/publish and existing identity membership.
+- Operations (admin): pause controls, durable work/queue visibility, independent structural checks, audited recovery and retained-trace minimization.
 
 No polling loop or model call runs simply because the UI is open. The authenticated source is simulated in this installation; it does not provide unrestricted multi-client self-service signup.
 
@@ -41,7 +42,7 @@ Publication is **at least once**, not exactly once. Consumers deduplicate `resul
 
 ## Delivery and verification boundary
 
-`npm run build` performs type checking and bundles the console and workers. GitHub Actions provisions the console assets with Terraform alongside runtime resources and applies schema 5. Assets are served with no-store and CloudFront caching disabled to avoid stale login/configuration files during this build stage. A dedicated custom app hostname is not configured yet; use Terraform's `console_url`. Email DNS is independent.
+`npm run build` performs type checking and bundles the console and workers. GitHub Actions provisions the console assets with Terraform alongside runtime resources and applies schema 6. Assets are served with no-store and CloudFront caching disabled to avoid stale login/configuration files during this build stage. A dedicated custom app hostname is not configured yet; use Terraform's `console_url`. Email DNS is independent.
 
 Application, browser interaction, model and live-channel verification have **not** been performed for this build. Build and Terraform validation do not establish login, business-flow or delivery correctness. Do not infer an accuracy/SLA/compliance claim from the controls described here.
 
@@ -52,3 +53,5 @@ References: [API Gateway JWT authorizers](https://docs.aws.amazon.com/apigateway
 After delivery, an authorized administrator runs `node scripts/bootstrap-operator.mjs APPROVED_EMAIL` with local AWS administrative access and initialized Terraform outputs. The script suppresses invitations, creates a temporary password locally, and binds the initial Cognito subject through the privileged migration function. It refuses a second initial membership. It does not sign in or send a message. First sign-in requires a new password and authenticator enrollment. `.private/operator-first-login.txt` and `.private/operator-bootstrap.json` contain credentials; never publish or package either file. Remove them after successful sign-in. For an uncertain create/bind result, inspect the account and private result first rather than resetting credentials blindly.
 
 Encryption reference: [SNS key management and publisher permissions](https://docs.aws.amazon.com/sns/latest/dg/sns-key-management.html).
+
+[Operational controls and limitations](OPERATIONS.md) supersede earlier statements about reconciliation/recovery being entirely future work. Human alert subscriptions, live evaluations and restore exercises remain pending.

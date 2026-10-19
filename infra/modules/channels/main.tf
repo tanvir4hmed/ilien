@@ -9,6 +9,7 @@ resource "aws_kms_key" "notifications" {
   enable_key_rotation     = true
   deletion_window_in_days = 30
   policy = jsonencode({ Version = "2012-10-17", Statement = [
+    { Effect = "Allow", Principal = { Service = "cloudwatch.amazonaws.com" }, Action = ["kms:GenerateDataKey*", "kms:Decrypt"], Resource = "*", Condition = { StringEquals = { "aws:SourceAccount" = local.account } } },
     { Effect = "Allow", Principal = { AWS = "arn:aws:iam::${local.account}:root" }, Action = "kms:*", Resource = "*" },
     { Effect = "Allow", Principal = { Service = ["ses.amazonaws.com", "social-messaging.amazonaws.com"] }, Action = ["kms:GenerateDataKey*", "kms:Decrypt"], Resource = "*", Condition = { StringEquals = { "aws:SourceAccount" = local.account }, ArnLike = { "aws:SourceArn" = [var.waba_arn, "arn:aws:ses:us-east-1:${local.account}:*"] } } }
   ] })
@@ -73,7 +74,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "evidence" {
     id     = "raw-evidence-retention"
     status = "Enabled"
     filter {}
-    expiration { days = 90 }
+    # Preserve original evidence until an explicit case-aware retention action.
     abort_incomplete_multipart_upload { days_after_initiation = 1 }
   }
 }
@@ -143,3 +144,12 @@ output "dns_records" {
 }
 
 output "notification_key_arn" { value = aws_kms_key.notifications.arn }
+output "inbound_name" { value = module.inbound.name }
+output "inbound_url" { value = module.inbound.url }
+output "inbound_dead_name" { value = module.inbound.dead_name }
+output "inbound_dead_arn" { value = module.inbound.dead_arn }
+output "inbound_dead_url" { value = module.inbound.dead_url }
+output "outbound_name" { value = module.outbound.name }
+output "outbound_dead_name" { value = module.outbound.dead_name }
+output "outbound_dead_arn" { value = module.outbound.dead_arn }
+output "outbound_dead_url" { value = module.outbound.dead_url }

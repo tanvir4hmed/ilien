@@ -32,7 +32,7 @@ resource "aws_iam_role" "runtime" {
 }
 resource "aws_iam_role_policy" "runtime" {
   role   = aws_iam_role.runtime.id
-  policy = var.policy
+  policy = jsonencode({ Version = "2012-10-17", Statement = concat(jsondecode(var.policy).Statement, var.async_failure_arn == null ? [] : [{ Effect = "Allow", Action = ["sqs:SendMessage"], Resource = var.async_failure_arn }]) })
 }
 resource "aws_cloudwatch_log_group" "runtime" {
   name              = "/aws/lambda/${var.name}"
@@ -63,4 +63,17 @@ output "name" {
 }
 output "invoke_arn" {
   value = aws_lambda_function.runtime.invoke_arn
+}
+variable "async_failure_arn" {
+  type    = string
+  default = null
+}
+resource "aws_lambda_function_event_invoke_config" "runtime" {
+  count                        = var.async_failure_arn == null ? 0 : 1
+  function_name                = aws_lambda_function.runtime.function_name
+  maximum_event_age_in_seconds = 3600
+  maximum_retry_attempts       = 2
+  destination_config {
+    on_failure { destination = var.async_failure_arn }
+  }
 }

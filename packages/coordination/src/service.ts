@@ -603,7 +603,7 @@ export async function processTimer(tenant: string, jobId: string) {
         tx,
       ),
     )[0];
-    if (locked?.state === "processed") return;
+    if (locked && ["processed", "exhausted"].includes(locked.state)) return;
     const state = decode(row.snapshot),
       now = new Date().toISOString();
     if (state.revision === job.expected_revision) {

@@ -26,3 +26,12 @@ variable "visibility_timeout" {
   type    = number
   default = 360
 }
+output "name" { value = aws_sqs_queue.work.name }
+output "dead_name" { value = aws_sqs_queue.dead.name }
+output "dead_arn" { value = aws_sqs_queue.dead.arn }
+output "dead_url" { value = aws_sqs_queue.dead.url }
+
+resource "aws_sqs_queue_redrive_allow_policy" "own_source" {
+  queue_url            = aws_sqs_queue.dead.id
+  redrive_allow_policy = jsonencode({ redrivePermission = "byQueue", sourceQueueArns = [aws_sqs_queue.work.arn] })
+}
