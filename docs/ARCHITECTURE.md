@@ -24,7 +24,14 @@ flowchart LR
   AG --> DB
   API --> REVIEW[Exact proposal review]
   REVIEW --> CORE
+  BROWSER[Operator console on CloudFront] --> AUTH[Cognito code + PKCE + MFA]
+  BROWSER --> JWT[API Gateway JWT + source membership]
+  JWT --> API
   API --> RESULT[Source result polling + acknowledgement]
+  RELAY --> RQ[Result SQS + DLQ]
+  RQ --> RW[Source result worker]
+  RW --> SNS[Source-specific SNS topic]
+  RW --> DB
   CI[GitHub OIDC delivery] --> TF[Terraform modules]
   CI --> MIG[Isolated migration Lambda]
   MIG --> DB
@@ -34,7 +41,7 @@ Machine source identity is resolved from trusted IAM context. Browser operators 
 
 `packages/coordination` separates deterministic graph transitions from transactional persistence. `packages/domain-packs` defines textile templates; it does not own provider credentials. One case row serializes concurrent transitions. Expected revisions reject stale changes; immutable command/evidence records preserve provenance. Relational obligation/dependency projections, result records and delayed-work intents commit together. Separate queue/compute modules allow intake and coordination capacity to change independently, although they share database capacity.
 
-Only validated versioned payloads activate configured workflows. Unknown or minimal catalogue payloads stay triage. Verified simulated claims satisfy required dependencies; changed evidence invalidates dependent claims. Results describe communication outcomes, never implicit factory actions. Contact snapshots remain separate from provider delivery intents, incoming evidence and transport events. Enabled consented bindings allow real sends. [Coordination API](COORDINATION.md) documents exact behavior and bounds.
+Built-in workflows validate their versioned payload contracts; administrator-configured mappings enforce configured required top-level fields, not arbitrary domain semantics. Unknown or minimal catalogue payloads stay triage. Verified simulated claims satisfy required dependencies; changed evidence invalidates dependent claims. Results describe communication outcomes, never implicit factory actions. Contact snapshots remain separate from provider delivery intents, incoming evidence and transport events. Enabled consented bindings allow real sends. [Coordination API](COORDINATION.md) documents exact behavior and bounds.
 
 The bounded AI worker proposes next steps through the same authority/version/evidence gates after exact-proposal operator review. See [AI architecture and limits](AI.md). The channel module supplies operator-attested identity bindings, fixed disclosure/rendering, provider receipts and conservative uncertain-send handling; runtime acceptance and scheduled reconciliation remain pending. See [channels](CHANNELS.md). Existing simulation role-play must not be reused as production authorization.
 

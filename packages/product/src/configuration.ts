@@ -241,7 +241,7 @@ export async function members(source: Source, raw?: string, caller?: string) {
         })
         .parse(JSON.parse(raw));
       await query(
-        "SELECT id FROM source_connections WHERE id=CAST(:source AS uuid) FOR UPDATE",
+        "SELECT connection_id FROM product_settings WHERE connection_id=CAST(:source AS uuid) FOR UPDATE",
         [param("source", source.id)],
         tx,
       );
