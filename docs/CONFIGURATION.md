@@ -28,3 +28,11 @@ References: [GitHub AWS OIDC](https://docs.github.com/en/actions/how-tos/secure-
 ## AI configuration
 
 The pinned regional model is `amazon.nova-lite-v1:0`, using the agent worker IAM role; no model API key or new GitHub secret is needed. Its exact model ARN is permitted in both the runtime boundary and worker policy. AI settings and approved knowledge are source-scoped operator API configuration with revision/audit history; see [AI](AI.md). The model does not receive contact credentials or choose the deployment model. Initial mode requires operator review of every effect. No customer knowledge is preloaded.
+
+## Web hostname and TLS
+
+`APP_DOMAIN` also selects the optional console hostname. Terraform requests an ACM DNS-validated certificate in us-east-1 and outputs `web_dns_records`. The deployment initially keeps `CUSTOM_DOMAIN_READY=false` (default), so certificate issuance does not block the working CloudFront URL. Add the generated validation CNAME and the application CNAME at the authoritative DNS provider, using the exact subdomain names and targets. Keep the validation CNAME for automatic certificate renewal; DNS-only records make validation/origin troubleshooting clearer.
+
+After ACM reports ISSUED and the application DNS target is in place, set the GitHub environment variable `CUSTOM_DOMAIN_READY=true` and run the delivery workflow. Terraform then attaches the hostname/certificate to the existing CloudFront distribution, enforces TLS 1.2 or newer, allows the exact custom and CloudFront origins in API CORS, and registers both exact callback/logout URLs in Cognito. Activation fails its plan precondition if the certificate is not issued. No new database or second application is needed.
+
+The browser selects its callback only from the server-configured exact allowlist, matching its current origin. This preserves PKCE session state on both the custom hostname and original CloudFront URL. It does not accept an arbitrary URL from a query parameter. Email identity/MX/DKIM records are separate from these web CNAMEs; retain them unchanged.

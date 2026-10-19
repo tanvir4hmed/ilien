@@ -7,6 +7,7 @@ type Config = {
   authDomain: string;
   clientId: string;
   redirectUri: string;
+  redirectUris?: string[];
 };
 type Row = Record<string, unknown>;
 const root = document.querySelector<HTMLDivElement>("#app")!;
@@ -986,6 +987,13 @@ async function boot() {
     if (!r.ok) throw new Error("Workspace configuration unavailable");
     return r.json();
   });
+  const localCallback = new URL("/", location.origin).href;
+  if (config.redirectUris) {
+    if (!config.redirectUris.includes(localCallback))
+      throw new Error("This hostname is not an approved sign-in origin.");
+    config.redirectUri = localCallback;
+  } else if (config.redirectUri !== localCallback)
+    throw new Error("Sign-in origin does not match workspace configuration.");
   const params = new URLSearchParams(location.search),
     code = params.get("code");
   if (params.has("error")) {

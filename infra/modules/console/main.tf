@@ -36,8 +36,8 @@ resource "aws_cognito_user_pool_client" "console" {
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_scopes                 = ["openid", "email"]
   supported_identity_providers         = ["COGNITO"]
-  callback_urls                        = ["https://${aws_cloudfront_distribution.console.domain_name}/"]
-  logout_urls                          = ["https://${aws_cloudfront_distribution.console.domain_name}/"]
+  callback_urls                        = [for origin in local.allowed_origins : "${origin}/"]
+  logout_urls                          = [for origin in local.allowed_origins : "${origin}/"]
   prevent_user_existence_errors        = "ENABLED"
   enable_token_revocation              = true
   access_token_validity                = 15
@@ -96,6 +96,13 @@ resource "aws_cloudfront_response_headers_policy" "console" {
   }
 }
 resource "aws_cloudfront_distribution" "console" {
+  aliases = local.custom_enabled ? [var.custom_domain] : []
+  lifecycle {
+    precondition {
+      condition     = !local.custom_enabled || try(aws_acm_certificate.console[0].status == "ISSUED", false)
+      error_message = "Publish the ACM DNS validation record and wait for ISSUED before enabling the custom hostname."
+    }
+  }
   enabled             = true
   is_ipv6_enabled     = true
   default_root_object = "index.html"
@@ -118,7 +125,12 @@ resource "aws_cloudfront_distribution" "console" {
   restrictions {
     geo_restriction { restriction_type = "none" }
   }
-  viewer_certificate { cloudfront_default_certificate = true }
+  viewer_certificate {
+    cloudfront_default_certificate = !local.custom_enabled
+    acm_certificate_arn            = local.custom_enabled ? aws_acm_certificate.console[0].arn : null
+    ssl_support_method             = local.custom_enabled ? "sni-only" : null
+    minimum_protocol_version       = local.custom_enabled ? "TLSv1.2_2021" : "TLSv1"
+  }
   tags = { Project = "ilien" }
 }
 resource "aws_s3_bucket_policy" "console" {
@@ -144,7 +156,7 @@ resource "aws_s3_object" "config" {
   content_type           = "application/json"
   cache_control          = "no-store"
   server_side_encryption = "AES256"
-  content                = jsonencode({ apiUrl = var.api_url, authDomain = "https://${aws_cognito_user_pool_domain.operators.domain}.auth.us-east-1.amazoncognito.com", clientId = aws_cognito_user_pool_client.console.id, redirectUri = "https://${aws_cloudfront_distribution.console.domain_name}/" })
+  content                = jsonencode({ apiUrl = var.api_url, authDomain = "https://${aws_cognito_user_pool_domain.operators.domain}.auth.us-east-1.amazoncognito.com", clientId = aws_cognito_user_pool_client.console.id, redirectUri = "${local.public_url}/", redirectUris = [for origin in local.allowed_origins : "${origin}/"] })
 }
 output "url" { value = "https://${aws_cloudfront_distribution.console.domain_name}" }
 output "issuer" { value = "https://cognito-idp.us-east-1.amazonaws.com/${aws_cognito_user_pool.operators.id}" }

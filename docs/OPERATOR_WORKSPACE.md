@@ -42,7 +42,7 @@ Publication is **at least once**, not exactly once. Consumers deduplicate `resul
 
 ## Delivery and verification boundary
 
-`npm run build` performs type checking and bundles the console and workers. GitHub Actions provisions the console assets with Terraform alongside runtime resources and applies schema 6. Assets are served with no-store and CloudFront caching disabled to avoid stale login/configuration files during this build stage. A dedicated custom app hostname is not configured yet; use Terraform's `console_url`. Email DNS is independent.
+`npm run build` performs type checking and bundles the console and workers. GitHub Actions provisions the console assets with Terraform alongside runtime resources and applies schema 6. Assets are served with no-store and CloudFront caching disabled to avoid stale login/configuration files during this build stage. Custom app hosting uses staged ACM validation and CloudFront activation; see [web hostname configuration](CONFIGURATION.md#web-hostname-and-tls). Use Terraform's `console_url` for the active URL. Email DNS is independent.
 
 Application, browser interaction, model and live-channel verification have **not** been performed for this build. Build and Terraform validation do not establish login, business-flow or delivery correctness. Do not infer an accuracy/SLA/compliance claim from the controls described here.
 
