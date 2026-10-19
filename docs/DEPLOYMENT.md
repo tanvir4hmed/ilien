@@ -1,5 +1,19 @@
 # Deployment record
 
+## Phase 4 deployment — 19 October 2026
+
+Deployed code: `6f9c623` (AI implementation `5da6a27`). [Successful AI delivery](https://github.com/tanvir4hmed/ilien/actions/runs/39190215362).
+
+- Build, publication guard, Terraform formatting and guarded delivery succeeded.
+- Initial infrastructure apply added 12 resources and changed 8, with zero deletions. Migration then encountered only Aurora auto-resume errors and exhausted the original short retry allowance.
+- The follow-up introduced a bounded 10-attempt migration allowance with 30-second spacing for resuming/unavailable database errors. Auto-pause remains enabled. Final apply changed 8 resources and destroyed none.
+- Schema version 4 applied. WhatsApp destination configuration succeeded without sending a message. Process health returned `ai`, version `0.4.0`.
+- Delivered: independent agent worker/queue, pinned regional Bedrock permissions, bounded tool loop, scoped versioned knowledge, evidence citations, usage records and exact-proposal operator review. See [AI contracts and limitations](AI.md).
+
+No model inference, live messaging or application/evaluation suite was run. These delivery checks do not prove useful agent decisions or end-to-end correctness. Every model-authored effect requires operator review; autonomous semantic effects are not enabled. DNS/SES and participant readiness are separate channel setup gates.
+
+Channel readiness checked on 19 October after owner-installed DNS: all eight email records matched generated values; SES domain and DKIM verification succeeded. Custom MAIL FROM verification remained pending despite a correct public MX record. SES sandbox restrictions and participant consent/verification still apply. No email was sent during these checks.
+
 ## Phase 3 deployment — 16 October 2026
 
 Deployed code: `81864f7`. [Successful channel delivery](https://github.com/tanvir4hmed/ilien/actions/runs/38878076274), with its job results rechecked on 19 October 2026.
