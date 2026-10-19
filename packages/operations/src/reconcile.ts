@@ -8,6 +8,14 @@ import type { Source } from "../../coordination/src/service.js";
 import { controlsFor } from "./controls.js";
 export async function reconcile(source: Source) {
   return transaction(source.tenant_id, async (tx) => {
+    const lock = rows<{ acquired: boolean }>(
+      await query(
+        "SELECT pg_try_advisory_xact_lock(hashtextextended(:key,0)) AS acquired",
+        [param("key", `${source.tenant_id}/${source.id}/reconcile`)],
+        tx,
+      ),
+    )[0];
+    if (!lock?.acquired) return { busy: true };
     const enabled = rows(
       await query(
         "SELECT id FROM source_connections WHERE id=CAST(:source AS uuid) AND enabled",

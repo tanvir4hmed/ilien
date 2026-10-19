@@ -18,6 +18,7 @@ export async function handler(event: unknown) {
     id: input.sourceId,
     origin: "simulated",
   });
+  if ("busy" in result) return { state: "reconciliation_already_running" };
   const caseChecks =
     "disabled" in result
       ? { checked: 0, review: 0, skipped: 0 }

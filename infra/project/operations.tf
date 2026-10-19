@@ -19,7 +19,6 @@ module "reconcile" {
   artifact_bucket      = "ilien-terraform-${local.account}-us-east-1"
   zip_path             = "../../dist/reconcile.zip"
   timeout              = 120
-  reserved_concurrency = 1
   enable_async_failure = true
   async_failure_arn    = aws_sqs_queue.runtime_failures.arn
   environment          = merge(local.common, { TENANT_ID = local.channel_env.TENANT_ID, SOURCE_ID = local.channel_env.SOURCE_ID, RELAY_FUNCTION = module.relay.name })

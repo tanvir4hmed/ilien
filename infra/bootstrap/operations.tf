@@ -1,7 +1,9 @@
 resource "aws_iam_policy" "operations_deploy" {
   name = "ilien-operations-provisioning"
   policy = jsonencode({ Version = "2012-10-17", Statement = [
-    { Effect = "Allow", Action = ["logs:CreateLogGroup", "logs:PutRetentionPolicy", "logs:TagResource", "logs:UntagResource", "logs:ListTagsForResource"], Resource = "arn:aws:logs:us-east-1:${local.account}:log-group:/aws/apigateway/ilien" },
+    { Effect = "Allow", Action = ["acm:RequestCertificate"], Resource = "*", Condition = { StringEquals = { "aws:RequestTag/Project" = "ilien" } } },
+    { Effect = "Allow", Action = ["acm:DescribeCertificate", "acm:ListTagsForCertificate", "acm:AddTagsToCertificate", "acm:RemoveTagsFromCertificate", "acm:DeleteCertificate"], Resource = "arn:aws:acm:us-east-1:${local.account}:certificate/*", Condition = { StringEquals = { "aws:ResourceTag/Project" = "ilien" } } },
+    { Effect = "Allow", Action = ["logs:CreateLogGroup", "logs:PutRetentionPolicy", "logs:TagResource", "logs:UntagResource", "logs:ListTagsForResource"], Resource = ["arn:aws:logs:us-east-1:${local.account}:log-group:/aws/apigateway/ilien", "arn:aws:logs:us-east-1:${local.account}:log-group:/aws/apigateway/ilien:*"] },
     { Effect = "Allow", Action = ["logs:CreateLogDelivery", "logs:GetLogDelivery", "logs:UpdateLogDelivery", "logs:DeleteLogDelivery", "logs:ListLogDeliveries", "logs:PutResourcePolicy", "logs:DescribeResourcePolicies"], Resource = "*", Condition = { StringEquals = { "aws:RequestedRegion" = "us-east-1" } } },
     { Effect = "Allow", Action = ["iam:CreateServiceLinkedRole"], Resource = "arn:aws:iam::${local.account}:role/aws-service-role/ops.apigateway.amazonaws.com/*", Condition = { StringEquals = { "iam:AWSServiceName" = "ops.apigateway.amazonaws.com" } } },
     { Effect = "Allow", Action = ["events:PutRule", "events:DescribeRule", "events:DeleteRule", "events:PutTargets", "events:RemoveTargets", "events:ListTargetsByRule", "events:TagResource", "events:UntagResource", "events:ListTagsForResource"], Resource = "arn:aws:events:us-east-1:${local.account}:rule/ilien-*" },

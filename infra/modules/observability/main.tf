@@ -11,7 +11,7 @@ resource "aws_sns_topic" "alerts" {
 }
 resource "aws_sns_topic_policy" "alerts" {
   arn    = aws_sns_topic.alerts.arn
-  policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Principal = { Service = "cloudwatch.amazonaws.com" }, Action = "sns:Publish", Resource = aws_sns_topic.alerts.arn, Condition = { StringEquals = { "aws:SourceAccount" = var.account }, ArnLike = { "aws:SourceArn" = "arn:aws:cloudwatch:us-east-1:${var.account}:alarm:ilien-*" } } }, { Effect = "Deny", Principal = "*", Action = "sns:Publish", Resource = aws_sns_topic.alerts.arn, Condition = { Bool = { "aws:SecureTransport" = "false" } } }] })
+  policy = jsonencode({ Version = "2012-10-17", Statement = [{ Sid = "CloudWatchPublish", Effect = "Allow", Principal = { Service = "cloudwatch.amazonaws.com" }, Action = "sns:Publish", Resource = aws_sns_topic.alerts.arn, Condition = { StringEquals = { "aws:SourceAccount" = var.account }, ArnLike = { "aws:SourceArn" = "arn:aws:cloudwatch:us-east-1:${var.account}:alarm:ilien-*" } } }, { Sid = "DenyInsecurePublish", Effect = "Deny", Principal = "*", Action = "sns:Publish", Resource = aws_sns_topic.alerts.arn, Condition = { Bool = { "aws:SecureTransport" = "false" } } }] })
 }
 resource "aws_cloudwatch_metric_alarm" "errors" {
   for_each            = var.functions
