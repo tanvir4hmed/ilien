@@ -19,6 +19,7 @@ import {
   type Delivery,
 } from "./intents.js";
 import type { Incoming } from "./normalize.js";
+import { enqueueAgent } from "../../ai/src/store.js";
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 export async function receive(
   tenant: string,
@@ -257,5 +258,19 @@ export async function receive(
       ],
       tx,
     );
+    if (
+      status === "needs_review" &&
+      reason === "unstructured_reply" &&
+      d &&
+      binding?.actor_id === d.actor_id
+    )
+      await enqueueAgent(
+        { tenant_id: tenant, id: sourceId, origin: "simulated" },
+        d.case_id,
+        receiptId,
+        `receipt:${receiptId}`,
+        tx,
+        true,
+      );
   });
 }

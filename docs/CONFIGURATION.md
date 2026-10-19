@@ -23,3 +23,8 @@ Do not duplicate or rotate a secret in competing systems without a defined owner
 A recipient's Gmail address or personal WhatsApp number is not a business sending identity. SES sandbox recipients/senders require appropriate verification; email replies require a controlled receiving domain and receipt routing. WhatsApp requires a linked business account and registered sending number. Prefer a separate business sender rather than migrating a personal number. Never commit participant contact details into fixtures or examples.
 
 References: [GitHub AWS OIDC](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws), [AWS WhatsApp onboarding](https://docs.aws.amazon.com/social-messaging/latest/userguide/getting-started-whatsapp.html), [SES receiving](https://docs.aws.amazon.com/ses/latest/dg/receiving-email-concepts.html).
+
+
+## AI configuration
+
+The pinned regional model is `amazon.nova-lite-v1:0`, using the agent worker IAM role; no model API key or new GitHub secret is needed. Its exact model ARN is permitted in both the runtime boundary and worker policy. AI settings and approved knowledge are source-scoped operator API configuration with revision/audit history; see [AI](AI.md). The model does not receive contact credentials or choose the deployment model. Initial mode requires operator review of every effect. No customer knowledge is preloaded.

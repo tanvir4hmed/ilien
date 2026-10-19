@@ -13,6 +13,7 @@ import {
 import migration from "../../../packages/persistence/migrations/001_foundation.sql";
 import coordinationMigration from "../../../packages/persistence/migrations/002_coordination.sql";
 import channelMigration from "../../../packages/persistence/migrations/003_channels.sql";
+import aiMigration from "../../../packages/persistence/migrations/004_ai.sql";
 import { textilePolicy } from "../../../packages/domain-packs/src/textile.js";
 const secrets = new SecretsManagerClient({ maxAttempts: 3 });
 export async function handler() {
@@ -70,13 +71,16 @@ export async function handler() {
         tx,
       ),
     )[0]?.version;
-    if (version !== 1 && version !== 2 && version !== 3)
+    if (version !== 1 && version !== 2 && version !== 3 && version !== 4)
       throw new Error("Unsupported database migration version");
     if (version === 1)
       for (const statement of coordinationMigration.split("-- statement"))
         await query(statement.trim(), [], tx);
     if (version! < 3)
       for (const statement of channelMigration.split("-- statement"))
+        await query(statement.trim(), [], tx);
+    if (version! < 4)
+      for (const statement of aiMigration.split("-- statement"))
         await query(statement.trim(), [], tx);
     await query(
       "INSERT INTO tenants(id,name) VALUES(CAST(:tenant AS uuid),'Synthetic textile workspace') ON CONFLICT(id) DO NOTHING",
@@ -102,6 +106,14 @@ export async function handler() {
       ],
       tx,
     );
+    await query(
+      "INSERT INTO ai_settings(tenant_id,connection_id) VALUES(CAST(:tenant AS uuid),CAST(:source AS uuid)) ON CONFLICT DO NOTHING",
+      [
+        param("tenant", process.env.TENANT_ID!),
+        param("source", process.env.SOURCE_ID!),
+      ],
+      tx,
+    );
   });
-  return { schemaVersion: 3 };
+  return { schemaVersion: 4 };
 }

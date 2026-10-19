@@ -1,6 +1,6 @@
 # Architecture overview
 
-ILIEN implements intake, deterministic coordination and real AWS WhatsApp/SES adapters. AI planning and a production human identity/UI remain subsequent components. Latest CI determines deployed status; application verification is deferred.
+ILIEN implements intake, deterministic coordination and real AWS WhatsApp/SES adapters. A bounded Bedrock planner with mandatory operator review is implemented; production human identity/UI remains subsequent work. Latest CI determines deployed status; application verification is deferred.
 
 ```mermaid
 flowchart LR
@@ -18,6 +18,12 @@ flowchart LR
   API --> CORE
   CORE --> DB
   CW --> RELAY
+  RELAY --> AQ[Agent SQS + DLQ]
+  AQ --> AG[Bounded agent worker]
+  AG --> BR[Bedrock Converse]
+  AG --> DB
+  API --> REVIEW[Exact proposal review]
+  REVIEW --> CORE
   API --> RESULT[Source result polling + acknowledgement]
   CI[GitHub OIDC delivery] --> TF[Terraform modules]
   CI --> MIG[Isolated migration Lambda]
@@ -30,6 +36,6 @@ Source identity is resolved from trusted IAM context. PostgreSQL RLS uses transa
 
 Only validated versioned payloads activate configured workflows. Unknown or minimal catalogue payloads stay triage. Verified simulated claims satisfy required dependencies; changed evidence invalidates dependent claims. Results describe communication outcomes, never implicit factory actions. Contact snapshots remain separate from provider delivery intents, incoming evidence and transport events. Enabled consented bindings allow real sends. [Coordination API](COORDINATION.md) documents exact behavior and bounds.
 
-Future AI will propose bounded next steps through the same authority/version/evidence gates. The channel module supplies operator-attested identity bindings, fixed disclosure/rendering, provider receipts and conservative uncertain-send handling; runtime acceptance and scheduled reconciliation remain pending. See [channels](CHANNELS.md). Existing simulation role-play must not be reused as production authorization.
+The bounded AI worker proposes next steps through the same authority/version/evidence gates after exact-proposal operator review. See [AI architecture and limits](AI.md). The channel module supplies operator-attested identity bindings, fixed disclosure/rendering, provider receipts and conservative uncertain-send handling; runtime acceptance and scheduled reconciliation remain pending. See [channels](CHANNELS.md). Existing simulation role-play must not be reused as production authorization.
 
 Infrastructure is modular Terraform delivered by GitHub Actions with short-lived OIDC credentials and content-addressed private Lambda artifacts. Aurora is private and encrypted; Data API avoids permanent app connection pools. There is one configured tenant, one database writer and no automatic regional failover. No production scalability, security certification or tested tenant-isolation claim is made.

@@ -23,6 +23,13 @@ import {
   channelView,
 } from "../../../packages/channels/src/admin.js";
 const lambda = new LambdaClient({ maxAttempts: 2 });
+import {
+  enqueueAgent,
+  listRuns,
+  runDetail,
+  reviewRun,
+} from "../../../packages/ai/src/store.js";
+import { adminView, adminWrite } from "../../../packages/ai/src/admin.js";
 const response = (statusCode: number, body: unknown) => ({
   statusCode,
   headers: { "content-type": "application/json", "cache-control": "no-store" },
@@ -33,8 +40,8 @@ export async function handler(event: APIGatewayProxyEventV2WithIAMAuthorizer) {
   if (event.rawPath === "/health")
     return response(200, {
       service: "ilien",
-      phase: "channels",
-      version: "0.3.0",
+      phase: "ai",
+      version: "0.4.0",
     });
   const principal = event.requestContext.authorizer?.iam?.userArn;
   if (!principal) return response(401, { error: "authentication_required" });
@@ -46,6 +53,74 @@ export async function handler(event: APIGatewayProxyEventV2WithIAMAuthorizer) {
     )[0];
     if (!source) return response(403, { error: "source_not_authorized" });
     const method = event.requestContext.http.method;
+    const aiCase = /^\/v1\/cases\/([0-9a-f-]{36})\/agent$/.exec(event.rawPath);
+    const aiRun = /^\/v1\/ai\/runs\/([0-9a-f-]{36})(?:\/(review))?$/.exec(
+      event.rawPath,
+    );
+    const aiAdmin = /^\/v1\/ai\/(settings|knowledge)$/.exec(event.rawPath);
+    if (aiCase || aiRun || aiAdmin) {
+      const raw = event.isBase64Encoded
+        ? Buffer.from(event.body ?? "", "base64").toString("utf8")
+        : (event.body ?? "");
+      if (Buffer.byteLength(raw) > 12000)
+        return response(413, { error: "ai_request_too_large" });
+      if (method === "GET") {
+        if (aiCase)
+          return response(200, {
+            items: await listRuns(source, z.uuid().parse(aiCase[1])),
+          });
+        if (aiRun && !aiRun[2])
+          return response(
+            200,
+            await runDetail(source, z.uuid().parse(aiRun[1])),
+          );
+        if (aiAdmin) return response(200, await adminView(source, aiAdmin[1]!));
+      }
+      if (method === "POST") {
+        let result: unknown;
+        if (aiCase) {
+          const input = z
+            .strictObject({
+              requestId: z.uuid(),
+              receiptId: z.uuid().optional(),
+            })
+            .parse(JSON.parse(raw));
+          result = await transaction(source.tenant_id, (tx) =>
+            enqueueAgent(
+              source,
+              z.uuid().parse(aiCase[1]),
+              input.receiptId ?? null,
+              `operator:${input.requestId}`,
+              tx,
+            ),
+          );
+        } else if (aiRun?.[2] === "review")
+          result = await reviewRun(
+            source,
+            z.uuid().parse(aiRun[1]),
+            raw,
+            principal,
+          );
+        else if (aiAdmin)
+          result = await adminWrite(source, aiAdmin[1]!, raw, principal);
+        else return response(404, { error: "not_found" });
+        await lambda
+          .send(
+            new InvokeCommand({
+              FunctionName: process.env.RELAY_FUNCTION,
+              InvocationType: "Event",
+              Payload: Buffer.from(
+                JSON.stringify({ tenantId: source.tenant_id }),
+              ),
+            }),
+          )
+          .catch(() =>
+            console.error(JSON.stringify({ code: "ai_relay_wake_failed" })),
+          );
+        return response(200, result);
+      }
+      return response(404, { error: "not_found" });
+    }
     const channelRoute =
       /^\/v1\/channels\/(bindings|deliveries|receipts|delivery-events|dispatch)$/.exec(
         event.rawPath,

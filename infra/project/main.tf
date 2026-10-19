@@ -57,8 +57,8 @@ module "relay" {
   boundary_arn    = local.boundary
   artifact_bucket = "ilien-terraform-${local.account}-us-east-1"
   zip_path        = "../../dist/relay.zip"
-  environment     = merge(local.common, { QUEUE_URL = module.queue.url, COORDINATION_QUEUE_URL = module.coordination_queue.url, CHANNEL_QUEUE_URL = module.channels.outbound_url })
-  policy          = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:SendMessage"], Resource = [module.queue.arn, module.coordination_queue.arn, module.channels.outbound_arn] }]) })
+  environment     = merge(local.common, { QUEUE_URL = module.queue.url, COORDINATION_QUEUE_URL = module.coordination_queue.url, CHANNEL_QUEUE_URL = module.channels.outbound_url, AGENT_QUEUE_URL = module.agent_queue.url })
+  policy          = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["sqs:SendMessage"], Resource = [module.queue.arn, module.coordination_queue.arn, module.channels.outbound_arn, module.agent_queue.arn] }]) })
 }
 module "api" {
   source          = "../modules/compute"
@@ -125,7 +125,7 @@ resource "aws_apigatewayv2_integration" "api" {
   payload_format_version = "2.0"
 }
 resource "aws_apigatewayv2_route" "events" {
-  for_each           = toset(["GET /v1/events", "POST /v1/events", "GET /v1/cases", "GET /v1/cases/{caseId}", "GET /v1/cases/{caseId}/{section}", "GET /v1/cases/{caseId}/evidence/{evidenceId}", "POST /v1/cases/{caseId}/commands", "POST /v1/cases/{caseId}/acknowledgements", "GET /v1/channels/{section}", "POST /v1/channels/{section}"])
+  for_each           = toset(["GET /v1/events", "POST /v1/events", "GET /v1/cases", "GET /v1/cases/{caseId}", "GET /v1/cases/{caseId}/{section}", "GET /v1/cases/{caseId}/evidence/{evidenceId}", "POST /v1/cases/{caseId}/commands", "POST /v1/cases/{caseId}/acknowledgements", "GET /v1/channels/{section}", "POST /v1/channels/{section}", "POST /v1/cases/{caseId}/agent", "GET /v1/ai/{section}", "POST /v1/ai/{section}", "GET /v1/ai/runs/{runId}", "POST /v1/ai/runs/{runId}/review"])
   api_id             = aws_apigatewayv2_api.api.id
   route_key          = each.value
   authorization_type = "AWS_IAM"
@@ -210,3 +210,29 @@ resource "aws_lambda_event_source_mapping" "channel_receive" {
 }
 output "channel_dns_records" { value = module.channels.dns_records }
 output "whatsapp_topic_arn" { value = module.channels.topics.whatsapp }
+
+module "agent_queue" {
+  source             = "../modules/queue"
+  name               = "ilien-agent"
+  visibility_timeout = 720
+}
+module "agent" {
+  source          = "../modules/compute"
+  name            = "ilien-agent"
+  boundary_arn    = local.boundary
+  artifact_bucket = "ilien-terraform-${local.account}-us-east-1"
+  zip_path        = "../../dist/agent.zip"
+  timeout         = 120
+  environment     = local.common
+  policy = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [
+    { Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], Resource = module.agent_queue.arn },
+    { Effect = "Allow", Action = ["bedrock:InvokeModel"], Resource = "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0" }
+  ]) })
+}
+resource "aws_lambda_event_source_mapping" "agent" {
+  event_source_arn        = module.agent_queue.arn
+  function_name           = module.agent.arn
+  batch_size              = 1
+  function_response_types = ["ReportBatchItemFailures"]
+  scaling_config { maximum_concurrency = 2 }
+}

@@ -1,6 +1,6 @@
 # Setup and operation
 
-The foundation contains an API, outbox relay, intake worker, coordination timer worker and privileged migration worker. It now includes separate channel send/receive workers. It has no AI agent or browser console yet. See [channel setup](CHANNELS.md) for identity, DNS, consent, limits and deferred acceptance. See [coordination API](COORDINATION.md) for command and result contracts.
+The foundation contains an API, outbox relay, intake worker, coordination timer worker and privileged migration worker. It now includes separate channel send/receive workers. A separate bounded AI worker proposes reviewed actions; no browser console exists yet. See [AI operation and limits](AI.md). See [channel setup](CHANNELS.md) for identity, DNS, consent, limits and deferred acceptance. See [coordination API](COORDINATION.md) for command and result contracts.
 
 ## Local build
 
@@ -55,4 +55,4 @@ AWS messaging requires configured identities and authorized recipients. Receivin
 The release must distinguish synthetic events/operational actions from actual communication delivery and disclose measured limits. Runtime claims and commands will be added only when the relevant components are available.
 
 
-Lambda delivery uploads only the seven explicit ZIP bundles to the encrypted, private Terraform bucket under the separate ilien/artifacts/ prefix. Keys are SHA-256 content addresses; Terraform references these objects when deploying Lambda. State remains under its own key. Artifact retention currently requires deliberate operator cleanup; do not remove packages referenced by an active or rollback release.
+Lambda delivery uploads only the eight explicit ZIP bundles to the encrypted, private Terraform bucket under the separate ilien/artifacts/ prefix. Keys are SHA-256 content addresses; Terraform references these objects when deploying Lambda. State remains under its own key. Artifact retention currently requires deliberate operator cleanup; do not remove packages referenced by an active or rollback release.

@@ -59,7 +59,7 @@ The outbound message includes a random 128-bit routing token, exact subject/obli
 
 For deterministic processing, reply with `ILIEN <token>` followed by one JSON operation from [the coordination contract](COORDINATION.md): `reply`, `verify`, or `add_child`. Email can omit that first line when using the generated Reply-To address. For a channel change, the participant can address `r+<token>@mail.<APP_DOMAIN>` from their separately consented email binding. The actor must match the original contact. The unchanged obligation revision is checked under a case lock; unrelated branch updates may advance the case revision without invalidating this reply. The existing coordinator still checks responsibility, subject revision, evidence age, dependency rules and verifier independence.
 
-Natural language, ambiguous correlation and stale requests are preserved for review. They do not mutate workflow state. The later AI phase will propose interpretations against this same deterministic boundary. High-impact business authorization is not established by email/phone access, and this release never executes operational actions.
+Natural language, ambiguous correlation and stale requests are preserved for review. They do not mutate workflow state. The bounded AI worker can propose an interpretation for eligible correlated unstructured replies, subject to mandatory operator review and this same deterministic boundary. See [AI](AI.md). High-impact business authorization is not established by email/phone access, and this release never executes operational actions.
 
 ## Attachments, limits and operations
 

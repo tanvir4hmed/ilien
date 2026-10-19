@@ -47,6 +47,7 @@ resource "aws_s3_bucket_policy" "state" {
 resource "aws_iam_policy" "runtime_boundary" {
   name = "ilien-runtime-boundary"
   policy = jsonencode({ Version = "2012-10-17", Statement = [
+    { Effect = "Allow", Action = ["bedrock:InvokeModel"], Resource = "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0" },
     { Effect = "Allow", Action = ["logs:CreateLogStream", "logs:PutLogEvents"], Resource = "arn:aws:logs:us-east-1:${local.account}:log-group:/aws/lambda/ilien-*" },
     { Effect = "Allow", Action = ["rds-data:*"], Resource = "arn:aws:rds:us-east-1:${local.account}:cluster:ilien" },
     { Effect = "Allow", Action = ["secretsmanager:GetSecretValue", "secretsmanager:PutSecretValue"], Resource = ["arn:aws:secretsmanager:us-east-1:${local.account}:secret:ilien-*", "arn:aws:secretsmanager:us-east-1:${local.account}:secret:rds!cluster-*"] },

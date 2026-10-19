@@ -49,7 +49,7 @@ const policySchema = z.object({
   maxDepth: z.number().int().min(1).max(8),
   evidenceAgeSeconds: z.number().int().min(60).max(604800),
 });
-async function policyFor(source: Source, tx: string): Promise<Policy | null> {
+export async function policyFor(source: Source, tx: string): Promise<Policy | null> {
   if (source.origin !== "simulated") return null;
   const p = rows<{ policy: Policy | string; simulation_enabled: boolean }>(
     await query(
@@ -60,7 +60,7 @@ async function policyFor(source: Source, tx: string): Promise<Policy | null> {
   )[0];
   return p?.simulation_enabled ? policySchema.parse(decode(p.policy)) : null;
 }
-async function getCase(
+export async function getCase(
   source: Source,
   id: string,
   tx: string,

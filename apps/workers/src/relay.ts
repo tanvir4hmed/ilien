@@ -85,8 +85,29 @@ export async function handler(event: unknown) {
       }),
     );
   return {
+    agentRuns: await dispatchAgents(tenantId),
     dispatched: jobs.length,
     timers: timers.length,
     deliveries: deliveries.length,
   };
+}
+
+async function dispatchAgents(tenantId: string) {
+  const runs = await transaction(tenantId, async (tx) =>
+    rows<{ id: string }>(
+      await query(
+        "WITH candidates AS (SELECT id FROM ai_runs WHERE state='pending' AND (queued_at IS NULL OR queued_at<now()-interval '5 minutes') ORDER BY created_at LIMIT 10 FOR UPDATE SKIP LOCKED) UPDATE ai_runs r SET queued_at=now() FROM candidates c WHERE r.id=c.id RETURNING r.id",
+        [],
+        tx,
+      ),
+    ),
+  );
+  for (const run of runs)
+    await sqs.send(
+      new SendMessageCommand({
+        QueueUrl: process.env.AGENT_QUEUE_URL,
+        MessageBody: JSON.stringify({ tenantId, runId: run.id }),
+      }),
+    );
+  return runs.length;
 }
