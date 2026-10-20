@@ -1,5 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { z } from "zod";
+import { toolInput } from "../../ai/src/planner.js";
 import {
   canonical,
   isGreeting,
@@ -16,6 +18,16 @@ import {
 import type { CaseState } from "../../coordination/src/types.js";
 const now = new Date().toISOString();
 const later = new Date(Date.now() + 1800000).toISOString();
+test("Nova tool schema uses only provider-supported top-level fields", () => {
+  const schema = toolInput(z.strictObject({ query: z.string().min(2) }));
+  assert.deepEqual(Object.keys(schema).sort(), [
+    "properties",
+    "required",
+    "type",
+  ]);
+  assert.equal(schema.type, "object");
+  assert.deepEqual(schema.required, ["query"]);
+});
 function state(): CaseState {
   return {
     id: "case-a",

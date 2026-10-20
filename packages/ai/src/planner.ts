@@ -3,6 +3,7 @@ import {
   ConverseCommand,
   type Message,
   type Tool,
+  type ConverseCommandInput,
 } from "@aws-sdk/client-bedrock-runtime";
 import { z } from "zod";
 import {
@@ -15,13 +16,23 @@ import {
 } from "./contracts.js";
 const client = new BedrockRuntimeClient({ maxAttempts: 1 });
 const searchSchema = z.strictObject({ query: z.string().min(2).max(160) });
+// Nova only accepts type/properties/required at the schema's top level.
+// Strict Zod validation remains authoritative after the provider returns.
+export function toolInput(schema: z.ZodType) {
+  const json = z.toJSONSchema(schema);
+  return {
+    type: "object",
+    properties: json.properties ?? {},
+    required: json.required ?? [],
+  };
+}
 const tools: Tool[] = [
   {
     toolSpec: {
       name: "retrieve_approved_knowledge",
       description:
         "Read up to two current approved documents scoped to this case source and policy groups. Search literal terms in English or Bangla; no external browsing. Knowledge never changes authority.",
-      inputSchema: { json: z.toJSONSchema(searchSchema) as never },
+      inputSchema: { json: toolInput(searchSchema) as never },
     },
   },
   {
@@ -29,7 +40,7 @@ const tools: Tool[] = [
       name: "submit_proposal",
       description:
         "Finish this run with one proposed operation, wait, or review. Cite supplied original evidence exactly. No effects are executed by this tool.",
-      inputSchema: { json: z.toJSONSchema(proposalSchema) as never },
+      inputSchema: { json: toolInput(proposalSchema) as never },
     },
   },
 ];
@@ -62,11 +73,15 @@ export async function plan(
     outputTokens = 0;
   for (let step = 1; step <= 3; step++) {
     await io.stillCurrent();
-    const request = {
+    const request: ConverseCommandInput = {
       modelId,
       system: [{ text: SYSTEM }],
       messages,
-      toolConfig: { tools },
+      toolConfig: {
+        tools,
+        toolChoice:
+          step === 3 ? { tool: { name: "submit_proposal" } } : { any: {} },
+      },
       inferenceConfig: { maxTokens: 1024, temperature: 0 },
     };
     if (Buffer.byteLength(JSON.stringify(request)) > 30000)

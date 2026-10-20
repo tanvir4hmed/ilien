@@ -6,7 +6,7 @@ import {
   type Policy,
 } from "../../coordination/src/types.js";
 export const MODEL_ID = "amazon.nova-lite-v1:0";
-export const PROMPT_VERSION = "coordination-review-1";
+export const PROMPT_VERSION = "coordination-review-2";
 export const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 export const decode = <T>(s: T | string): T =>
   typeof s === "string" ? JSON.parse(s) : s;
