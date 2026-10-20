@@ -17,7 +17,7 @@ resource "aws_cognito_user_pool" "operators" {
   # Temporarily disabled for operator onboarding. Restore ON and enabled=true
   # before the release security review; changing this is an explicit deployment.
   mfa_configuration = "OFF"
-  software_token_mfa_configuration { enabled = false }
+  # software_token_mfa_configuration { enabled = true }
   account_recovery_setting {
     recovery_mechanism {
       name     = "admin_only"
