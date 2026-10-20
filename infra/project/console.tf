@@ -23,6 +23,12 @@ resource "aws_apigatewayv2_route" "console" {
   authorization_scopes = ["openid"]
   target               = "integrations/${aws_apigatewayv2_integration.api.id}"
 }
+resource "aws_apigatewayv2_route" "console_preflight" {
+  api_id             = aws_apigatewayv2_api.api.id
+  route_key          = "OPTIONS /console/{proxy+}"
+  authorization_type = "NONE"
+  target             = "integrations/${aws_apigatewayv2_integration.api.id}"
+}
 output "console_url" { value = module.console.app_url }
 output "operator_pool_id" { value = module.console.pool_id }
 
