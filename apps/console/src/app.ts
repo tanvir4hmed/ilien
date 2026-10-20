@@ -826,6 +826,10 @@ async function casePage(id: string) {
       },
       heading,
     );
+  requestAnimationFrame(() => {
+    if (map.isConnected && page === "Cases")
+      map.scrollIntoView({ block: "start", behavior: "auto" });
+  });
 }
 function caseActions(state: CaseState, policy: Policy, id: string) {
   const c = card("Practice a response");

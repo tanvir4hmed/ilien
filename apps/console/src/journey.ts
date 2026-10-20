@@ -327,7 +327,16 @@ export function renderJourney(
     fit.onclick = () =>
       canvas.style.setProperty(
         "zoom",
-        String(Math.max(0.4, Math.min(1, (frame.clientWidth - 44) / width))),
+        String(
+          Math.max(
+            0.4,
+            Math.min(
+              1,
+              (frame.clientWidth - 44) / width,
+              Math.max(300, Math.min(600, window.innerHeight - 300)) / height,
+            ),
+          ),
+        ),
       );
     full.onclick = () => canvas.style.setProperty("zoom", "1");
     focus.onclick = () => {
