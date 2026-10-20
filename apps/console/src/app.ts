@@ -1067,6 +1067,13 @@ async function runPage(id: string) {
   const c = card("Evidence-bound proposal");
   const run = (data.run ?? data) as Row;
   c.append(el("span", words(run.state), "badge"));
+  const context = run.context ? decode(run.context as Row | string) : null;
+  const original = context?.receipt as Row | undefined;
+  if (original)
+    c.append(
+      el("h3", "Original participant message"),
+      el("blockquote", String(original.text), "message-body"),
+    );
   let proposal = run.proposal;
   try {
     proposal = decode(proposal as Row | string);
@@ -1111,10 +1118,27 @@ async function runPage(id: string) {
     summary({ message: "No suggestion is ready yet.", reason: run.reason }, c);
   if (data.review) details("Review decision", data.review, c);
   if (role === "admin") details("Advanced investigation details", data, c);
-  if (role !== "viewer" && run.proposal_hash) {
+  if (
+    role !== "viewer" &&
+    run.proposal_hash &&
+    !data.review &&
+    ["proposed", "waiting", "needs_review"].includes(String(run.state))
+  ) {
     const reason = input();
     c.append(field("Review reason", reason));
-    for (const disposition of ["approve", "reject"])
+    const actionable =
+      proposal &&
+      typeof proposal === "object" &&
+      (proposal as Row).disposition === "propose" &&
+      (proposal as Row).operation;
+    if (!actionable)
+      c.append(
+        el(
+          "p",
+          "No action was proposed. Read the original message in Incoming messages if a human interpretation is needed.",
+        ),
+      );
+    for (const disposition of actionable ? ["approve", "reject"] : ["reject"])
       c.append(
         button(
           disposition === "approve"
@@ -1160,14 +1184,19 @@ async function reviewIncoming(r: Row) {
       "Keep the sender's meaning, units, uncertainty and evidence times. Missing information needs clarification. Saving records an interpretation of this original message; independent verification is still required.",
     ),
   );
-  const choice = options([
-      { value: "reply", label: "Record reported information" },
-      { value: "verify", label: "Record independent verification" },
-      { value: "add_child", label: "Request prerequisite information" },
-      ...(task.proposal
-        ? [{ value: "decide", label: "Record an explicit decision" }]
-        : []),
-    ]),
+  const choice = options(
+      request.contact.kind === "verify_request"
+        ? [{ value: "verify", label: "Record independent verification" }]
+        : [
+            ...(task.kind !== "decision"
+              ? [{ value: "reply", label: "Record reported information" }]
+              : []),
+            { value: "add_child", label: "Request prerequisite information" },
+            ...(task.proposal
+              ? [{ value: "decide", label: "Record an explicit decision" }]
+              : []),
+          ],
+    ),
     area = el("div"),
     reason = input();
   choice.value =
@@ -1891,6 +1920,12 @@ async function inbox() {
       c.append(button("Open request & map", () => casePage(String(r.caseId))));
     if (r.runId)
       c.append(button("Review AI suggestion", () => runPage(String(r.runId))));
+    if (r.bindingId && r.bindingEnabled === false)
+      c.append(
+        notice(
+          "This person's channel is disabled or consent was withdrawn. An administrator must record renewed consent before messaging can continue.",
+        ),
+      );
     if (
       role !== "viewer" &&
       r.status === "needs_review" &&
@@ -1901,6 +1936,7 @@ async function inbox() {
     if (
       role === "viewer" ||
       r.blockedReason ||
+      (r.bindingId && r.bindingEnabled === false) ||
       !["unmatched", "received"].includes(String(r.status))
     )
       continue;

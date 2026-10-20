@@ -31,7 +31,7 @@ export async function inboxView(source: Source) {
     );
     const bindings = rows<Binding>(
       await query(
-        "SELECT * FROM channel_bindings WHERE connection_id=CAST(:source AS uuid) AND enabled",
+        "SELECT * FROM channel_bindings WHERE connection_id=CAST(:source AS uuid)",
         [param("source", source.id)],
         tx,
       ),
@@ -60,6 +60,7 @@ export async function inboxView(source: Source) {
         request: row.request ? decode(row.request) : null,
         receivedAt: item.timestamp,
         bindingId: binding?.id,
+        bindingEnabled: binding?.enabled,
         actorId: binding?.actor_id,
         blockedReason: item.blockedReason,
         candidates:
