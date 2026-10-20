@@ -7,7 +7,7 @@ import {
 } from "../../persistence/src/database.js";
 import type { Source } from "../../coordination/src/service.js";
 import { CoordinationError } from "../../coordination/src/types.js";
-import { decode, type Binding } from "./intents.js";
+import { contactCurrent, decode, type Binding } from "./intents.js";
 import { openDeliveries, type OpenDelivery } from "./matching.js";
 import { receive } from "./inbound.js";
 import type { Incoming } from "./normalize.js";
@@ -21,10 +21,11 @@ export async function inboxView(source: Source) {
       reason: string;
       case_id: string | null;
       run_id: string | null;
+      delivery_id: string | null;
       request: DeliveryRequest | string | null;
     }>(
       await query(
-        "SELECT r.id,r.normalized,r.status,r.reason,r.case_id,r.created_at,d.request,(SELECT id FROM ai_runs WHERE receipt_id=r.id ORDER BY created_at DESC LIMIT 1) AS run_id FROM channel_receipts r LEFT JOIN channel_deliveries d ON d.tenant_id=r.tenant_id AND d.id=r.delivery_id WHERE r.connection_id=CAST(:source AS uuid) ORDER BY r.created_at DESC LIMIT 50",
+        "SELECT r.id,r.normalized,r.status,r.reason,r.case_id,r.delivery_id,r.created_at,d.request,(SELECT id FROM ai_runs WHERE receipt_id=r.id ORDER BY created_at DESC LIMIT 1) AS run_id FROM channel_receipts r LEFT JOIN channel_deliveries d ON d.tenant_id=r.tenant_id AND d.id=r.delivery_id WHERE r.connection_id=CAST(:source AS uuid) ORDER BY r.created_at DESC LIMIT 50",
         [param("source", source.id)],
         tx,
       ),
@@ -61,6 +62,8 @@ export async function inboxView(source: Source) {
         receivedAt: item.timestamp,
         bindingId: binding?.id,
         bindingEnabled: binding?.enabled,
+        reviewAvailable: !!binding?.enabled && open.some((d) =>
+          d.id === row.delivery_id && contactCurrent(decode(d.snapshot), d)),
         actorId: binding?.actor_id,
         blockedReason: item.blockedReason,
         candidates:

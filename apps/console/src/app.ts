@@ -1,5 +1,6 @@
 import { scenarioFields, userGuide } from "./operator-guide.js";
 import { guestLogin, type GuestConfig } from "./guest-login.js";
+import { authoredReplyText } from "../../../packages/channels/src/text.js";
 import {
   renderJourney,
   summary,
@@ -1929,20 +1930,27 @@ async function inbox() {
     const c = card(
       `${words(r.channel)} · ${r.actorId ? words(r.actorId) : "New sender"}`,
     );
+    const originalText = String(r.text || "Message contains no supported text");
+    const authoredText = authoredReplyText(originalText);
+    const earlierReply = r.status === "needs_review" && r.reason === "unstructured_reply" && !r.reviewAvailable;
     c.append(
       el("p", `${String(r.sender)} · ${date(r.receivedAt)}`, "muted"),
       el(
         "blockquote",
-        String(r.text || "Message contains no supported text"),
+        authoredText || originalText,
         "message-body",
       ),
-      el("p", explanations[String(r.reason)] ?? words(r.reason)),
-      el("span", words(r.status), "badge"),
+      el("p", earlierReply ? "Retained for history. Its task has changed or is no longer awaiting this answer; it cannot be applied to the current request." : explanations[String(r.reason)] ?? words(r.reason)),
+      el("span", earlierReply ? "Earlier reply" : words(r.status), "badge"),
     );
+    if (authoredText !== originalText) {
+      const original = fold("Read full original message and quoted history", c);
+      original.append(el("blockquote", originalText, "message-body"));
+    }
     if (r.caseId)
       c.append(button("Open request & map", () => casePage(String(r.caseId))));
     if (r.runId)
-      c.append(button("Review AI suggestion", () => runPage(String(r.runId))));
+      c.append(button("View AI interpretation", () => runPage(String(r.runId))));
     if (r.bindingId && r.bindingEnabled === false)
       c.append(
         notice(
@@ -1953,6 +1961,7 @@ async function inbox() {
       role !== "viewer" &&
       r.status === "needs_review" &&
       r.reason === "unstructured_reply" &&
+      r.reviewAvailable &&
       r.request
     )
       c.append(button("Review original reply", () => reviewIncoming(r)));
