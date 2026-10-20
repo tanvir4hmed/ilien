@@ -22,6 +22,12 @@ export interface Incoming {
   blockedReason?: string;
   media?: unknown[];
   eventType?: string;
+  channelMessageId?: string;
+  deliveryFailure?: {
+    code?: number | string;
+    title?: string;
+    message?: string;
+  };
   object?: { bucket: string; key: string; sha256?: string };
 }
 const tokenIn = (text: string) =>
@@ -35,6 +41,7 @@ export async function normalize(
   if (topic === process.env.WHATSAPP_TOPIC_ARN) {
     const header = z
       .object({
+        messageId: str.optional(),
         aws_account_id: str,
         context: z.object({
           MetaWabaIds: z.array(z.object({ arn: str })),
@@ -81,7 +88,22 @@ export async function normalize(
                   .max(100)
                   .optional(),
                 statuses: z
-                  .array(z.object({ id: str, status: str, timestamp: str }))
+                  .array(
+                    z.object({
+                      id: str,
+                      status: str,
+                      timestamp: str,
+                      errors: z
+                        .array(
+                          z.object({
+                            code: z.union([z.number(), z.string()]).optional(),
+                            title: str.optional(),
+                            message: str.optional(),
+                          }),
+                        )
+                        .optional(),
+                    }),
+                  )
                   .max(100)
                   .optional(),
               }),
@@ -116,7 +138,9 @@ export async function normalize(
       for (const status of v.statuses ?? [])
         output.push({
           channel: "whatsapp",
-          providerId: status.id,
+          providerId: header.messageId ?? status.id,
+          channelMessageId: status.id,
+          deliveryFailure: status.errors?.[0],
           sender: "",
           text: "",
           raw,

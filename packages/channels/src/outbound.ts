@@ -21,6 +21,7 @@ import { configurationFor } from "../../product/src/configuration.js";
 import { approvedTemplate } from "./templates.js";
 import { pausedFor } from "../../operations/src/controls.js";
 import { caseHeld } from "../../operations/src/supervision.js";
+import { projectProviderEvents } from "./events.js";
 const social = new SocialMessagingClient({ maxAttempts: 1 });
 const email = new SESv2Client({ maxAttempts: 1 });
 
@@ -250,11 +251,12 @@ export async function sendDelivery(tenant: string, id: string) {
     );
     return;
   }
-  await transaction(tenant, (tx) =>
-    query(
+  await transaction(tenant, async (tx) => {
+    await query(
       "UPDATE channel_deliveries SET status='accepted',provider_message_id=:provider WHERE id=CAST(:id AS uuid)",
       [param("id", id), param("provider", providerId!)],
       tx,
-    ),
-  );
+    );
+    await projectProviderEvents(providerId!, tx);
+  });
 }

@@ -14,6 +14,10 @@ Operators can recheck unresolved receipts or explicitly select an eligible sent 
 
 Direct authenticated mail to `requests@<mail-domain>` or `inbox@<mail-domain>` enters the unresolved inbox. Token reply addresses preserve exact case continuation. Spam, failed authentication and attachments retain existing quarantine rules.
 
+AWS outbound request IDs and Meta `wamid` IDs are retained as separate aliases. Incoming provider events use the AWS ID to project status; direct WhatsApp replies can use the Meta alias. A failed receipt moves the send to blocked, retains the provider code and can trigger a configured consented fallback. Contradictory delivery/failure receipts produce an uncertain outcome. Early receipts are replayed against the send when its API acceptance is persisted. Provider acceptance is never treated as delivery. Sender-account locks are external account readiness failures, not completed requests.
+
+The SES workload may send only from `requests@<mail-domain>`, enforced by `ses:FromAddress` in both the role and permissions boundary. The resource scope covers account identities required by SES authorization and the single application configuration set; it does not grant SES administration. Consent and sender/recipient readiness remain separate runtime gates.
+
 ## Transport and evidence
 
 ```mermaid

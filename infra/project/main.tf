@@ -195,7 +195,7 @@ module "channel_send" {
     { Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes", "sqs:SendMessage"], Resource = module.channels.outbound_arn },
     { Effect = "Allow", Action = ["social-messaging:GetWhatsAppMessageTemplate"], Resource = local.waba_arn },
     { Effect = "Allow", Action = ["social-messaging:SendWhatsAppMessage"], Resource = local.phone_arn },
-    { Effect = "Allow", Action = ["ses:SendEmail"], Resource = ["arn:aws:ses:us-east-1:${local.account}:identity/${var.mail_domain}", "arn:aws:ses:us-east-1:${local.account}:identity/requests@${var.mail_domain}", "arn:aws:ses:us-east-1:${local.account}:configuration-set/ilien"] }
+    { Effect = "Allow", Action = ["ses:SendEmail"], Resource = ["arn:aws:ses:us-east-1:${local.account}:identity/*", "arn:aws:ses:us-east-1:${local.account}:configuration-set/ilien"], Condition = { StringEquals = { "ses:FromAddress" = "requests@${var.mail_domain}" } } }
   ]) })
 }
 module "channel_receive" {

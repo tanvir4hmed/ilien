@@ -174,7 +174,7 @@ export async function channelView(source: Source, section: string) {
     if (section === "deliveries")
       return rows(
         await query(
-          "SELECT id,case_id,contact_id,actor_id,channel,status,reason,provider_message_id,created_at FROM channel_deliveries WHERE connection_id=CAST(:source AS uuid) ORDER BY created_at DESC LIMIT 100",
+          "SELECT id,case_id,contact_id,actor_id,channel,status,reason,provider_error,provider_message_id,created_at FROM channel_deliveries WHERE connection_id=CAST(:source AS uuid) ORDER BY created_at DESC LIMIT 100",
           [param("source", source.id)],
           tx,
         ),
@@ -190,7 +190,7 @@ export async function channelView(source: Source, section: string) {
     if (section === "delivery-events")
       return rows(
         await query(
-          "SELECT e.id,e.channel,e.provider_message_id,e.event_type,e.evidence_id,e.occurred_at FROM channel_delivery_events e WHERE EXISTS(SELECT 1 FROM channel_deliveries d WHERE d.channel=e.channel AND d.provider_message_id=e.provider_message_id AND d.connection_id=CAST(:source AS uuid)) ORDER BY e.created_at DESC LIMIT 100",
+          "SELECT e.id,e.channel,coalesce(e.normalized->>'providerRequestId',e.provider_message_id) AS provider_message_id,e.event_type,e.evidence_id,e.occurred_at FROM channel_delivery_events e WHERE EXISTS(SELECT 1 FROM channel_deliveries d WHERE d.channel=e.channel AND (d.provider_message_id=e.provider_message_id OR d.provider_message_id=e.normalized->>'providerRequestId') AND d.connection_id=CAST(:source AS uuid)) ORDER BY e.created_at DESC LIMIT 100",
           [param("source", source.id)],
           tx,
         ),

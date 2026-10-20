@@ -97,6 +97,7 @@ export async function processRun(tenant: string, id: string) {
     });
   try {
     const result = await plan(context, run.model_id, {
+      validate: (proposal) => gate(context, proposal),
       stillCurrent: current,
       retrieve: (search) =>
         transaction(tenant, (tx) =>

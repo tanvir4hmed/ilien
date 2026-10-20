@@ -20,6 +20,7 @@ import {
 } from "./intents.js";
 import type { Incoming } from "./normalize.js";
 import { enqueueAgent } from "../../ai/src/store.js";
+import { projectProviderEvents } from "./events.js";
 import {
   canonical,
   isGreeting,
@@ -72,7 +73,7 @@ export async function receive(
         tx,
       );
       await query(
-        "INSERT INTO channel_delivery_events(tenant_id,id,channel,provider_message_id,event_key,event_type,evidence_id,occurred_at) VALUES(CAST(:tenant AS uuid),CAST(:id AS uuid),:channel,:provider,:key,:type,CAST(:evidence AS uuid),CAST(:time AS timestamptz))",
+        "INSERT INTO channel_delivery_events(tenant_id,id,channel,provider_message_id,event_key,event_type,evidence_id,occurred_at,normalized) VALUES(CAST(:tenant AS uuid),CAST(:id AS uuid),:channel,:provider,:key,:type,CAST(:evidence AS uuid),CAST(:time AS timestamptz),CAST(:normalized AS jsonb))",
         [
           param("tenant", tenant),
           param("id", randomUUID()),
@@ -82,6 +83,14 @@ export async function receive(
           param("type", item.eventType),
           param("evidence", evidence),
           param("time", item.timestamp ?? new Date().toISOString()),
+          param(
+            "normalized",
+            JSON.stringify({
+              providerRequestId: item.providerId,
+              channelMessageId: item.channelMessageId,
+              failure: item.deliveryFailure,
+            }),
+          ),
         ],
         tx,
       );
@@ -92,7 +101,9 @@ export async function receive(
           [param("channel", item.channel), param("provider", item.providerId)],
           tx,
         );
-      return;
+      return {
+        failedDeliveryId: await projectProviderEvents(item.providerId, tx),
+      };
     }
     const prior = rows<{
       id: string;
@@ -139,7 +150,7 @@ export async function receive(
     )[0];
     let candidates = rows<Delivery>(
       await query(
-        "SELECT * FROM channel_deliveries WHERE connection_id=CAST(:source AS uuid) AND ((:delivery<>'' AND id=CAST(NULLIF(:delivery,'') AS uuid)) OR (:delivery='' AND ((:token<>'' AND token=:token) OR (:reply<>'' AND channel=:channel AND provider_message_id=:reply)))) LIMIT 2",
+        "SELECT * FROM channel_deliveries WHERE connection_id=CAST(:source AS uuid) AND ((:delivery<>'' AND id=CAST(NULLIF(:delivery,'') AS uuid)) OR (:delivery='' AND ((:token<>'' AND token=:token) OR (:reply<>'' AND channel=:channel AND (provider_message_id=:reply OR channel_message_id=:reply))))) LIMIT 2",
         [
           param("source", sourceId),
           param("delivery", resolution?.deliveryId ?? ""),

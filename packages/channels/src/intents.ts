@@ -151,6 +151,7 @@ export async function fallbackDelivery(tenant: string, id: string) {
       d.status !== "blocked" ||
       ![
         "provider_rejected",
+        "provider_delivery_failed",
         "whatsapp_session_or_approved_template_required",
         "template_verification_unavailable",
       ].includes(d.reason)

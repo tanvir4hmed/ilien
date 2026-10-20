@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { z } from "zod";
 import { toolInput } from "../../ai/src/planner.js";
+import { normalize } from "../src/normalize.js";
 import {
   canonical,
   isGreeting,
@@ -27,6 +28,54 @@ test("Nova tool schema uses only provider-supported top-level fields", () => {
   ]);
   assert.equal(schema.type, "object");
   assert.deepEqual(schema.required, ["query"]);
+});
+test("AWS outbound request and Meta reply IDs are preserved as separate aliases", async () => {
+  process.env.WHATSAPP_TOPIC_ARN = "test-whatsapp-topic";
+  process.env.AWS_ACCOUNT_ID = "test-account";
+  process.env.WHATSAPP_WABA_ARN = "test-waba";
+  process.env.WHATSAPP_PHONE_ARN = "test-phone";
+  const notification = {
+    messageId: "aws-request-1",
+    aws_account_id: "test-account",
+    context: {
+      MetaWabaIds: [{ arn: "test-waba" }],
+      MetaPhoneNumberIds: [
+        { arn: "test-phone", metaPhoneNumberId: "test-meta-phone" },
+      ],
+    },
+    whatsAppWebhookEntry: JSON.stringify({
+      changes: [
+        {
+          value: {
+            metadata: { phone_number_id: "test-meta-phone" },
+            statuses: [
+              {
+                id: "wamid-test-message",
+                status: "failed",
+                timestamp: String(Math.floor(Date.now() / 1000)),
+                errors: [{ code: 131031, title: "Business Account locked" }],
+              },
+            ],
+          },
+        },
+      ],
+    }),
+  };
+  const items = await normalize(
+    "test-whatsapp-topic",
+    JSON.stringify(notification),
+  );
+  assert.equal(items[0]!.providerId, "aws-request-1");
+  assert.equal(items[0]!.channelMessageId, "wamid-test-message");
+  assert.equal(items[0]!.deliveryFailure!.code, 131031);
+  await assert.rejects(
+    () =>
+      normalize(
+        "test-whatsapp-topic",
+        JSON.stringify({ ...notification, aws_account_id: "another-account" }),
+      ),
+    /WrongChannelAccount/,
+  );
 });
 function state(): CaseState {
   return {

@@ -18,6 +18,7 @@ import { textilePolicy } from "../../../packages/domain-packs/src/textile.js";
 import reliabilityMigration from "../../../packages/persistence/migrations/006_reliability.sql";
 import productMigration from "../../../packages/persistence/migrations/005_product.sql";
 import conversationMigration from "../../../packages/persistence/migrations/007_conversation_intake.sql";
+import providerMigration from "../../../packages/persistence/migrations/008_provider_events.sql";
 import { z } from "zod";
 const secrets = new SecretsManagerClient({ maxAttempts: 3 });
 export async function handler(event: unknown = {}) {
@@ -93,7 +94,8 @@ export async function handler(event: unknown = {}) {
       version !== 4 &&
       version !== 5 &&
       version !== 6 &&
-      version !== 7
+      version !== 7 &&
+      version !== 8
     )
       throw new Error("Unsupported database migration version");
     if (version === 1)
@@ -113,6 +115,9 @@ export async function handler(event: unknown = {}) {
         await query(statement.trim(), [], tx);
     if (version! < 7)
       for (const statement of conversationMigration.split("-- statement"))
+        await query(statement.trim(), [], tx);
+    if (version! < 8)
+      for (const statement of providerMigration.split("-- statement"))
         await query(statement.trim(), [], tx);
     await query(
       "INSERT INTO tenants(id,name) VALUES(CAST(:tenant AS uuid),'Synthetic textile workspace') ON CONFLICT(id) DO NOTHING",
@@ -206,5 +211,5 @@ export async function handler(event: unknown = {}) {
       );
     }
   });
-  return { schemaVersion: 7 };
+  return { schemaVersion: 8 };
 }

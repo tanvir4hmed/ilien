@@ -210,7 +210,7 @@ export async function operationsWrite(
         detail =
           rows(
             await query(
-              "UPDATE channel_deliveries d SET status='pending',reason=NULL,queued_at=NULL,queue_attempts=0 WHERE d.id=CAST(:target AS uuid) AND d.connection_id=CAST(:source AS uuid) AND d.status='blocked' AND d.reason IN ('provider_rejected','whatsapp_session_or_approved_template_required','template_verification_unavailable','operator_confirmed_not_sent','case_integrity_review_required') AND NOT EXISTS(SELECT 1 FROM channel_deliveries other WHERE other.tenant_id=d.tenant_id AND other.contact_id=d.contact_id AND other.id<>d.id AND other.status IN ('pending','sending','accepted','uncertain')) RETURNING d.id",
+              "UPDATE channel_deliveries d SET status='pending',reason=NULL,queued_at=NULL,queue_attempts=0 WHERE d.id=CAST(:target AS uuid) AND d.connection_id=CAST(:source AS uuid) AND d.status='blocked' AND d.reason IN ('provider_rejected','provider_delivery_failed','whatsapp_session_or_approved_template_required','template_verification_unavailable','operator_confirmed_not_sent','case_integrity_review_required') AND NOT EXISTS(SELECT 1 FROM channel_deliveries other WHERE other.tenant_id=d.tenant_id AND other.contact_id=d.contact_id AND other.id<>d.id AND other.status IN ('pending','sending','accepted','uncertain')) RETURNING d.id",
               p,
               tx,
             ),

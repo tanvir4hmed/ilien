@@ -38,7 +38,7 @@ Only a correlated, enabled-actor receipt marked `needs_review / unstructured_rep
 
 ## Model and execution limits
 
-- Pinned model: `amazon.nova-lite-v1:0`, regional Bedrock Converse in us-east-1. Prompt/tool contract version: `coordination-review-1`. Availability APIs are read-only readiness evidence, not a successful inference test or model-quality assessment.
+- Pinned model: `amazon.nova-lite-v1:0`, regional Bedrock Converse in us-east-1. Prompt/tool contract version: `coordination-review-3`. Tool schemas use Nova's supported top-level fields; each call must select an allowed tool, and the last call must submit a proposal/wait/review. The operation schema exposes only actions eligible for the current kind of run. Schema/grounding failures receive bounded tool-error feedback within the existing three-call budget. Runtime validation and operator review remain mandatory.
 - At most three serial model calls per run, one requested tool per call, 1,024 output tokens per call, 22-second provider timeout and no SDK retry. An unsupported/invalid result stops for review; no hidden stronger-model fallback.
 - Serialized model request maximum 30,000 UTF-8 bytes; original base context maximum 19,000 bytes. Overlarge originals are not silently summarized or truncated. They require operator review. Context contains bounded case-linked evidence, not all historic conversations.
 - Tenant admission limits: 30 runs per rolling 24 hours; 12 per case per rolling 24 hours; 40 lifetime per case; at most two attempts for an identical case revision/receipt. These limits accommodate multi-branch cases and verification while bounding inference. Failed, rejected and interrupted runs still consume admission capacity. Repeated identical searches stop the loop.
