@@ -18,9 +18,15 @@ export const words = (value: unknown): string =>
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/[_.-]+/g, " ")
     .replace(/^./, (s) => s.toUpperCase());
+export const instant = (value: unknown): number => {
+  let text = String(value ?? "");
+  if (/^\d{4}-\d\d-\d\d[ T]\d\d:\d\d:\d\d(?:\.\d+)?$/.test(text))
+    text = text.replace(" ", "T") + "Z";
+  return Date.parse(text);
+};
 export const date = (value: unknown): string =>
   value
-    ? new Date(String(value)).toLocaleString([], {
+    ? new Date(instant(value)).toLocaleString([], {
         month: "short",
         day: "numeric",
         hour: "2-digit",
@@ -541,9 +547,7 @@ export function renderJourney(
         },
       });
     const list = node("ol", "", "timeline");
-    for (const e of entries.sort(
-      (a, b) => Date.parse(a.time) - Date.parse(b.time),
-    )) {
+    for (const e of entries.sort((a, b) => instant(a.time) - instant(b.time))) {
       const item = node("li"),
         b = node("button", e.title);
       b.onclick = () => show(e.title, e.body, e.evidence);

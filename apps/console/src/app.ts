@@ -1363,7 +1363,9 @@ async function simulator() {
         "Maintenance · inspection, parts and scheduling (requires configured workflow)",
     },
   ]);
-  c.append(button("Create a custom source event", () => load("custom")));
+  const customButton = button("Create a custom source event", () =>
+    load("custom"),
+  );
   const fields = el("div"),
     feedback = el("div");
   let custom = false;
@@ -1417,6 +1419,7 @@ async function simulator() {
   const catalogue = fold("Browse other source events", c),
     search = input(),
     browse = el("select");
+  catalogue.remove();
   search.placeholder = "Find an event by name";
   function filter() {
     browse.replaceChildren();
@@ -1484,7 +1487,11 @@ async function simulator() {
         true,
       ),
     );
-  c.append(button("Open requests", () => show("Cases")));
+  c.append(
+    button("Open requests", () => show("Cases")),
+    catalogue,
+    customButton,
+  );
   const inbox = card("Your recently started requests");
   async function openWhenReady(inboxId: string) {
     feedback.replaceChildren(notice("2. Request accepted. Preparing its map…"));

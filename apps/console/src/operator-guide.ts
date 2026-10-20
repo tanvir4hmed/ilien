@@ -20,6 +20,7 @@ export function scenarioFields(
       !payload.materialLotId)
   )
     return null;
+  host.replaceChildren();
   const draft = structuredClone(event),
     outSubject = draft.subject as Row,
     outPayload = draft.payload as Row,
@@ -73,7 +74,10 @@ export function scenarioFields(
         : "Request reference",
     "A name or reference your team recognises.",
     subject.id,
-    (v) => (outSubject.id = v),
+    (v) => {
+      outSubject.id = v;
+      draft.correlationId = v;
+    },
   );
   if (material) {
     field(

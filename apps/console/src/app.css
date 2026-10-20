@@ -710,3 +710,23 @@ blockquote {
 .guide-steps p {
   margin-top: 0;
 }
+.scenario-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 24px;
+  max-width: 1000px;
+}
+.scenario-fields > h3,
+.scenario-fields > p,
+.scenario-fields > details,
+.scenario-fields > label:has(input[type="datetime-local"]) {
+  grid-column: 1/-1;
+}
+.scenario-fields > label {
+  margin: 5px 0;
+}
+@media (max-width: 650px) {
+  .scenario-fields {
+    grid-template-columns: 1fr;
+  }
+}
