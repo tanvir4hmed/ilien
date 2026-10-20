@@ -1422,6 +1422,16 @@ function jsonForm(
   seed: unknown,
   choices: Record<string, string[]> = {},
 ) {
+  if (path === "/configuration") {
+    seed = structuredClone(seed);
+    const proposal = seed as { policy: Policy };
+    proposal.policy.version = `workspace-${Date.now()}`;
+    choices = {
+      ...choices,
+      role: ["respondent", "verifier", "coordinator"],
+      group: proposal.policy.groups,
+    };
+  }
   const d = fold(title, parent),
     read = formFields(seed as Row, d, {
       hidden: [
