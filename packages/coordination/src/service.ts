@@ -479,7 +479,18 @@ export async function listCases(source: Source) {
   return transaction(source.tenant_id, async (tx) =>
     rows(
       await query(
-        "SELECT id,inbox_id,workflow,revision,status,updated_at FROM coordination_cases WHERE connection_id=CAST(:source AS uuid) ORDER BY updated_at DESC LIMIT 50",
+        "SELECT id,inbox_id,workflow,revision,status,updated_at,snapshot->>'goal' AS goal,snapshot->'subject' AS subject,snapshot->>'deadline' AS deadline,snapshot->>'origin' AS origin FROM coordination_cases WHERE connection_id=CAST(:source AS uuid) ORDER BY updated_at DESC LIMIT 50",
+        [param("source", source.id)],
+        tx,
+      ),
+    ),
+  );
+}
+export async function listTasks(source: Source) {
+  return transaction(source.tenant_id, async (tx) =>
+    rows(
+      await query(
+        "SELECT c.id AS case_id,c.snapshot->>'goal' AS goal,c.snapshot->'subject'->>'id' AS subject,o.value->>'id' AS obligation_id,o.value->>'group' AS department,o.value->>'assignee' AS owner,o.value->>'question' AS question,o.value->>'status' AS status,c.updated_at FROM coordination_cases c CROSS JOIN LATERAL jsonb_array_elements(c.snapshot->'obligations') o(value) WHERE c.connection_id=CAST(:source AS uuid) AND c.status IN ('active','blocked','paused') AND o.value->>'status'<>'verified' ORDER BY c.updated_at DESC,c.id,o.value->>'id' LIMIT 100",
         [param("source", source.id)],
         tx,
       ),
@@ -487,46 +498,99 @@ export async function listCases(source: Source) {
   );
 }
 export async function caseView(source: Source, id: string, section: string) {
-  return transaction(source.tenant_id, async (tx) => {
-    const state = await getCase(source, id, tx);
-    if (section === "state") return state;
-    if (section === "policy") {
-      const policy = await policyFor(source, tx);
-      return policy
-        ? { ...policy, mode: "authenticated_simulator_role_play" }
-        : null;
-    }
-    const table = (
-      {
-        journal: "coordination_journal",
-        contacts: "coordination_contacts",
-        claims: "coordination_claims",
-        results: "coordination_results",
-        rejections: "coordination_rejections",
-      } as Record<string, string>
-    )[section];
-    if (!table) throw new CoordinationError("not_found", 404);
-    // Keyset pagination can be added before expanding the bounded case history.
-    if (section === "results")
+  return transaction(
+    source.tenant_id,
+    async (tx) => {
+      const state = await getCase(source, id, tx);
+      if (section === "state") return state;
+      if (section === "journey") {
+        const sourceEvent = rows(
+          await query(
+            "SELECT event_type,occurred_at,received_at FROM inbox_events WHERE id=CAST(:inbox AS uuid) AND connection_id=CAST(:source AS uuid)",
+            [param("inbox", state.inboxId), param("source", source.id)],
+            tx,
+          ),
+        )[0];
+        const definitions: Record<string, string> = {
+          contacts:
+            "SELECT id,case_revision,contact,delivery_status,created_at FROM coordination_contacts WHERE case_id=CAST(:case AS uuid) ORDER BY created_at DESC,id DESC LIMIT 101",
+          deliveries:
+            "SELECT id,contact_id,obligation_id,actor_id,channel,status,reason,provider_message_id,left(rendered_text,2000) AS message_preview,length(rendered_text)>2000 AS preview_truncated,created_at FROM channel_deliveries WHERE case_id=CAST(:case AS uuid) AND connection_id=CAST(:source AS uuid) ORDER BY created_at DESC,id DESC LIMIT 101",
+          receipts:
+            "SELECT id,delivery_id,evidence_id,channel,status,reason,left(normalized->>'text',2000) AS message_preview,length(normalized->>'text')>2000 AS preview_truncated,created_at FROM channel_receipts WHERE case_id=CAST(:case AS uuid) AND connection_id=CAST(:source AS uuid) ORDER BY created_at DESC,id DESC LIMIT 101",
+          deliveryEvents:
+            "SELECT e.id,e.channel,e.provider_message_id,e.event_type,e.evidence_id,e.occurred_at,e.created_at FROM channel_delivery_events e WHERE EXISTS(SELECT 1 FROM channel_deliveries d WHERE d.case_id=CAST(:case AS uuid) AND d.connection_id=CAST(:source AS uuid) AND d.channel=e.channel AND d.provider_message_id=e.provider_message_id) ORDER BY e.created_at DESC,e.id DESC LIMIT 101",
+          journal:
+            "SELECT j.command_id AS id,j.actor_id,j.case_revision,j.evidence_id,e.origin,coalesce(j.operation->'operation',j.operation)->>'type' AS action,coalesce(j.operation->'operation',j.operation)->>'obligationId' AS obligation_id,coalesce(j.operation->'operation',j.operation)->>'parentId' AS parent_id,left(coalesce(j.operation->'operation',j.operation)->>'statement',2000) AS message_preview,left(coalesce(j.operation->'operation',j.operation)->>'reason',1000) AS reason,j.created_at FROM coordination_journal j LEFT JOIN evidence_items e ON e.tenant_id=j.tenant_id AND e.id=j.evidence_id WHERE j.case_id=CAST(:case AS uuid) ORDER BY j.case_revision DESC LIMIT 101",
+          aiRuns:
+            "SELECT id,state,reason,created_at,updated_at FROM ai_runs WHERE case_id=CAST(:case AS uuid) AND connection_id=CAST(:source AS uuid) ORDER BY created_at DESC,id DESC LIMIT 101",
+          results:
+            "SELECT r.id,r.case_revision,r.result,r.created_at,d.state AS dispatch_state,a.disposition AS acknowledgement,(r.case_revision=CAST(:revision AS integer)) AS current FROM coordination_results r LEFT JOIN result_dispatches d ON d.tenant_id=r.tenant_id AND d.result_id=r.id LEFT JOIN coordination_result_acks a ON a.tenant_id=r.tenant_id AND a.result_id=r.id WHERE r.case_id=CAST(:case AS uuid) ORDER BY r.created_at DESC,r.id DESC LIMIT 101",
+        };
+        const records: Record<string, unknown[]> = {};
+        const truncated: string[] = [];
+        for (const [name, sql] of Object.entries(definitions)) {
+          const data = rows(
+            await query(
+              sql,
+              [
+                param("case", id),
+                param("source", source.id),
+                param("revision", String(state.revision)),
+              ],
+              tx,
+            ),
+          );
+          if (data.length > 100) truncated.push(name);
+          records[name] = data.slice(0, 100);
+        }
+        return {
+          state,
+          sourceEvent,
+          ...records,
+          truncated,
+          observedAt: new Date().toISOString(),
+        };
+      }
+      if (section === "policy") {
+        const policy = await policyFor(source, tx);
+        return policy
+          ? { ...policy, mode: "authenticated_simulator_role_play" }
+          : null;
+      }
+      const table = (
+        {
+          journal: "coordination_journal",
+          contacts: "coordination_contacts",
+          claims: "coordination_claims",
+          results: "coordination_results",
+          rejections: "coordination_rejections",
+        } as Record<string, string>
+      )[section];
+      if (!table) throw new CoordinationError("not_found", 404);
+      // Keyset pagination can be added before expanding the bounded case history.
+      if (section === "results")
+        return rows(
+          await query(
+            "SELECT r.id,r.case_revision,r.result,r.created_at,a.disposition AS acknowledgement,a.reason AS acknowledgement_reason,(r.case_revision=CAST(:revision AS integer)) AS current FROM coordination_results r LEFT JOIN coordination_result_acks a ON a.tenant_id=r.tenant_id AND a.result_id=r.id WHERE r.case_id=CAST(:case AS uuid) ORDER BY r.created_at DESC LIMIT 50",
+            [param("case", id), param("revision", String(state.revision))],
+            tx,
+          ),
+        );
+      const columns =
+        section === "journal"
+          ? "command_id,actor_id,case_revision,evidence_id,state_hash,created_at"
+          : "*";
       return rows(
         await query(
-          "SELECT r.id,r.case_revision,r.result,r.created_at,a.disposition AS acknowledgement,a.reason AS acknowledgement_reason,(r.case_revision=CAST(:revision AS integer)) AS current FROM coordination_results r LEFT JOIN coordination_result_acks a ON a.tenant_id=r.tenant_id AND a.result_id=r.id WHERE r.case_id=CAST(:case AS uuid) ORDER BY r.created_at DESC LIMIT 50",
-          [param("case", id), param("revision", String(state.revision))],
+          `SELECT ${columns} FROM ${table} WHERE case_id=CAST(:case AS uuid) ORDER BY created_at DESC LIMIT 50`,
+          [param("case", id)],
           tx,
         ),
       );
-    const columns =
-      section === "journal"
-        ? "command_id,actor_id,case_revision,evidence_id,state_hash,created_at"
-        : "*";
-    return rows(
-      await query(
-        `SELECT ${columns} FROM ${table} WHERE case_id=CAST(:case AS uuid) ORDER BY created_at DESC LIMIT 50`,
-        [param("case", id)],
-        tx,
-      ),
-    );
-  });
+    },
+    section === "journey",
+  );
 }
 export async function acknowledge(source: Source, id: string, raw: string) {
   const input = acknowledgementSchema.parse(JSON.parse(raw));
@@ -658,7 +722,7 @@ export async function readEvidence(
     const state = await getCase(source, id, tx);
     const result = rows(
       await query(
-        "SELECT id,origin,original_text,sha256,received_at FROM evidence_items WHERE id=CAST(:evidence AS uuid) AND (id=CAST(:original AS uuid) OR EXISTS(SELECT 1 FROM coordination_journal j WHERE j.case_id=CAST(:case AS uuid) AND j.evidence_id=evidence_items.id) OR EXISTS(SELECT 1 FROM coordination_rejections r WHERE r.case_id=CAST(:case AS uuid) AND r.evidence_id=evidence_items.id) OR EXISTS(SELECT 1 FROM channel_receipts cr WHERE cr.case_id=CAST(:case AS uuid) AND cr.evidence_id=evidence_items.id))",
+        "SELECT id,origin,original_text,sha256,received_at FROM evidence_items WHERE id=CAST(:evidence AS uuid) AND (id=CAST(:original AS uuid) OR EXISTS(SELECT 1 FROM coordination_journal j WHERE j.case_id=CAST(:case AS uuid) AND j.evidence_id=evidence_items.id) OR EXISTS(SELECT 1 FROM coordination_rejections r WHERE r.case_id=CAST(:case AS uuid) AND r.evidence_id=evidence_items.id) OR EXISTS(SELECT 1 FROM channel_receipts cr WHERE cr.case_id=CAST(:case AS uuid) AND cr.evidence_id=evidence_items.id) OR EXISTS(SELECT 1 FROM channel_delivery_events e JOIN channel_deliveries d ON d.tenant_id=e.tenant_id AND d.channel=e.channel AND d.provider_message_id=e.provider_message_id WHERE d.case_id=CAST(:case AS uuid) AND e.evidence_id=evidence_items.id))",
         [
           param("evidence", evidenceId),
           param("original", state.sourceEvidenceId),

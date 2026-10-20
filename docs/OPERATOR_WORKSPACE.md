@@ -8,17 +8,40 @@ An identity alone grants no workspace access. `operator_memberships` binds a ver
 
 Static assets and public client configuration contain no credentials. CSP disallows inline scripts, embedding, and third-party scripts. CORS allows the console origin. Browser mutations append a hash-only **admitted request** audit entry before execution; this is not a success ledger. Case, binding, configuration and AI journals record their actual outcomes. Access logs and finer-grained component/database privileges remain separate hardening work.
 
-## Screens
+## Operator screens
 
-- Overview: actual recent case/event records, with explicitly bounded counts; manual refresh.
-- Cases: subject/version, dependency cards, original evidence, claims, journal, contacts, results, source acknowledgement, participant role-play, bounded agent requests and exact proposal review.
-- Simulator: editable examples and 231 synthetic catalogue fixtures. Unmapped events go to triage; catalogue presence does not claim workflow support. No simulation fires on load.
-- Channels: bindings, receipts, delivery outcomes and explicit contact dispatch. Enabling a consented binding can enable real messages; recipient contacts are never auto-populated.
-- Knowledge: versioned publication and revocation.
-- Settings: AI controls, configuration preview/publish and existing identity membership.
-- Operations (admin): pause controls, durable work/queue visibility, independent structural checks, audited recovery and retained-trace minimization.
+The everyday workspace uses plain-language forms and summaries rather than JSON editors.
 
-No polling loop or model call runs simply because the UI is open. The authenticated source is simulated in this installation; it does not provide unrestricted multi-client self-service signup.
+- **Home:** recent requests, bounded counts, and shortcuts to outstanding work.
+- **Requests:** search and status filtering; subject, goal, responsibility and due date.
+- **Tasks:** shared workspace tasks waiting for a response or verification, with the responsible person shown. This is not a claim of personal assignment to the signed-in operator. Limited to the latest 100 pending tasks.
+- **Start a scenario:** guided source-event forms and searchable synthetic event catalogue. Nothing fires on load. Unmapped events enter routing review; a sample is not proof of integration. Connected recipients may cause real messaging when a request runs.
+- **Activity:** select a request to inspect its workflow, communication flow and chronological history.
+- **Settings (admin):** people/channels, approved references, configuration and membership. Recovery and infrastructure controls are under **Advanced operations**, outside everyday navigation.
+
+### Request journey
+
+`GET /console/v1/cases/{id}/journey` reads the authorized case plus source-event metadata, contacts, channel deliveries, inbound replies, provider receipts, journal operations, AI review states and result dispatch/acknowledgement. Tenant RLS and source ownership apply before any history is read. The endpoint is read-only; it does not invoke a model or create communication. It returns no recipient addresses, correlation tokens, model prompts or credentials.
+
+The graph is derived from the current case, not a hardcoded scenario:
+
+- Source, subject, department, person and communication medium are distinct concepts.
+- **Workflow map** lays out obligations by prerequisite depth. Child requests and dependencies change the graph. Arrows mean prerequisite to dependent work, not an invented chronological send order. Source and outcome nodes are based on recorded case/results.
+- **Communication flow** joins actual contacts to outbound sends, provider events and replies using their recorded IDs. Different channels remain within the same case. Missing links are labelled, never guessed.
+- **Activity** combines the recorded case actions, AI reviews, sends, replies, provider events and results by time. Simulated response evidence is labelled separately from external evidence.
+- Selecting a step opens readable details and original evidence where available. Fit-to-screen, actual-size and pending-work focus controls support walkthroughs without inventing progress animations.
+- Message bodies are explicitly previews, capped at 2,000 characters; original inbound evidence remains accessible. Each history category is capped at the latest 100 records and reports truncation. This is a bounded recent history, not an unlimited audit export. Current task status can reflect older evidence outside that window.
+- Live updates are **opt in**, every ten seconds, only while the tab is visible. Navigating away cancels updates. No AI runs while watching. The selected view persists; new case revisions prompt the operator to refresh before changing work.
+
+Sending, provider acceptance, confirmed delivery, received reply, verified answer, published result and source acknowledgement are different states. No receipt is fabricated and provider acceptance is not labelled as delivery. Source simulation, participant role-play and real channel activity remain explicitly distinguishable.
+
+### Working with a request
+
+Task cards show the question, responsible person, dependency, reported answer and verification. Guided **Practice a response** forms translate human input into existing version-bound commands; eligible actor selection helps prevent role confusion, while the server remains authoritative. Simulation does not prove a real employee's identity. **Send through a connected channel** selects an actual contact and an enabled, consented recipient for that actor; it requires an explicit real-send confirmation. Source acknowledgement role-play is separately labelled.
+
+AI assistance is on demand and review-gated. The reviewer sees the suggested action, target task, reason, uncertainty and quoted supporting evidence; exact proposal hashes remain bound on submission. Administrator diagnostics are collapsed. UI simplification does not change actor authority, consent, evidence validity, optimistic concurrency, independent verification, PKCE, MFA or server membership controls.
+
+The authenticated source is simulated in this installation; no unrestricted self-service tenancy is provided. New incoming channels require trusted intake adapters; the map does not imply that arbitrary personal messages can create cases. Backend adapters currently support email and WhatsApp, with machine-source intake and source result handback. Additional adapters can feed the same model; their existence is not claimed by the diagram.
 
 ## Versioned configuration
 
@@ -44,7 +67,7 @@ Publication is **at least once**, not exactly once. Consumers deduplicate `resul
 
 `npm run build` performs type checking and bundles the console and workers. GitHub Actions provisions the console assets with Terraform alongside runtime resources and applies schema 6. Assets are served with no-store and CloudFront caching disabled to avoid stale login/configuration files during this build stage. Custom app hosting uses staged ACM validation and CloudFront activation; see [web hostname configuration](CONFIGURATION.md#web-hostname-and-tls). Use Terraform's `console_url` for the active URL. Email DNS is independent.
 
-Application, browser interaction, model and live-channel verification have **not** been performed for this build. Build and Terraform validation do not establish login, business-flow or delivery correctness. Do not infer an accuracy/SLA/compliance claim from the controls described here.
+This UI release is compiled and deployed through the existing pipeline. Prior login troubleshooting verified credential acceptance and fixed browser preflight; that does not establish complete business-flow, graph, role-isolation or live-channel acceptance. Model and real channel evaluations remain separately tracked. Do not infer an accuracy/SLA/compliance claim from the controls described here.
 
 References: [API Gateway JWT authorizers](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-jwt-authorizer.html), [Cognito PKCE](https://docs.aws.amazon.com/cognito/latest/developerguide/using-pkce-in-authorization-code.html), [Cognito token endpoint](https://docs.aws.amazon.com/cognito/latest/developerguide/token-endpoint.html).
 

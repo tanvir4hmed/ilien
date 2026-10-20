@@ -15,6 +15,7 @@ import { z } from "zod";
 import {
   executeCommand,
   listCases,
+  listTasks,
   caseView,
   acknowledge,
   readEvidence,
@@ -60,8 +61,8 @@ export async function handler(
   if (event.rawPath === "/health")
     return response(200, {
       service: "ilien",
-      phase: "reliability",
-      version: "0.6.0",
+      phase: "operator-experience",
+      version: "0.7.0",
     });
   const consoleRequest = event.rawPath.startsWith("/console/");
   if (consoleRequest && event.requestContext.http.method === "OPTIONS")
@@ -306,6 +307,8 @@ export async function handler(
     }
     if (method === "GET" && event.rawPath === "/v1/cases")
       return response(200, { items: await listCases(source) });
+    if (method === "GET" && event.rawPath === "/v1/tasks")
+      return response(200, { items: await listTasks(source) });
     const evidenceRoute =
       /^\/v1\/cases\/([0-9a-f-]{36})\/evidence\/([0-9a-f-]{36})$/.exec(
         event.rawPath,
@@ -320,7 +323,7 @@ export async function handler(
         ),
       );
     const route =
-      /^\/v1\/cases\/([0-9a-f-]{36})(?:\/(commands|acknowledgements|policy|journal|contacts|claims|results|rejections))?$/.exec(
+      /^\/v1\/cases\/([0-9a-f-]{36})(?:\/(commands|acknowledgements|policy|journey|journal|contacts|claims|results|rejections))?$/.exec(
         event.rawPath,
       );
     if (route) {

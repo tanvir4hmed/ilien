@@ -1,3 +1,10 @@
+import {
+  renderJourney,
+  summary,
+  words,
+  date,
+  type Journey,
+} from "./journey.js";
 import type {
   CaseState,
   Policy,
@@ -17,6 +24,40 @@ let config: Config,
   role = "viewer",
   page = "Overview";
 let content: HTMLElement;
+let stopLive: (() => void) | undefined;
+const pageLabels: Record<string, string> = {
+  Overview: "Home",
+  Cases: "Requests",
+  Tasks: "Tasks",
+  Simulator: "Start a scenario",
+  Activity: "Activity",
+  Settings: "Settings",
+  Channels: "People & channels",
+  Knowledge: "Reference library",
+  Operations: "Advanced operations",
+  "Agent review": "AI suggestion",
+};
+const label = (value: unknown) => pageLabels[String(value)] ?? words(value);
+function options(entries: { value: string; label: string }[]) {
+  const n = el("select");
+  for (const e of entries) {
+    const o = el("option", e.label);
+    o.value = e.value;
+    n.append(o);
+  }
+  return n;
+}
+function fold(title: string, parent: HTMLElement) {
+  const d = el("details", "", "advanced");
+  d.append(el("summary", title));
+  parent.append(d);
+  return d;
+}
+function required(n: HTMLInputElement | HTMLTextAreaElement, title: string) {
+  if (!n.value.trim()) throw new Error(`Please enter ${title.toLowerCase()}.`);
+  return n.value.trim();
+}
+
 const pretty = (value: unknown) => JSON.stringify(value, null, 2);
 const decode = <T>(v: T | string): T =>
   typeof v === "string" ? JSON.parse(v) : v;
@@ -83,8 +124,7 @@ function card(title: string, parent: HTMLElement = content) {
   return n;
 }
 function json(value: unknown, parent: HTMLElement) {
-  const n = el("pre", pretty(value));
-  parent.append(n);
+  summary(value, parent);
 }
 function details(title: string, value: unknown, parent: HTMLElement) {
   const d = el("details");
@@ -105,7 +145,7 @@ function table(
   const wrap = el("div", "", "table-wrap"),
     t = el("table"),
     head = el("tr");
-  for (const k of keys) head.append(el("th", k.replaceAll("_", " ")));
+  for (const k of keys) head.append(el("th", label(k)));
   if (onSelect) head.append(el("th", "Open"));
   const thead = el("thead");
   thead.append(head);
@@ -115,11 +155,29 @@ function table(
     const tr = el("tr");
     for (const k of keys)
       tr.append(
-        el("td", typeof r[k] === "object" ? pretty(r[k]) : String(r[k] ?? "—")),
+        el(
+          "td",
+          typeof r[k] === "object"
+            ? Object.entries(r[k] as Row)
+                .map(([a, b]) => `${words(a)}: ${String(b)}`)
+                .join(" · ")
+            : /(_at|At|deadline)$/.test(k) && r[k]
+              ? date(r[k])
+              : [
+                    "status",
+                    "state",
+                    "disposition",
+                    "event_type",
+                    "channel",
+                    "role",
+                  ].includes(k)
+                ? words(r[k] ?? "Not recorded")
+                : String(r[k] ?? "—"),
+        ),
       );
     if (onSelect) {
       const td = el("td");
-      td.append(button("Inspect", () => onSelect(r)));
+      td.append(button("Open", () => onSelect(r)));
       tr.append(td);
     }
     body.append(tr);
@@ -145,8 +203,26 @@ async function api<T = unknown>(path: string, body?: unknown): Promise<T> {
     credentials: "omit",
   });
   const data = await response.json();
-  if (!response.ok)
-    throw new Error(`${data.error ?? "Request failed"} (${response.status})`);
+  if (!response.ok) {
+    const messages: Record<string, string> = {
+      stale_case_revision:
+        "This request changed. Refresh it before trying again.",
+      stale_revision: "This request changed. Refresh it before trying again.",
+      stale_contact:
+        "This message request is out of date. Refresh the request.",
+      source_not_authorized:
+        "Your account is not connected to this workspace. Ask the administrator.",
+      actor_not_authorized: "This participant cannot perform that action.",
+      independent_verifier_required:
+        "Choose an independent verifier to check this answer.",
+      invalid_operator_token:
+        "Your sign-in session is no longer valid. Sign in again.",
+    };
+    throw new Error(
+      messages[data.error] ??
+        `${words(data.error ?? "Unable to complete this action")}. Please review the form and try again.`,
+    );
+  }
   return data as T;
 }
 const base64 = (bytes: Uint8Array) =>
@@ -220,13 +296,12 @@ function shell() {
   for (const name of [
     "Overview",
     "Cases",
+    "Tasks",
     "Simulator",
-    "Channels",
-    "Knowledge",
-    "Settings",
-    ...(role === "admin" ? ["Operations"] : []),
+    "Activity",
+    ...(role === "admin" ? ["Settings"] : []),
   ]) {
-    const b = button(name, () => show(name));
+    const b = button(label(name), () => show(name));
     if (page === name) b.classList.add("active");
     nav.append(b);
   }
@@ -239,13 +314,10 @@ function shell() {
     top = el("header", "", "top"),
     heading = el("div");
   heading.append(
-    el("div", "Workspace / Textile & apparel", "eyebrow"),
-    el("h1", page),
+    el("div", "Your coordination workspace", "eyebrow"),
+    el("h1", label(page)),
   );
-  top.append(
-    heading,
-    el("span", "Synthetic source · Real channel adapters", "badge"),
-  );
+  top.append(heading, el("span", "Communication workspace", "badge"));
   content = el("div");
   main.append(
     top,
@@ -259,6 +331,8 @@ function shell() {
   root.append(layout);
 }
 async function show(name: string) {
+  stopLive?.();
+  stopLive = undefined;
   page = name;
   shell();
   content.append(el("p", "Loading…", "muted"));
@@ -266,6 +340,8 @@ async function show(name: string) {
     const tasks: Record<string, () => Promise<void>> = {
       Overview: overview,
       Cases: cases,
+      Tasks: pendingTasks,
+      Activity: activity,
       Simulator: simulator,
       Channels: channels,
       Knowledge: knowledge,
@@ -280,316 +356,682 @@ async function show(name: string) {
     );
   }
 }
+function requestList(items: Row[], parent: HTMLElement) {
+  if (!items.length) {
+    parent.append(
+      el(
+        "p",
+        "No requests yet. Start a scenario to see how a request moves between people.",
+        "empty",
+      ),
+    );
+    return;
+  }
+  for (const r of items) {
+    const c = el("article", "", "request-item");
+    const subject = r.subject ? decode(r.subject as Row | string) : {};
+    c.append(
+      el("span", words(r.status), "badge"),
+      el("h3", String(subject.id ?? words(r.workflow))),
+      el("p", String(r.goal ?? words(r.workflow))),
+      el(
+        "p",
+        `Updated ${date(r.updated_at)}${r.deadline ? ` · Due ${date(r.deadline)}` : ""}`,
+        "muted",
+      ),
+      button("Open request", () => casePage(String(r.id))),
+    );
+    parent.append(c);
+  }
+}
 async function overview() {
-  const [cases, events] = await Promise.all([
-    api<{ items: Row[] }>("/cases"),
-    api<{ items: Row[] }>("/events"),
-  ]);
+  const data = await api<{ items: Row[] }>("/cases");
   const grid = el("div", "", "grid");
   content.append(grid);
-  for (const [label, n] of [
-    ["Recent cases", cases.items.length],
-    ["Active", cases.items.filter((c) => c.status === "active").length],
+  for (const [title, n] of [
+    ["Requests", data.items.length],
+    ["In progress", data.items.filter((c) => c.status === "active").length],
     [
       "Needs attention",
-      cases.items.filter((c) => c.status === "blocked" || c.status === "paused")
+      data.items.filter((c) => ["blocked", "paused"].includes(String(c.status)))
         .length,
     ],
-    ["Completed", cases.items.filter((c) => c.status === "completed").length],
+    ["Completed", data.items.filter((c) => c.status === "completed").length],
   ]) {
-    const c = card(String(label), grid);
+    const c = card(String(title), grid);
     c.append(el("span", String(n), "metric"));
   }
+  const welcome = card("Keep every conversation moving");
+  welcome.append(
+    el(
+      "p",
+      "Start a request, see who needs to respond, and follow the evidence through to an outcome.",
+    ),
+    button("Start a scenario", () => show("Simulator"), true),
+    button("View tasks", () => show("Tasks")),
+  );
+  requestList(data.items.slice(0, 6), card("Recent requests"));
   content.append(
     el(
       "p",
-      "Counts reflect the latest 50 cases. Refresh is manual; no background model calls.",
+      "Showing the latest 50 requests. Counts are for this recent window.",
       "muted",
     ),
+    button("Refresh", () => show("Overview")),
   );
-  table(
-    cases.items.slice(0, 8),
-    ["workflow", "status", "revision", "updated_at"],
-    card("Recent work"),
-    (r) => casePage(String(r.id)),
-  );
-  table(
-    events.items.slice(0, 8),
-    ["event_type", "status", "disposition"],
-    card("Source inbox"),
-  );
-  content.append(button("Refresh workspace", () => show("Overview")));
 }
 async function cases() {
   const data = await api<{ items: Row[] }>("/cases");
-  table(
-    data.items,
-    ["workflow", "status", "revision", "updated_at"],
-    card("Cases"),
-    (r) => casePage(String(r.id)),
+  const c = card("Find a request"),
+    search = input(),
+    status = options(
+      [
+        "all",
+        "active",
+        "blocked",
+        "paused",
+        "completed",
+        "cancelled",
+        "handed_off",
+      ].map((value) => ({
+        value,
+        label: value === "all" ? "All statuses" : words(value),
+      })),
+    ),
+    list = el("div");
+  search.placeholder = "Search by subject or request";
+  function render() {
+    list.replaceChildren();
+    requestList(
+      data.items.filter(
+        (r) =>
+          (status.value === "all" || r.status === status.value) &&
+          JSON.stringify(r).toLowerCase().includes(search.value.toLowerCase()),
+      ),
+      list,
+    );
+  }
+  search.oninput = render;
+  status.onchange = render;
+  c.append(
+    field("Search", search),
+    field("Status", status),
+    el("p", "Latest 50 requests", "muted"),
+    list,
   );
+  render();
 }
-async function casePage(id: string) {
-  page = "Cases";
-  shell();
-  const state = await api<CaseState>(`/cases/${id}`),
-    policy = await api<Policy>(`/cases/${id}/policy`);
-  const heading = card(state.workflow);
-  heading.append(
-    el("p", state.goal),
-    el("span", `${state.status} · revision ${state.revision}`, "badge"),
+async function pendingTasks() {
+  const data = await api<{ items: Row[] }>("/tasks");
+  const c = card("Work waiting for a response");
+  c.append(
     el(
       "p",
-      `${state.subject.type} / ${state.subject.id} / revision ${state.subject.revision}`,
+      "Shared task list for this workspace, grouped by responsible person. These are not all personally assigned to you. Latest 100 pending tasks.",
       "muted",
     ),
   );
-  details(
-    "Case identity and bounds",
-    {
-      id: state.id,
-      configuration: state.configurationVersion,
-      deadline: state.deadline,
-      sourceEvidenceId: state.sourceEvidenceId,
-      missionRevision: state.missionRevision ?? 1,
-    },
-    heading,
-  );
-  heading.append(
-    button("Read original evidence", async () =>
-      json(
-        await api(`/cases/${id}/evidence/${state.sourceEvidenceId}`),
-        heading,
+  for (const r of data.items) {
+    const item = el("article", "", "request-item");
+    item.append(
+      el("span", words(r.status), "badge"),
+      el("h3", String(r.question)),
+      el(
+        "p",
+        `${words(r.department)} · ${words(r.owner)} · ${String(r.subject)}`,
+        "muted",
       ),
+      button("Open request", () => casePage(String(r.case_id))),
+    );
+    c.append(item);
+  }
+  if (!data.items.length) c.append(el("p", "No pending tasks.", "empty"));
+}
+async function activity() {
+  const data = await api<{ items: Row[] }>("/cases");
+  const c = card("Follow a conversation");
+  c.append(
+    el(
+      "p",
+      "Choose a request to see its workflow map, channel flow and complete available activity.",
     ),
-    button("Refresh case", () => casePage(id)),
+  );
+  requestList(data.items, c);
+}
+async function casePage(id: string) {
+  stopLive?.();
+  stopLive = undefined;
+  page = "Cases";
+  shell();
+  const [journey, policy] = await Promise.all([
+    api<Journey>(`/cases/${id}/journey`),
+    api<Policy>(`/cases/${id}/policy`),
+  ]);
+  const state = journey.state;
+  const heading = card(`${words(state.subject.type)} · ${state.subject.id}`);
+  heading.append(
+    el("span", words(state.status), "badge"),
+    el("p", state.goal),
+    el(
+      "p",
+      `Due ${date(state.deadline)} · Source: ${state.origin === "simulated" ? "Simulated event" : "Recorded request"}`,
+      "muted",
+    ),
+    button("Refresh request", () => casePage(id)),
+    button("Back to requests", () => show("Cases")),
+  );
+  const evidenceHost = el("div");
+  async function evidence(evidenceId: string) {
+    const data = await api<Row>(`/cases/${id}/evidence/${evidenceId}`);
+    evidenceHost.replaceChildren(el("h3", "Original evidence"));
+    let original: unknown = data.original_text;
+    try {
+      original = JSON.parse(String(data.original_text));
+    } catch {}
+    summary(original, evidenceHost);
+    details(
+      "Evidence integrity",
+      {
+        received: date(data.received_at),
+        origin: data.origin,
+        sha256: data.sha256,
+      },
+      evidenceHost,
+    );
+    evidenceHost.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+  heading.append(
+    button("Read original request", () => evidence(state.sourceEvidenceId)),
+  );
+  const map = card("Request journey"),
+    controls = el("div", "", "row"),
+    mapHost = el("div"),
+    live = input("", "checkbox"),
+    status = el("span", "Updates are off", "muted");
+  let disposed = false,
+    timer: ReturnType<typeof setTimeout> | undefined,
+    refreshing = false;
+  let current = journey;
+  const draw = () => renderJourney(mapHost, current, evidence);
+  async function refresh() {
+    if (refreshing || disposed || document.hidden) return;
+    refreshing = true;
+    try {
+      const next = await api<Journey>(`/cases/${id}/journey`);
+      if (disposed) return;
+      const changed = next.state.revision !== state.revision;
+      const changedHistory =
+        JSON.stringify({ ...current, observedAt: "" }) !==
+        JSON.stringify({ ...next, observedAt: "" });
+      current = next;
+      if (changedHistory) draw();
+      status.textContent = changed
+        ? "New activity received. Refresh the request before taking an action."
+        : `Updated ${date(next.observedAt)}`;
+    } catch (e) {
+      if (!disposed)
+        status.textContent =
+          e instanceof Error ? e.message : "Could not update. Retry.";
+    } finally {
+      refreshing = false;
+    }
+  }
+  function schedule() {
+    if (live.checked && !disposed)
+      timer = setTimeout(async () => {
+        await refresh();
+        schedule();
+      }, 10000);
+  }
+  live.onchange = () => {
+    if (timer) clearTimeout(timer);
+    status.textContent = live.checked
+      ? "Watching for new activity every 10 seconds"
+      : "Updates are off";
+    schedule();
+  };
+  stopLive = () => {
+    disposed = true;
+    if (timer) clearTimeout(timer);
+  };
+  controls.append(
+    button("Update map", refresh),
+    field("Live updates", live),
+    status,
+  );
+  map.append(controls, mapHost);
+  draw();
+  content.append(evidenceHost);
+  const requiredWork = state.obligations.filter(
+    (o) => o.required && o.status !== "verified",
+  );
+  const next = card("What needs to happen next");
+  next.append(
+    el(
+      "p",
+      requiredWork.length
+        ? `${requiredWork.length} required answers still need verification. ${state.status === "paused" ? "Processing is paused." : ""}`
+        : state.status === "completed"
+          ? "The request has a completed outcome. Check the source acknowledgement below."
+          : "Required answers are verified. Review the outcome before reporting back.",
+    ),
   );
   const grid = el("div", "", "grid");
-  content.append(grid);
+  next.append(grid);
   for (const o of state.obligations) {
-    const c = card(o.group, grid);
-    c.classList.add("node");
+    const c = card(words(o.group), grid);
     c.dataset.status = o.status;
+    c.classList.add("node");
     c.append(
-      el("span", o.status, "badge"),
+      el("span", words(o.status), "badge"),
       el("p", o.question),
-      el("p", `${o.id} · ${o.assignee} · revision ${o.revision}`, "muted"),
+      el("p", `Responsible: ${words(o.assignee)}`, "muted"),
     );
     if (o.dependencies.length)
-      c.append(el("p", `Waiting on: ${o.dependencies.join(", ")}`));
-    if (o.proposal) details("Bound proposal", o.proposal, c);
-    if (o.decision) details("Recorded decision", o.decision, c);
-    if (o.reply) details("Reported information", o.reply, c);
-    if (o.verification) details("Verification", o.verification, c);
+      c.append(
+        el(
+          "p",
+          `Waiting for: ${o.dependencies.map((d) => state.obligations.find((n) => n.id === d)?.question ?? d).join("; ")}`,
+        ),
+      );
+    if (o.reply)
+      c.append(
+        el("p", o.reply.statement),
+        el("p", `Answer valid until ${date(o.reply.validUntil)}`, "muted"),
+      );
+    if (o.verification)
+      c.append(el("p", `Verified by ${words(o.verification.actorId)}`));
+    if (o.proposal) details("Proposal to decide", o.proposal, c);
+    if (o.decision) details("Decision", o.decision, c);
   }
   if (role !== "viewer") {
-    const c = card("Participant simulator");
-    c.append(
-      notice(
-        "Authenticated role-play for synthetic cases. Commands use the selected actor’s authority and do not represent real participant identity.",
+    caseActions(state, policy, id);
+    const send = card("Send through a connected channel");
+    send.append(
+      el(
+        "p",
+        "This sends a real message to a consented recipient. A simulated reply is never a channel receipt.",
+        "muted",
       ),
     );
-    const actor = select(
-        policy.actors.filter((a) => a.enabled).map((a) => a.id),
+    const bindings = await api<{ items: Row[] }>("/channels/bindings");
+    const contact = options(
+        journey.contacts.map((r) => {
+          const c = decode(r.contact as Row | string);
+          return {
+            value: String(r.id),
+            label: `${words(c.actorId)} · ${String(c.question)}`,
+          };
+        }),
       ),
-      node = select(state.obligations.map((o) => o.id)),
-      kind = select([
-        "reply",
-        "verify",
-        "attach_proposal",
-        "decide",
-        "add_child",
-        "link_dependency",
-        "reassign",
-        "reopen",
-        "pause",
-        "resume",
-        "takeover",
-        "release",
-        "report",
-        "cancel",
-        "handoff",
-        "adopt_configuration",
-        "amend_subject",
-      ]),
-      editor = el("textarea");
-    editor.classList.add("code");
-    function draft() {
-      const o = state.obligations.find((o) => o.id === node.value)!;
-      const now = new Date().toISOString();
-      const common = { obligationId: o.id };
-      const map: Record<string, unknown> = {
-        attach_proposal: {
-          type: "attach_proposal",
-          ...common,
-          proposalId: o.proposal?.id ?? "proposal",
-          proposalRevision: (o.proposal?.revision ?? 0) + 1,
-          statement: "",
-          reason: "",
-        },
-        decide: {
-          type: "decide",
-          ...common,
-          expectedObligationRevision: o.revision,
-          proposalHash: o.proposal?.sha256 ?? "",
-          choice: "approve",
-          reason: "",
-          subjectRevision: state.subject.revision,
-          observedAt: now,
-          validUntil: new Date(Date.now() + 1800000).toISOString(),
-        },
-        reply: {
-          type: "reply",
-          ...common,
-          expectedObligationRevision: o.revision,
-          statement: "",
-          observedAt: now,
-          validUntil: new Date(Date.now() + 1800000).toISOString(),
-          subjectRevision: state.subject.revision,
-        },
-        verify: {
-          type: "verify",
-          ...common,
-          replyRevision: o.reply?.revision ?? 1,
-          accept: true,
-          reason: "",
-        },
-        add_child: {
-          type: "add_child",
-          parentId: o.id,
-          obligationId: `child_${crypto.randomUUID().slice(0, 8)}`,
-          group: policy.groups[0],
-          kind: "fact",
-          question: "",
-        },
-        link_dependency: {
-          type: "link_dependency",
-          ...common,
-          dependencyId: "",
-        },
-        reassign: { type: "reassign", ...common, actorId: "", reason: "" },
-        reopen: { type: "reopen", ...common, reason: "" },
-        adopt_configuration: {
-          type: "adopt_configuration",
-          version: policy.version,
-          reason: "",
-        },
-        amend_subject: {
-          type: "amend_subject",
-          subjectRevision: "",
-          goal: state.goal,
-          reason: "",
-        },
-      };
-      editor.value = pretty(
-        map[kind.value] ?? { type: kind.value, reason: "" },
-      );
+      binding = el("select"),
+      preview = el("p");
+    function eligible() {
+      binding.replaceChildren();
+      const r = journey.contacts.find((r) => r.id === contact.value);
+      const c = r ? decode(r.contact as Row | string) : {};
+      for (const b of bindings.items.filter(
+        (b) => b.enabled && b.actor_id === c.actorId,
+      )) {
+        const o = el("option", `${words(b.channel)} · ${String(b.address)}`);
+        o.value = String(b.id);
+        binding.append(o);
+      }
+      preview.textContent = binding.options.length
+        ? "The selected recipient will receive this request."
+        : "No enabled, consented channel for this person. Ask an admin to connect a recipient in Settings.";
     }
-    kind.onchange = draft;
-    node.onchange = draft;
-    draft();
-    c.append(
-      field("Actor", actor),
-      field("Obligation", node),
-      field("Operation", kind),
-      field("Command body", editor),
+    contact.onchange = eligible;
+    eligible();
+    send.append(
+      field("Request to send", contact),
+      field("Recipient and channel", binding),
+      preview,
       button(
-        "Apply simulated command",
+        "Send real message",
         async () => {
-          await api(`/cases/${id}/commands`, {
-            commandId: crypto.randomUUID(),
-            expectedRevision: state.revision,
-            actorId: actor.value,
-            operation: JSON.parse(editor.value),
+          if (!contact.value || !binding.value)
+            throw new Error("Select a request and an enabled recipient.");
+          if (!confirm("Send this request to the selected real recipient now?"))
+            return;
+          await api("/channels/dispatch", {
+            caseId: id,
+            contactId: contact.value,
+            bindingId: binding.value,
           });
+          toast(
+            "Delivery queued. Follow its actual status in Communication flow.",
+          );
           await casePage(id);
         },
         true,
       ),
     );
   }
-  const tabs = card("Evidence, conversation and outcomes");
-  const target = el("div");
-  const row = el("div", "", "row");
-  for (const section of [
-    "journal",
-    "contacts",
-    "claims",
-    "results",
-    "rejections",
-  ])
-    row.append(
-      button(section, async () => {
-        target.replaceChildren();
-        const data = await api<Row[]>(`/cases/${id}/${section}`);
-        for (const item of data) {
-          details(String(item.id ?? item.command_id ?? section), item, target);
-          if (item.evidence_id)
-            target.append(
-              button("Read evidence", async () =>
-                json(
-                  await api(`/cases/${id}/evidence/${item.evidence_id}`),
-                  target,
-                ),
-              ),
-            );
-          if (section === "results" && item.current && role !== "viewer") {
-            const reason = input();
-            target.append(
-              field("Source acknowledgement reason", reason),
-              button("Acknowledge result as simulated source", async () => {
-                await api(`/cases/${id}/acknowledgements`, {
-                  acknowledgementId: crypto.randomUUID(),
-                  resultId: item.id,
-                  disposition: "accepted",
-                  reason: reason.value,
-                });
-                toast("Source acknowledgement recorded");
-              }),
-            );
-          }
-        }
-        if (!data.length) target.append(el("p", "No records yet.", "empty"));
-      }),
+  const outcomes = card("Outcome and source response");
+  if (!journey.results.length)
+    outcomes.append(el("p", "No outcome has been recorded yet.", "empty"));
+  for (const r of journey.results) {
+    const item = el("article", "", "request-item");
+    item.append(
+      el("h3", r.current ? "Current outcome" : "Earlier outcome"),
+      el(
+        "p",
+        `Source delivery: ${words(r.dispatch_state ?? "not recorded")} · Acknowledgement: ${words(r.acknowledgement ?? "not received")}`,
+      ),
     );
-  tabs.append(row, target);
-  const ai = card("Agent investigation & review");
+    summary(decode(r.result as Row | string), item);
+    if (r.current && !r.acknowledgement && role !== "viewer") {
+      const reason = input();
+      item.append(
+        field("Why is the source accepting this outcome?", reason),
+        button("Simulate source acknowledgement", async () => {
+          await api(`/cases/${id}/acknowledgements`, {
+            acknowledgementId: crypto.randomUUID(),
+            resultId: r.id,
+            disposition: "accepted",
+            reason: required(reason, "a reason"),
+          });
+          await casePage(id);
+        }),
+      );
+    }
+    outcomes.append(item);
+  }
+  const ai = card("AI assistance");
   ai.append(
     el(
       "p",
-      "Bounded investigations spend model tokens only when requested or when eligible inbound receipts arrive. Every proposal needs review.",
+      "Ask the assistant to review the evidence and suggest a next step. Suggestions require review; requesting a review uses model tokens.",
       "muted",
     ),
   );
   if (role !== "viewer")
     ai.append(
-      button(
-        "Request investigation",
-        async () => {
-          const r = await api(`/cases/${id}/agent`, {
-            requestId: crypto.randomUUID(),
-          });
-          json(r, ai);
-        },
-        true,
-      ),
+      button("Ask AI to review this request", async () => {
+        await api(`/cases/${id}/agent`, { requestId: crypto.randomUUID() });
+        toast("Review requested. Check suggestions when ready.");
+      }),
     );
   ai.append(
-    button("Load agent runs", async () => {
-      const data = await api<{ items: Row[] }>(`/cases/${id}/agent`);
-      table(data.items, ["id", "state", "created_at"], ai, (r) =>
+    button("View suggestions", async () => {
+      const runs = await api<{ items: Row[] }>(`/cases/${id}/agent`);
+      table(runs.items, ["state", "created_at"], ai, (r) =>
         runPage(String(r.id)),
       );
     }),
   );
+  if (role === "admin")
+    details(
+      "Advanced request identifiers",
+      {
+        id: state.id,
+        revision: state.revision,
+        configuration: state.configurationVersion,
+        sourceEvidenceId: state.sourceEvidenceId,
+      },
+      heading,
+    );
+}
+function caseActions(state: CaseState, policy: Policy, id: string) {
+  const c = card("Practice a response");
+  c.append(
+    notice(
+      "Simulation only: act as a participant to explore this case. These actions are labelled as role-play and do not send WhatsApp or email messages.",
+    ),
+  );
+  const labels: Record<string, string> = {
+    reply: "Provide information",
+    verify: "Check an answer",
+    attach_proposal: "Propose a decision",
+    decide: "Approve or reject a proposal",
+    add_child: "Ask for additional information",
+    link_dependency: "Wait for another task",
+    reassign: "Change responsible person",
+    reopen: "Ask again",
+    pause: "Pause request",
+    resume: "Resume request",
+    takeover: "Take manual control",
+    release: "Return to automatic coordination",
+    report: "Prepare source report",
+    cancel: "Cancel request",
+    handoff: "Hand over request",
+    adopt_configuration: "Use updated workflow settings",
+    amend_subject: "Correct request details",
+  };
+  const actor = options(
+      policy.actors
+        .filter((a) => a.enabled)
+        .map((a) => ({
+          value: a.id,
+          label: `${words(a.id)} · ${words(a.role)}`,
+        })),
+    ),
+    task = options(
+      state.obligations.map((o) => ({
+        value: o.id,
+        label: `${words(o.group)} · ${o.question}`,
+      })),
+    ),
+    action = options(
+      Object.entries(labels).map(([value, label]) => ({ value, label })),
+    ),
+    fields = el("div");
+  let read = () => ({}) as Row;
+  function draft() {
+    fields.replaceChildren();
+    const o = state.obligations.find((n) => n.id === task.value);
+    const now = new Date().toISOString(),
+      end = new Date(Date.now() + 1800000).toISOString();
+    if (!o) {
+      fields.append(el("p", "No task available."));
+      return;
+    }
+    const previousActor = actor.value;
+    actor.replaceChildren();
+    const eligibleActors = policy.actors.filter(
+      (a) =>
+        a.enabled &&
+        (action.value === "verify"
+          ? a.role === "verifier" &&
+            a.group === o.group &&
+            a.id !== o.reply?.actorId
+          : ["reply", "decide"].includes(action.value)
+            ? a.id === o.assignee
+            : ["add_child"].includes(action.value)
+              ? a.role === "coordinator" || a.id === o.assignee
+              : a.role === "coordinator"),
+    );
+    for (const a of eligibleActors) {
+      const option = el("option", `${words(a.id)} · ${words(a.role)}`);
+      option.value = a.id;
+      actor.append(option);
+    }
+    if (eligibleActors.some((a) => a.id === previousActor))
+      actor.value = previousActor;
+    const base = { obligationId: o.id };
+    const seeds: Record<string, Row> = {
+      reply: {
+        type: "reply",
+        ...base,
+        expectedObligationRevision: o.revision,
+        statement: "",
+        observedAt: now,
+        validUntil: end,
+        subjectRevision: state.subject.revision,
+      },
+      verify: {
+        type: "verify",
+        ...base,
+        replyRevision: o.reply?.revision ?? 1,
+        accept: true,
+        reason: "",
+      },
+      attach_proposal: {
+        type: "attach_proposal",
+        ...base,
+        proposalId:
+          o.proposal?.id ?? `proposal_${crypto.randomUUID().slice(0, 8)}`,
+        proposalRevision: (o.proposal?.revision ?? 0) + 1,
+        statement: "",
+        reason: "",
+      },
+      decide: {
+        type: "decide",
+        ...base,
+        expectedObligationRevision: o.revision,
+        proposalHash: o.proposal?.sha256 ?? "",
+        choice: "approve",
+        reason: "",
+        subjectRevision: state.subject.revision,
+        observedAt: now,
+        validUntil: end,
+      },
+      add_child: {
+        type: "add_child",
+        parentId: o.id,
+        obligationId: `child_${crypto.randomUUID().slice(0, 8)}`,
+        group: policy.groups[0],
+        kind: "fact",
+        question: "",
+      },
+      link_dependency: { type: "link_dependency", ...base, dependencyId: "" },
+      reassign: { type: "reassign", ...base, actorId: "", reason: "" },
+      reopen: { type: "reopen", ...base, reason: "" },
+      adopt_configuration: {
+        type: "adopt_configuration",
+        version: policy.version,
+        reason: "",
+      },
+      amend_subject: {
+        type: "amend_subject",
+        subjectRevision: "",
+        goal: state.goal,
+        reason: "",
+      },
+    };
+    const seed = seeds[action.value] ?? { type: action.value, reason: "" };
+    read = formFields(seed, fields, {
+      hidden: [
+        "type",
+        "obligationId",
+        "parentId",
+        "proposalId",
+        "proposalRevision",
+        "expectedObligationRevision",
+        "replyRevision",
+        "proposalHash",
+        ...(action.value !== "amend_subject" ? ["subjectRevision"] : []),
+      ],
+      choices: {
+        group: policy.groups,
+        kind: ["fact", "decision", "acknowledgement", "evidence", "commitment"],
+        choice: ["approve", "reject"],
+        actorId: policy.actors.filter((a) => a.enabled).map((a) => a.id),
+        dependencyId: state.obligations
+          .filter((n) => n.id !== o.id)
+          .map((n) => n.id),
+      },
+    });
+    if (action.value === "verify")
+      fields.prepend(
+        el(
+          "p",
+          o.reply
+            ? `Answer to check: ${o.reply.statement}`
+            : "No answer has been recorded for this task.",
+        ),
+      );
+    if (action.value === "decide")
+      fields.prepend(
+        el(
+          "p",
+          o.proposal
+            ? `Exact proposal: ${o.proposal.statement}`
+            : "Record a proposal before deciding.",
+        ),
+      );
+  }
+  action.onchange = draft;
+  task.onchange = draft;
+  draft();
+  c.append(
+    field("Act as", actor),
+    field("Task", task),
+    field("What do you want to do?", action),
+    fields,
+    button(
+      "Record simulated response",
+      async () => {
+        if (!actor.value)
+          throw new Error(
+            "No eligible participant for this action. Ask an administrator to review the workflow.",
+          );
+        await api(`/cases/${id}/commands`, {
+          commandId: crypto.randomUUID(),
+          expectedRevision: state.revision,
+          actorId: actor.value,
+          operation: read(),
+        });
+        await casePage(id);
+      },
+      true,
+    ),
+  );
 }
 async function runPage(id: string) {
+  stopLive?.();
+  stopLive = undefined;
   page = "Agent review";
   shell();
   const data = await api<Row>(`/ai/runs/${id}`);
   const c = card("Evidence-bound proposal");
-  json(data, c);
   const run = (data.run ?? data) as Row;
+  c.append(el("span", words(run.state), "badge"));
+  let proposal = run.proposal;
+  try {
+    proposal = decode(proposal as Row | string);
+  } catch {}
+  if (proposal && typeof proposal === "object") {
+    const p = proposal as Row,
+      operation = p.operation as Row | null;
+    c.append(el("p", String(p.reason ?? "")));
+    if (operation) {
+      const state = await api<CaseState>(`/cases/${run.case_id}`);
+      const task = state.obligations.find(
+        (o) => o.id === operation.obligationId || o.id === operation.parentId,
+      );
+      summary(
+        {
+          suggestedAction: words(operation.type),
+          task: task?.question,
+          department: task ? words(task.group) : undefined,
+          ...Object.fromEntries(
+            Object.entries(operation).filter(([k]) =>
+              [
+                "statement",
+                "question",
+                "reason",
+                "choice",
+                "group",
+                "accept",
+                "goal",
+              ].includes(k),
+            ),
+          ),
+        },
+        c,
+      );
+    }
+    if (Array.isArray(p.uncertainties) && p.uncertainties.length)
+      details("What remains uncertain", p.uncertainties, c);
+    if (Array.isArray(p.citations))
+      for (const quote of p.citations as Row[])
+        c.append(el("blockquote", String(quote.quote)));
+  } else
+    summary({ message: "No suggestion is ready yet.", reason: run.reason }, c);
+  if (data.review) details("Review decision", data.review, c);
+  if (role === "admin") details("Advanced investigation details", data, c);
   if (role !== "viewer" && run.proposal_hash) {
     const reason = input();
     c.append(field("Review reason", reason));
@@ -603,7 +1045,7 @@ async function runPage(id: string) {
             await api(`/ai/runs/${id}/review`, {
               proposalHash: run.proposal_hash,
               disposition,
-              reason: reason.value,
+              reason: required(reason, "a review reason"),
             });
             await runPage(id);
           },
@@ -611,13 +1053,144 @@ async function runPage(id: string) {
       );
   }
 }
+function formFields(
+  seed: Row,
+  parent: HTMLElement,
+  settings: { hidden?: string[]; choices?: Record<string, string[]> } = {},
+) {
+  const readers: Record<string, () => unknown> = {};
+  const labels: Record<string, string> = {
+    statement: "Your information",
+    reason: "Reason or supporting evidence",
+    observedAt: "When was this observed?",
+    validUntil: "Valid until",
+    subjectRevision: "Subject version",
+    actorId: "Responsible person",
+    dependencyId: "Task to wait for",
+    group: "Department",
+    kind: "Information needed",
+    accept: "Does this answer pass verification?",
+    enabled: "Enabled",
+    consentRef: "Consent reference",
+    address: "Email address or international phone number",
+    expectedRevision: "Settings version",
+    autoReceipts: "Request AI review for incoming replies",
+    intakePaused: "Pause new requests",
+    agentPaused: "Pause AI reviews",
+    outboundPaused: "Pause outgoing messages",
+    resultsPaused: "Pause source reports",
+    legalHold: "Keep data on legal hold",
+    targetId: "Record reference",
+    retentionDays: "Retention period (days)",
+    requestId: "Change reference",
+    action: "Action",
+    role: "Access role",
+  };
+  for (const [key, value] of Object.entries(seed)) {
+    if (settings.hidden?.includes(key)) {
+      readers[key] = () => value;
+      continue;
+    }
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const d = fold(label(key), parent);
+      readers[key] = formFields(value as Row, d, settings);
+      continue;
+    }
+    if (Array.isArray(value) && value.some((v) => v && typeof v === "object")) {
+      const d = fold(`${label(key)} (${value.length})`, parent);
+      const entries = value.map((v) => {
+        const c = el("section", "", "form-group");
+        d.append(c);
+        return formFields(v as Row, c, settings);
+      });
+      readers[key] = () => entries.map((read) => read());
+      continue;
+    }
+    let n: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+    const choices =
+      settings.choices?.[key] ??
+      (
+        {
+          channel: ["email", "whatsapp"],
+          role: ["viewer", "operator", "admin"],
+          choice: ["approve", "reject"],
+          outcome: ["not_sent", "accepted"],
+        } as Record<string, string[]>
+      )[key];
+    const isDate = typeof value === "string" && /^\d{4}-\d\d-\d\dT/.test(value);
+    if (typeof value === "boolean") {
+      n = options([
+        { value: "true", label: "Yes" },
+        { value: "false", label: "No" },
+      ]);
+      n.value = String(value);
+      readers[key] = () => n.value === "true";
+    } else if (choices) {
+      n = options(choices.map((v) => ({ value: v, label: words(v) })));
+      if (choices.includes(String(value))) n.value = String(value);
+      readers[key] = () => n.value;
+    } else if (Array.isArray(value)) {
+      n = el("textarea");
+      n.value = value.join("\n");
+      n.rows = 3;
+      readers[key] = () =>
+        n.value
+          .split("\n")
+          .map((v) => v.trim())
+          .filter(Boolean);
+    } else {
+      n =
+        typeof value === "string" &&
+        (value.length > 110 ||
+          ["statement", "reason", "body", "goal", "question"].includes(key))
+          ? el("textarea")
+          : input();
+      n.value = value === null ? "" : String(value);
+      if (n instanceof HTMLInputElement)
+        n.type =
+          typeof value === "number"
+            ? "number"
+            : isDate
+              ? "datetime-local"
+              : "text";
+      if (isDate)
+        n.value = new Date(
+          Date.parse(String(value)) - new Date().getTimezoneOffset() * 60000,
+        )
+          .toISOString()
+          .slice(0, 16);
+      readers[key] = () => {
+        if (value === null && !n.value) return null;
+        const text = n.value.trim();
+        if (typeof value === "number") {
+          const result = Number(text);
+          if (!text || !Number.isFinite(result))
+            throw new Error(`Enter a number for ${label(key)}.`);
+          return result;
+        }
+        if (isDate) {
+          const result = new Date(text);
+          if (!Number.isFinite(result.getTime()))
+            throw new Error(`Enter a valid time for ${label(key)}.`);
+          return result.toISOString();
+        }
+        if (!text)
+          throw new Error(`Please enter ${labels[key] ?? label(key)}.`);
+        return text;
+      };
+    }
+    parent.append(field(labels[key] ?? label(key), n));
+  }
+  return () =>
+    Object.fromEntries(
+      Object.entries(readers).map(([key, read]) => [key, read()]),
+    );
+}
 async function simulator() {
-  const c = card("Source event simulator");
+  const c = card("Start a practice request");
   c.append(
-    el(
-      "p",
-      "Choose a synthetic source event or author your own. Catalogue coverage does not mean every event has a configured workflow. Unmapped events enter triage.",
-      "muted",
+    notice(
+      "The source event is simulated. Connected channel sends are real if enabled recipients are configured. This form does not create real factory data.",
     ),
   );
   const catalog = (await fetch("/catalog.json").then((r) => r.json())) as {
@@ -625,80 +1198,169 @@ async function simulator() {
     fixture: string;
     workflowSupported: boolean;
   }[];
-  const choice = select([
-      "material-readiness",
-      "revision-acknowledgement",
-      "maintenance-escalation",
-      ...catalog.map((x) => x.eventType),
-    ]),
-    editor = el("textarea");
-  editor.classList.add("code");
-  editor.rows = 20;
-  async function load() {
-    const selected = catalog.find((c) => c.eventType === choice.value);
+  const choice = options([
+    {
+      value: "material-readiness",
+      label: "Material readiness · stock, quality and supplier information",
+    },
+    {
+      value: "revision-acknowledgement",
+      label: "Revision acknowledgement · confirm a changed specification",
+    },
+    {
+      value: "maintenance-escalation",
+      label:
+        "Maintenance · inspection, parts and scheduling (requires configured workflow)",
+    },
+  ]);
+  const fields = el("div"),
+    feedback = el("div");
+  let event: Row = {},
+    read = () => ({}) as Row;
+  async function load(value: string) {
+    feedback.replaceChildren();
+    const selected = catalog.find((c) => c.eventType === value);
     const url = selected
       ? `/fixtures/${encodeURIComponent(selected.fixture)}`
-      : `/examples/${choice.value}.event.json`;
-    const event = await fetch(url).then((r) => r.json());
+      : `/examples/${value}.event.json`;
+    event = await fetch(url).then((r) => r.json());
     event.eventId = crypto.randomUUID();
     event.occurredAt = new Date().toISOString();
-    if (event.payload?.neededBy)
-      event.payload.neededBy = new Date(Date.now() + 86400000).toISOString();
-    editor.value = pretty(event);
+    const payload = event.payload as Row;
+    if (payload?.neededBy)
+      payload.neededBy = new Date(Date.now() + 86400000).toISOString();
+    fields.replaceChildren(el("h3", words(event.eventType)));
+    read = formFields(event, fields, {
+      hidden: [
+        "eventId",
+        "occurredAt",
+        "contractVersion",
+        "payloadVersion",
+        "correlationId",
+        "eventType",
+      ],
+    });
   }
-  choice.onchange = () => {
-    void load().catch((e) => toast(String(e)));
-  };
-  await load();
-  c.append(field("Event", choice), field("Editable original event", editor));
+  choice.onchange = () =>
+    void load(choice.value).catch((e) => toast(String(e)));
+  await load(choice.value);
+  c.append(field("Choose a scenario", choice));
+  const catalogue = fold("Browse other source events", c),
+    search = input(),
+    browse = el("select");
+  search.placeholder = "Find an event by name";
+  function filter() {
+    browse.replaceChildren();
+    for (const item of catalog.filter((i) =>
+      i.eventType.toLowerCase().includes(search.value.toLowerCase()),
+    )) {
+      const o = el(
+        "option",
+        `${words(item.eventType)}${item.workflowSupported ? "" : " · May need routing review"}`,
+      );
+      o.value = item.eventType;
+      browse.append(o);
+    }
+  }
+  search.oninput = filter;
+  filter();
+  catalogue.append(
+    field("Search event catalogue", search),
+    field("Event", browse),
+    button("Use this event", async () => {
+      await load(browse.value);
+      toast("Selected event loaded into the form below.");
+    }),
+    el(
+      "p",
+      "One sample per declared event. Events without a configured workflow enter the review queue; a sample is not a working integration.",
+      "muted",
+    ),
+  );
+  c.append(fields, feedback);
   if (role !== "viewer")
     c.append(
       button(
-        "Submit source event",
+        "Start request",
         async () => {
-          const r = await api("/events", JSON.parse(editor.value));
-          json(r, c);
-          toast("Event accepted. Refresh Cases to see processing.");
+          const original = read();
+          const result = await api<Row>("/events", original);
+          feedback.replaceChildren(
+            notice(
+              "Request received. Processing continues in the background. Open Requests or refresh the received-event list below.",
+            ),
+          );
+          event = {
+            ...original,
+            eventId: crypto.randomUUID(),
+            occurredAt: new Date().toISOString(),
+          };
+          fields.replaceChildren(el("h3", words(event.eventType)));
+          read = formFields(event, fields, {
+            hidden: [
+              "eventId",
+              "occurredAt",
+              "contractVersion",
+              "payloadVersion",
+              "correlationId",
+              "eventType",
+            ],
+          });
+          if (role === "admin") details("Receipt reference", result, feedback);
         },
         true,
       ),
     );
-  c.append(
-    button("New event identity", () => {
-      const v = JSON.parse(editor.value);
-      v.eventId = crypto.randomUUID();
-      v.occurredAt = new Date().toISOString();
-      editor.value = pretty(v);
-    }),
-  );
+  c.append(button("Open requests", () => show("Cases")));
+  const inbox = card("Recently received events");
+  async function refresh() {
+    inbox.replaceChildren(el("h2", "Recently received events"));
+    const data = await api<{ items: Row[] }>("/events");
+    table(data.items, ["event_type", "status", "disposition"], inbox);
+    inbox.append(button("Refresh received events", refresh));
+  }
+  await refresh();
 }
 function jsonForm(
   parent: HTMLElement,
   title: string,
   path: string,
   seed: unknown,
+  choices: Record<string, string[]> = {},
 ) {
-  const d = el("details");
-  d.append(el("summary", title));
-  const t = el("textarea");
-  t.classList.add("code");
-  t.value = pretty(seed);
+  const d = fold(title, parent),
+    read = formFields(seed as Row, d, {
+      hidden: [
+        "requestId",
+        "expectedRevision",
+        ...(path === "/configuration" ? [] : ["action"]),
+      ],
+      choices:
+        path === "/configuration"
+          ? { ...choices, action: ["preview", "publish"] }
+          : choices,
+    });
   d.append(
-    field("Request", t),
     button(
-      "Save",
+      "Save changes",
       async () => {
-        const result = await api(path, JSON.parse(t.value));
-        json(result, d);
-        toast("Saved");
+        const result = await api(path, read());
+        const message = el("div");
+        d.append(message);
+        message.append(
+          notice("Changes saved. Refresh before making another change."),
+        );
+        if (role === "admin")
+          details("Advanced result details", result, message);
+        toast("Changes saved.");
       },
       true,
     ),
   );
-  parent.append(d);
 }
 async function channels() {
-  const c = card("Communication channels");
+  const configuration = await api<{ policy: Policy }>("/configuration");
+  const c = card("People & communication channels");
   c.append(
     el(
       "p",
@@ -721,25 +1383,34 @@ async function channels() {
         if (!data.items.length)
           target.append(el("p", "No records yet.", "empty"));
         for (const item of data.items)
-          details(String(item.id ?? section), item, target);
+          details(
+            `${words(item.channel ?? item.actor_id ?? section)} · ${words(item.status ?? "")} · ${date(item.created_at)}`,
+            item,
+            target,
+          );
       }),
     );
   c.append(row, target);
   if (role === "admin")
-    jsonForm(c, "Add or update a consented binding", "/channels/bindings", {
-      actorId: "",
-      channel: "email",
-      address: "",
-      consentRef: "",
-      enabled: false,
-      priority: 10,
-    });
-  if (role !== "viewer")
-    jsonForm(c, "Explicit channel dispatch", "/channels/dispatch", {
-      caseId: "",
-      contactId: "",
-      bindingId: "",
-    });
+    jsonForm(
+      c,
+      "Add or update a consented binding",
+      "/channels/bindings",
+      {
+        actorId: "",
+        channel: "email",
+        address: "",
+        consentRef: "",
+        enabled: false,
+        priority: 10,
+      },
+      {
+        actorId: configuration.policy.actors
+          .filter((a) => a.enabled)
+          .map((a) => a.id),
+      },
+    );
+  c.append(button("Open a request to send a message", () => show("Cases")));
 }
 async function knowledge() {
   const c = card("Approved knowledge");
@@ -779,10 +1450,34 @@ async function settings() {
     api<Row>("/configuration"),
     api<Row>("/ai/settings"),
   ]);
-  const c = card("Workspace configuration");
-  details("Current configuration", configuration, c);
-  details("AI settings", ai, c);
+  const intro = card("Workspace settings");
+  intro.append(
+    el(
+      "p",
+      "Manage recipients, approved reference material and workflow rules. Only workspace administrators can change these settings.",
+    ),
+  );
+  intro.append(
+    button("People & channels", () => show("Channels")),
+    button("Reference library", () => show("Knowledge")),
+  );
+  if (role === "admin")
+    intro.append(button("Advanced operations", () => show("Operations")));
+  const c = card("Workflow rules");
+  const configSummary = configuration.configuration as { workflows?: Row[] };
+  for (const rule of configSummary.workflows ?? [])
+    c.append(el("p", `${words(rule.eventType)} → ${words(rule.workflow)}`));
+  const advanced = fold("Advanced workflow configuration", c);
+  details("Current workflow settings", configuration, advanced);
+  details("AI assistance settings", ai, advanced);
   if (role === "admin") {
+    c.append(
+      el(
+        "p",
+        "Changes to workflow rules are advanced administrator tasks. Preview before publishing. Existing requests retain their rules until explicitly updated.",
+        "muted",
+      ),
+    );
     c.append(
       button("Prepare maintenance workflow", () => {
         const policy = structuredClone(configuration.policy) as Policy;
