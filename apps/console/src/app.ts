@@ -157,7 +157,7 @@ function table(
       tr.append(
         el(
           "td",
-          typeof r[k] === "object"
+          r[k] !== null && typeof r[k] === "object"
             ? Object.entries(r[k] as Row)
                 .map(([a, b]) => `${words(a)}: ${String(b)}`)
                 .join(" · ")
@@ -1093,17 +1093,94 @@ function formFields(
     }
     if (value && typeof value === "object" && !Array.isArray(value)) {
       const d = fold(label(key), parent);
-      readers[key] = formFields(value as Row, d, settings);
+      const readObject = formFields(value as Row, d, settings);
+      if (key === "payload") {
+        const extra = fold("Additional information fields", d),
+          names: { key: HTMLInputElement; value: HTMLInputElement }[] = [];
+        extra.append(
+          button("Add information field", () => {
+            const name = input(),
+              text = input(),
+              row = el("div", "", "form-group");
+            names.push({ key: name, value: text });
+            row.append(field("Field name", name), field("Value", text));
+            extra.append(row);
+          }),
+        );
+        readers[key] = () => {
+          const out = readObject();
+          for (const item of names) {
+            const name = required(item.key, "a field name");
+            if (
+              !/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(name) ||
+              ["constructor", "prototype"].includes(name) ||
+              Object.hasOwn(out, name)
+            )
+              throw new Error(
+                "Use a unique field name containing letters, numbers or underscores.",
+              );
+            out[name] = required(item.value, "a field value");
+          }
+          return out;
+        };
+      } else readers[key] = readObject;
       continue;
     }
-    if (Array.isArray(value) && value.some((v) => v && typeof v === "object")) {
-      const d = fold(`${label(key)} (${value.length})`, parent);
-      const entries = value.map((v) => {
-        const c = el("section", "", "form-group");
-        d.append(c);
-        return formFields(v as Row, c, settings);
-      });
-      readers[key] = () => entries.map((read) => read());
+    const templates: Record<string, Row> = {
+      workflows: {
+        eventType: "",
+        workflow: "",
+        goal: "",
+        requiredPayloadKeys: ["siteId"],
+        branches: [{ group: "", kind: "fact", question: "" }],
+      },
+      actors: { id: "", group: "", role: "respondent", enabled: true },
+      branches: { group: "", kind: "fact", question: "" },
+    };
+    if (
+      Array.isArray(value) &&
+      (templates[key] || value.some((v) => v && typeof v === "object"))
+    ) {
+      const d = fold(label(key), parent),
+        list = el("div");
+      d.append(list);
+      const entries: { read: () => Row; box: HTMLElement }[] = [];
+      function appendItem(seed: Row) {
+        const box = el("section", "", "form-group");
+        const read = formFields(seed, box, settings);
+        const entry = { read, box };
+        entries.push(entry);
+        box.append(
+          button("Remove item", () => {
+            entries.splice(entries.indexOf(entry), 1);
+            box.remove();
+          }),
+        );
+        list.append(box);
+      }
+      for (const v of value) appendItem(v as Row);
+      if (templates[key])
+        d.append(
+          button("Add item", () =>
+            appendItem(structuredClone(templates[key]!)),
+          ),
+        );
+      readers[key] = () => entries.map((e) => e.read());
+      continue;
+    }
+    if (key === "whatsappTemplate" && value === null) {
+      const d = fold("Optional approved WhatsApp template", parent),
+        enabled = input("", "checkbox"),
+        body = el("div");
+      const read = formFields(
+        { name: "", language: "en", approvalRef: "", enabled: true },
+        body,
+        settings,
+      );
+      body.hidden = true;
+      enabled.onchange = () => (body.hidden = !enabled.checked);
+      d.append(field("Configure an approved template", enabled), body);
+      readers[key] = () => (enabled.checked ? read() : null);
       continue;
     }
     let n: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
@@ -1213,8 +1290,10 @@ async function simulator() {
         "Maintenance · inspection, parts and scheduling (requires configured workflow)",
     },
   ]);
+  c.append(button("Create a custom source event", () => load("custom")));
   const fields = el("div"),
     feedback = el("div");
+  let custom = false;
   let event: Row = {},
     read = () => ({}) as Row;
   async function load(value: string) {
@@ -1223,7 +1302,22 @@ async function simulator() {
     const url = selected
       ? `/fixtures/${encodeURIComponent(selected.fixture)}`
       : `/examples/${value}.event.json`;
-    event = await fetch(url).then((r) => r.json());
+    custom = value === "custom";
+    event = custom
+      ? {
+          contractVersion: "1.0",
+          eventId: crypto.randomUUID(),
+          eventType: "custom.information_requested",
+          payloadVersion: "1.0",
+          occurredAt: new Date().toISOString(),
+          correlationId: crypto.randomUUID(),
+          subject: { type: "request", id: "my-request", revision: "1" },
+          payload: {
+            siteId: "my-site",
+            requestedInformation: ["Describe the information you need"],
+          },
+        }
+      : await fetch(url).then((r) => r.json());
     event.eventId = crypto.randomUUID();
     event.occurredAt = new Date().toISOString();
     const payload = event.payload as Row;
@@ -1237,7 +1331,7 @@ async function simulator() {
         "contractVersion",
         "payloadVersion",
         "correlationId",
-        "eventType",
+        ...(custom ? [] : ["eventType"]),
       ],
     });
   }
@@ -1303,7 +1397,7 @@ async function simulator() {
               "contractVersion",
               "payloadVersion",
               "correlationId",
-              "eventType",
+              ...(custom ? [] : ["eventType"]),
             ],
           });
           if (role === "admin") details("Receipt reference", result, feedback);
