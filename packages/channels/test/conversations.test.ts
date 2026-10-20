@@ -1,0 +1,248 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  canonical,
+  isGreeting,
+  openDeliveries,
+  type OpenDelivery,
+} from "../src/matching.js";
+import type { Binding } from "../src/intents.js";
+import { textilePolicy } from "../../domain-packs/src/textile.js";
+import {
+  initialize,
+  transition,
+  resolveActor,
+} from "../../coordination/src/engine.js";
+import type { CaseState } from "../../coordination/src/types.js";
+const now = new Date().toISOString();
+const later = new Date(Date.now() + 1800000).toISOString();
+function state(): CaseState {
+  return {
+    id: "case-a",
+    inboxId: "inbox-a",
+    sourceEvidenceId: "original-a",
+    sourceId: "source-a",
+    revision: 1,
+    subject: { type: "material_lot", id: "LOT-A", revision: "2" },
+    workflow: "material-readiness-v1",
+    configurationVersion: textilePolicy.version,
+    origin: "simulated",
+    status: "active",
+    goal: "Collect readiness",
+    createdAt: now,
+    deadline: later,
+    contacts: 0,
+    obligations: [
+      {
+        id: "stock",
+        group: "stores",
+        kind: "fact",
+        question: "How much usable stock?",
+        required: true,
+        dependencies: [],
+        assignee: "stores_owner",
+        revision: 1,
+        status: "waiting",
+        reminders: 0,
+        escalated: false,
+        nextContactAt: now,
+      },
+    ],
+  };
+}
+const binding: Binding = {
+  id: "binding-a",
+  actor_id: "stores_owner",
+  channel: "whatsapp",
+  address: "123456789",
+  enabled: true,
+};
+function delivery(overrides: Partial<OpenDelivery> = {}): OpenDelivery {
+  return {
+    id: "delivery-a",
+    connection_id: "source-a",
+    case_id: "case-a",
+    contact_id: "contact-a",
+    binding_id: "binding-a",
+    actor_id: "stores_owner",
+    channel: "whatsapp",
+    address: "123456789",
+    token: "a".repeat(32),
+    obligation_id: "stock",
+    obligation_revision: 1,
+    status: "accepted",
+    attempt_at: new Date(Date.now() - 60000).toISOString(),
+    request: {
+      contact: {
+        actorId: "stores_owner",
+        obligationId: "stock",
+        kind: "ask",
+        question: "Stock?",
+        subject: state().subject,
+        sourceEvidenceId: "original-a",
+        origin: "simulated",
+      },
+      subject: state().subject,
+      obligationRevision: 1,
+      deadline: later,
+    },
+    snapshot: state(),
+    ...overrides,
+  };
+}
+test("provider JSON key order does not turn a duplicate into a conflict", () => {
+  assert.equal(
+    canonical({
+      text: "hi",
+      media: [],
+      object: { key: "a", bucket: "b" },
+      raw: undefined,
+    }),
+    canonical({ object: { bucket: "b", key: "a" }, media: [], text: "hi" }),
+  );
+  assert.notEqual(canonical({ text: "hi" }), canonical({ text: "hello" }));
+});
+test("greetings are recognised without fabricating task evidence", () => {
+  for (const text of ["hi", "Hello!", "হ্যালো", "আসসালামু আলাইকুম"])
+    assert.equal(isGreeting(text), true);
+  assert.equal(isGreeting("Hello, usable stock is not confirmed"), false);
+});
+test("one current request may match a plain reply from its bound participant", () =>
+  assert.equal(openDeliveries(binding, [delivery()], now).length, 1));
+test("multiple cases stay ambiguous", () =>
+  assert.equal(
+    openDeliveries(
+      binding,
+      [delivery(), delivery({ id: "delivery-b", case_id: "case-b" })],
+      now,
+    ).length,
+    2,
+  ));
+test("cross-channel reminders for the same obligation do not create ambiguity", () =>
+  assert.equal(
+    openDeliveries(
+      binding,
+      [delivery(), delivery({ id: "fallback-b", channel: "email" })],
+      now,
+    ).length,
+    1,
+  ));
+test("a different or disabled participant never matches", () => {
+  assert.equal(
+    openDeliveries({ ...binding, actor_id: "quality_owner" }, [delivery()], now)
+      .length,
+    0,
+  );
+  assert.equal(
+    openDeliveries({ ...binding, enabled: false }, [delivery()], now).length,
+    0,
+  );
+});
+test("a stale task, expired case or message predating a send never matches", () => {
+  const stale = state();
+  stale.obligations[0]!.revision++;
+  assert.equal(
+    openDeliveries(binding, [delivery({ snapshot: stale })], now).length,
+    0,
+  );
+  const expired = state();
+  expired.deadline = new Date(Date.now() - 1000).toISOString();
+  assert.equal(
+    openDeliveries(binding, [delivery({ snapshot: expired })], now).length,
+    0,
+  );
+  assert.equal(
+    openDeliveries(binding, [delivery({ attempt_at: later })], now).length,
+    0,
+  );
+});
+test("a received answer needs independent verification before completion", () => {
+  const initial = initialize(state(), textilePolicy, now);
+  const answered = transition(
+    initial.state,
+    textilePolicy,
+    resolveActor(textilePolicy, "stores_owner"),
+    {
+      type: "reply",
+      obligationId: "stock",
+      expectedObligationRevision: 1,
+      statement: "500 kg usable, not 700 kg physical",
+      observedAt: now,
+      validUntil: later,
+      subjectRevision: "2",
+    },
+    "external-answer",
+    now,
+  );
+  assert.equal(answered.state.obligations[0]!.status, "answered");
+  assert.notEqual(answered.state.status, "completed");
+  assert.throws(() =>
+    transition(
+      answered.state,
+      textilePolicy,
+      resolveActor(textilePolicy, "stores_owner"),
+      {
+        type: "verify",
+        obligationId: "stock",
+        replyRevision: 2,
+        accept: true,
+        reason: "self verify",
+      },
+      "bad-check",
+      now,
+    ),
+  );
+  const verified = transition(
+    answered.state,
+    textilePolicy,
+    resolveActor(textilePolicy, "stores_verifier"),
+    {
+      type: "verify",
+      obligationId: "stock",
+      replyRevision: 2,
+      accept: true,
+      reason: "Independent count confirmed",
+    },
+    "external-check",
+    now,
+  );
+  assert.equal(verified.state.status, "completed");
+  assert.equal(
+    verified.state.obligations[0]!.reply!.statement,
+    "500 kg usable, not 700 kg physical",
+  );
+});
+test("a child dependency blocks closure and cannot create a cycle", () => {
+  const initial = initialize(state(), textilePolicy, now);
+  const child = transition(
+    initial.state,
+    textilePolicy,
+    resolveActor(textilePolicy, "stores_owner"),
+    {
+      type: "add_child",
+      parentId: "stock",
+      obligationId: "qa-check",
+      group: "quality",
+      kind: "evidence",
+      question: "Has the quarantined roll passed inspection?",
+    },
+    "external-request",
+    now,
+  );
+  assert.deepEqual(child.state.obligations[0]!.dependencies, ["qa-check"]);
+  assert.throws(() =>
+    transition(
+      child.state,
+      textilePolicy,
+      resolveActor(textilePolicy, "coordinator"),
+      {
+        type: "link_dependency",
+        obligationId: "qa-check",
+        dependencyId: "stock",
+      },
+      "cycle",
+      now,
+    ),
+  );
+  assert.notEqual(child.state.status, "completed");
+});

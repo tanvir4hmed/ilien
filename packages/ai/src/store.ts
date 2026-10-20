@@ -116,7 +116,9 @@ export async function enqueueAgent(
       tx,
     ),
   )[0]!;
-  if (count.daily >= 10 || count.case_daily >= 3 || count.case_total >= 20)
+  // A material case has four branches plus independent verification/children.
+  // Admission must allow that complete bounded workflow, not stop at branch 3.
+  if (count.daily >= 30 || count.case_daily >= 12 || count.case_total >= 40)
     return { state: "budget_exhausted" };
   if (count.same_input >= 2) return { state: "no_progress_limit" };
   const id = randomUUID();

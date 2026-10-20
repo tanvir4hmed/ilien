@@ -271,7 +271,7 @@ export function userGuide(parent: HTMLElement, go: (page: string) => void) {
     ),
     node(
       "p",
-      "Conversation links use recorded case and message references. Replies on unrelated personal channels are not automatically imported. Never remove the case reference when moving a conversation between connected channels.",
+      "Open Incoming messages to see every supported WhatsApp and email receipt. An administrator can connect a new sender to an authorised person with recorded consent. Replies to a sent message keep their request reference. A recognised sender with exactly one current outstanding request can reply naturally; several outstanding requests require an explicit reference or operator selection. Greetings open a channel conversation without answering a task.",
     ),
     node(
       "p",

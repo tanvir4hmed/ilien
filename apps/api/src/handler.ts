@@ -27,6 +27,11 @@ import {
   channelView,
 } from "../../../packages/channels/src/admin.js";
 import {
+  inboxView,
+  resolveReceipt,
+} from "../../../packages/channels/src/inbox.js";
+import { reviewReceipt } from "../../../packages/channels/src/review.js";
+import {
   audit,
   readConfiguration,
   publishConfiguration,
@@ -61,8 +66,8 @@ export async function handler(
   if (event.rawPath === "/health")
     return response(200, {
       service: "ilien",
-      phase: "operator-experience",
-      version: "0.7.0",
+      phase: "conversation-intake",
+      version: "0.8.0",
     });
   const consoleRequest = event.rawPath.startsWith("/console/");
   if (consoleRequest && event.requestContext.http.method === "OPTIONS")
@@ -273,14 +278,25 @@ export async function handler(
       return response(404, { error: "not_found" });
     }
     const channelRoute =
-      /^\/v1\/channels\/(bindings|deliveries|receipts|delivery-events|dispatch)$/.exec(
+      /^\/v1\/channels\/(bindings|deliveries|receipts|delivery-events|dispatch|inbox|resolve|review)$/.exec(
         event.rawPath,
       );
     if (channelRoute) {
       const section = channelRoute[1]!;
-      if (method === "GET" && section !== "dispatch")
-        return response(200, { items: await channelView(source, section) });
-      if (method === "POST" && ["bindings", "dispatch"].includes(section)) {
+      if (
+        method === "GET" &&
+        !["dispatch", "resolve", "review"].includes(section)
+      )
+        return response(200, {
+          items:
+            section === "inbox"
+              ? await inboxView(source)
+              : await channelView(source, section),
+        });
+      if (
+        method === "POST" &&
+        ["bindings", "dispatch", "resolve", "review"].includes(section)
+      ) {
         const raw = event.isBase64Encoded
           ? Buffer.from(event.body ?? "", "base64").toString("utf8")
           : (event.body ?? "");
@@ -289,7 +305,11 @@ export async function handler(
         const result =
           section === "bindings"
             ? await saveBinding(source, raw)
-            : await dispatchContact(source, raw);
+            : section === "resolve"
+              ? await resolveReceipt(source, raw, principal)
+              : section === "review"
+                ? await reviewReceipt(source, raw, principal)
+                : await dispatchContact(source, raw);
         await lambda
           .send(
             new InvokeCommand({

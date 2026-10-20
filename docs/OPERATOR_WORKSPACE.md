@@ -17,6 +17,7 @@ The everyday workspace uses plain-language forms and summaries rather than JSON 
 - **Tasks:** shared workspace tasks waiting for a response or verification, with the responsible person shown. This is not a claim of personal assignment to the signed-in operator. Limited to the latest 100 pending tasks.
 - **Start a scenario:** guided source-event forms and searchable synthetic event catalogue. Nothing fires on load. Unmapped events enter routing review; a sample is not proof of integration. Connected recipients may cause real messaging when a request runs.
 - **Activity:** select a request to inspect its workflow, communication flow and chronological history.
+- **Incoming messages:** read original WhatsApp/email text, recognise a sender with recorded consent, resolve ambiguous request links, and review AI or human interpretations without replacing external evidence. Greetings are recognised conversations, not business answers. Several open requests require a reference or explicit operator selection.
 - **Settings (admin):** people/channels, approved references, configuration and membership. Recovery and infrastructure controls are under **Advanced operations**, outside everyday navigation.
 
 ### Request journey

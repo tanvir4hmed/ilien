@@ -87,6 +87,24 @@ export async function saveBinding(source: Source, raw: string) {
       ],
       tx,
     );
+    if (b.enabled && b.channel === "whatsapp") {
+      // A newly registered participant may already have opened the service
+      // window. Recover it from verified provider evidence, never operator time.
+      await query(
+        "UPDATE channel_bindings SET last_inbound_at=GREATEST(last_inbound_at,(SELECT max(CAST(normalized->>'timestamp' AS timestamptz)) FROM channel_receipts WHERE connection_id=CAST(:source AS uuid) AND channel='whatsapp' AND normalized->>'sender'=:address AND normalized->>'blockedReason' IS NULL AND normalized->>'timestamp' IS NOT NULL AND CAST(normalized->>'timestamp' AS timestamptz)<=now()+interval '1 minute')) WHERE id=CAST(:id AS uuid)",
+        [
+          param("source", source.id),
+          param("address", b.address),
+          param("id", id),
+        ],
+        tx,
+      );
+      await query(
+        "UPDATE channel_deliveries SET status='pending',reason=NULL,queued_at=NULL WHERE binding_id=CAST(:id AS uuid) AND status='blocked' AND reason IN ('whatsapp_session_required','whatsapp_session_or_approved_template_required') AND EXISTS(SELECT 1 FROM channel_bindings WHERE id=CAST(:id AS uuid) AND last_inbound_at>now()-interval '23 hours 54 minutes')",
+        [param("id", id)],
+        tx,
+      );
+    }
     return { bindingId: id, enabled: b.enabled };
   });
 }

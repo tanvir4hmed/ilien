@@ -1,6 +1,18 @@
 # WhatsApp and email coordination
 
-The channel layer uses `@aws-sdk/client-socialmessaging` / `SendWhatsAppMessage` and `@aws-sdk/client-sesv2` / `SendEmail`. Real provider calls are implemented; deployment or compilation does not prove a message was delivered. Runtime acceptance is still pending. No AI interpretation runs in this release.
+The channel layer uses AWS End User Messaging Social / `SendWhatsAppMessage` and SES / `SendEmail`. Transport receipts, case replies and verified business outcomes are distinct. Correlated natural-language replies can queue the bounded, review-gated AI coordinator.
+
+## Recognising incoming conversations
+
+Incoming messages remain visible in the operator inbox even when their identity or request is unresolved. Administrators connect an exact sender address to an eligible actor using recorded consent. The application never grants an actor's authority based on message prose or a model's confidence. A verified prior WhatsApp inbound event can restore that sender's service window when the administrator registers the binding.
+
+Explicit reply references or correlation tokens select a delivery and still require the bound actor. Without an explicit reference, exactly one current question for the enabled actor may be matched; reminders and cross-channel copies of that same question count once. Multiple cases/questions stay in the inbox for explicit operator selection. Messages preceding a send cannot be automatically matched to it. Greetings record a recognised conversation without creating a business claim.
+
+Operators can recheck unresolved receipts or explicitly select an eligible sent request with a reason. Original normalized content and external evidence remain immutable; changes append `channel_receipt_audit`. Quarantined messages cannot be linked into actions. Natural-language replies can use AI review or the guided human review form. Both paths preserve the original external evidence, actor and task scope, and recheck current authority/revisions before effects.
+
+`GET /v1/channels/inbox`, `POST /v1/channels/resolve` and `POST /v1/channels/review` use existing source authentication (console uses `/console` prefix). Resolve accepts `{receiptId, deliveryId?, reason}`. Review accepts `{receiptId, operation, reason}`. Review only permits scoped reply/decision/verification/prerequisite operations. A free-form business claim is never silently accepted as independently verified.
+
+Direct authenticated mail to `requests@<mail-domain>` or `inbox@<mail-domain>` enters the unresolved inbox. Token reply addresses preserve exact case continuation. Spam, failed authentication and attachments retain existing quarantine rules.
 
 ## Transport and evidence
 

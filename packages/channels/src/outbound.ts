@@ -24,9 +24,9 @@ import { caseHeld } from "../../operations/src/supervision.js";
 const social = new SocialMessagingClient({ maxAttempts: 1 });
 const email = new SESv2Client({ maxAttempts: 1 });
 
-function render(d: Delivery) {
+export function render(d: Delivery) {
   const r = d.request;
-  return `ILIEN ${d.token}\nRequest: ${r.contact.question}\nSubject: ${r.subject.type} / ${r.subject.id} / revision ${r.subject.revision}\nObligation: ${d.obligation_id} / revision ${d.obligation_revision}\nDeadline: ${r.deadline}\n${r.proposal ? `Decision proposal (requires explicit response; no action authorized): ${JSON.stringify(r.proposal)}\n` : ""}${r.claim ? `Reported claim (unverified): ${JSON.stringify(r.claim)}\n` : ""}Source context is synthetic. Reply with ILIEN ${d.token} followed by a JSON reply, verify, or add_child operation. Free text is retained for review. STOP withdraws this channel's consent. This request authorizes no operational action.`;
+  return `ILIEN ${d.token}\n\n${r.contact.question}\n\nRegarding: ${r.subject.type} / ${r.subject.id}, revision ${r.subject.revision}\nPlease respond by: ${r.deadline}\n${r.proposal ? `Proposal needing your explicit decision: ${JSON.stringify(r.proposal)}\n` : ""}${r.claim ? `Information to independently check: ${JSON.stringify(r.claim)}\n` : ""}\nReply directly to this message in your own words. Preserve quantities, units, dates and uncertainty; say when the information was checked and how long it remains valid. If you need someone else's information first, tell us what is missing. ILIEN retains your original reply for review.\n\nSource context is simulated. This message requests information or a decision; it does not authorize a factory action. Send STOP to stop messages on this channel.`;
 }
 export async function sendDelivery(tenant: string, id: string) {
   const prepared = await transaction(tenant, async (tx) => {

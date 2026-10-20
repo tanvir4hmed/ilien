@@ -37,6 +37,7 @@ const pageLabels: Record<string, string> = {
   Activity: "Activity",
   Settings: "Settings",
   Channels: "People & channels",
+  Inbox: "Incoming messages",
   Knowledge: "Reference library",
   Operations: "Advanced operations",
   Help: "User guide",
@@ -322,6 +323,7 @@ function shell() {
     "Tasks",
     "Simulator",
     "Activity",
+    "Inbox",
     "Help",
     ...(role === "admin" ? ["Settings"] : []),
   ]) {
@@ -369,6 +371,7 @@ async function show(name: string) {
       Help: async () => userGuide(content, (name) => void show(name)),
       Simulator: simulator,
       Channels: channels,
+      Inbox: inbox,
       Knowledge: knowledge,
       Settings: settings,
       Operations: operations,
@@ -442,6 +445,7 @@ async function overview() {
     ),
     button("Start a scenario", () => show("Simulator"), true),
     button("View tasks", () => show("Tasks")),
+    button("Incoming messages", () => show("Inbox")),
   );
   requestList(data.items.slice(0, 6), card("Recent requests"));
   content.append(
@@ -1111,6 +1115,136 @@ async function runPage(id: string) {
       );
   }
 }
+async function reviewIncoming(r: Row) {
+  stopLive?.();
+  stopLive = undefined;
+  page = "Incoming reply";
+  shell();
+  const [state, config] = await Promise.all([
+    api<CaseState>(`/cases/${r.caseId}`),
+    api<{ policy: Policy }>("/configuration"),
+  ]);
+  const request = r.request as {
+    contact: { obligationId: string; kind: string; replyRevision?: number };
+  };
+  const task = state.obligations.find(
+    (o) => o.id === request.contact.obligationId,
+  );
+  if (!task) throw new Error("The related task is no longer available.");
+  const c = card("Review the original reply");
+  c.append(
+    el(
+      "p",
+      `${words(r.actorId)} · ${String(state.subject.id)} · ${task.question}`,
+    ),
+    el("blockquote", String(r.text), "message-body"),
+    el(
+      "p",
+      "Keep the sender's meaning, units, uncertainty and evidence times. Missing information needs clarification. Saving records an interpretation of this original message; independent verification is still required.",
+    ),
+  );
+  const choice = options([
+      { value: "reply", label: "Record reported information" },
+      { value: "verify", label: "Record independent verification" },
+      { value: "add_child", label: "Request prerequisite information" },
+      ...(task.proposal
+        ? [{ value: "decide", label: "Record an explicit decision" }]
+        : []),
+    ]),
+    area = el("div"),
+    reason = input();
+  choice.value =
+    request.contact.kind === "verify_request"
+      ? "verify"
+      : task.kind === "decision"
+        ? "decide"
+        : "reply";
+  let read = () => ({}) as Row;
+  function render() {
+    area.replaceChildren();
+    let seed: Row;
+    if (choice.value === "verify")
+      seed = {
+        type: "verify",
+        obligationId: task!.id,
+        replyRevision:
+          request.contact.replyRevision ?? task!.reply?.revision ?? 0,
+        accept: false,
+        reason: "",
+      };
+    else if (choice.value === "add_child")
+      seed = {
+        type: "add_child",
+        parentId: task!.id,
+        obligationId: `followup_${crypto.randomUUID().slice(0, 8)}`,
+        group: task!.group,
+        question: "",
+        kind: "evidence",
+      };
+    else if (choice.value === "decide")
+      seed = {
+        type: "decide",
+        obligationId: task!.id,
+        expectedObligationRevision: task!.revision,
+        proposalHash: task!.proposal?.sha256 ?? "",
+        choice: "reject",
+        reason: "",
+        subjectRevision: state.subject.revision,
+        observedAt: "",
+        validUntil: "",
+      };
+    else
+      seed = {
+        type: "reply",
+        obligationId: task!.id,
+        expectedObligationRevision: task!.revision,
+        statement: String(r.text).replace(/^\s*ILIEN [a-f0-9]{32}\s*/, ""),
+        subjectRevision: state.subject.revision,
+        observedAt: "",
+        validUntil: "",
+      };
+    read = formFields(seed, area, {
+      hidden: [
+        "type",
+        "obligationId",
+        "parentId",
+        "expectedObligationRevision",
+        "replyRevision",
+        "subjectRevision",
+        "proposalHash",
+      ],
+      choices: {
+        group: config.policy.groups,
+        kind: ["fact", "evidence", "decision", "acknowledgement", "commitment"],
+        choice: ["approve", "reject"],
+      },
+    });
+  }
+  choice.onchange = render;
+  render();
+  c.append(
+    field("What does this reply do?", choice),
+    area,
+    field(
+      "Why is this interpretation supported by the original message?",
+      reason,
+    ),
+    button(
+      "Record reviewed reply",
+      async () => {
+        await api("/channels/review", {
+          receiptId: r.id,
+          operation: read(),
+          reason: required(reason, "a review reason"),
+        });
+        toast("Reply recorded with its original external evidence.");
+        await casePage(String(r.caseId));
+      },
+      true,
+    ),
+    button("Back to incoming messages", () => show("Inbox")),
+  );
+}
 function formFields(
   seed: Row,
   parent: HTMLElement,
@@ -1264,7 +1398,10 @@ function formFields(
           outcome: ["not_sent", "accepted"],
         } as Record<string, string[]>
       )[key];
-    const isDate = typeof value === "string" && /^\d{4}-\d\d-\d\dT/.test(value);
+    const isDate =
+      typeof value === "string" &&
+      (/^\d{4}-\d\d-\d\dT/.test(value) ||
+        ["observedAt", "validUntil"].includes(key));
     if (typeof value === "boolean") {
       n = options([
         { value: "true", label: "Yes" },
@@ -1300,7 +1437,7 @@ function formFields(
             : isDate
               ? "datetime-local"
               : "text";
-      if (isDate)
+      if (isDate && value)
         n.value = new Date(
           Date.parse(String(value)) - new Date().getTimezoneOffset() * 60000,
         )
@@ -1629,6 +1766,7 @@ function jsonForm(
 async function channels() {
   const configuration = await api<{ policy: Policy }>("/configuration");
   const c = card("People & communication channels");
+  c.append(button("Open incoming messages", () => show("Inbox")));
   c.append(
     el(
       "p",
@@ -1679,6 +1817,161 @@ async function channels() {
       },
     );
   c.append(button("Open a request to send a message", () => show("Cases")));
+}
+async function inbox() {
+  const [data, configuration] = await Promise.all([
+    api<{ items: Row[] }>("/channels/inbox"),
+    api<{ policy: Policy }>("/configuration"),
+  ]);
+  const intro = card("Incoming messages");
+  intro.append(
+    el(
+      "p",
+      "Every received WhatsApp or email message stays here, including messages waiting for a known person or request. Connecting a sender requires an authorised person and recorded consent.",
+    ),
+    button("Refresh messages", () => show("Inbox")),
+    button("Manage people & channels", () => show("Channels")),
+  );
+  if (!data.items.length)
+    intro.append(el("p", "No messages received yet.", "empty"));
+  const explanations: Record<string, string> = {
+    identity_or_correlation_required:
+      "Connect this sender to a person, then check for a matching request.",
+    sender_not_registered:
+      "This sender has not been connected to a workspace person.",
+    greeting_received:
+      "Greeting received. This person is recognised; no task was answered by the greeting.",
+    no_open_request_for_participant:
+      "This person is recognised, but no current sent request matches this message.",
+    multiple_open_requests_choose_one:
+      "This person has more than one open request. Choose which request this reply concerns.",
+    request_reference_not_found:
+      "The message references a request that cannot be found. Review it before linking.",
+    sender_not_authorized_for_request:
+      "The sender is not authorised to answer the referenced request.",
+    unstructured_reply:
+      "Reply linked to its original request. AI interpretation is waiting for review.",
+    authorized_structured_reply:
+      "The authorised reply was recorded against the request.",
+    consent_withdrawn:
+      "The sender asked to stop receiving messages. This channel is disabled.",
+  };
+  for (const r of data.items) {
+    const c = card(
+      `${words(r.channel)} · ${r.actorId ? words(r.actorId) : "New sender"}`,
+    );
+    c.append(
+      el("p", `${String(r.sender)} · ${date(r.receivedAt)}`, "muted"),
+      el(
+        "blockquote",
+        String(r.text || "Message contains no supported text"),
+        "message-body",
+      ),
+      el("p", explanations[String(r.reason)] ?? words(r.reason)),
+      el("span", words(r.status), "badge"),
+    );
+    if (r.caseId)
+      c.append(button("Open request & map", () => casePage(String(r.caseId))));
+    if (r.runId)
+      c.append(button("Review AI suggestion", () => runPage(String(r.runId))));
+    if (
+      role !== "viewer" &&
+      r.status === "needs_review" &&
+      r.reason === "unstructured_reply" &&
+      r.request
+    )
+      c.append(button("Review original reply", () => reviewIncoming(r)));
+    if (
+      role === "viewer" ||
+      r.blockedReason ||
+      !["unmatched", "received"].includes(String(r.status))
+    )
+      continue;
+    if (!r.actorId && role === "admin") {
+      const form = el("div", "", "form-group"),
+        actor = options(
+          configuration.policy.actors
+            .filter((a) => a.enabled)
+            .map((a) => ({
+              value: a.id,
+              label: `${words(a.id)} · ${words(a.group)} · ${words(a.role)}`,
+            })),
+        ),
+        consent = input(),
+        checked = input("", "checkbox");
+      consent.placeholder = "Who consented, when, and for what communication?";
+      form.append(
+        field("Who is this sender?", actor),
+        field("Consent record", consent),
+        field(
+          "I checked this identity and have permission to contact this person",
+          checked,
+        ),
+        button(
+          "Connect sender and recognise message",
+          async () => {
+            if (!checked.checked)
+              throw new Error(
+                "Confirm this person's identity and consent first.",
+              );
+            await api("/channels/bindings", {
+              actorId: actor.value,
+              channel: r.channel,
+              address: r.sender,
+              consentRef: required(consent, "a consent record"),
+              enabled: true,
+              priority: 10,
+            });
+            await api("/channels/resolve", {
+              receiptId: r.id,
+              reason:
+                "Sender identity and consent checked by workspace administrator",
+            });
+            toast(
+              "Sender connected. The original message and evidence are preserved.",
+            );
+            await show("Inbox");
+          },
+          true,
+        ),
+      );
+      c.append(form);
+    } else if (r.actorId) {
+      const candidates = (r.candidates ?? []) as Row[];
+      if (candidates.length && r.reason !== "greeting_received") {
+        const choose = options([
+            { value: "", label: "Choose the request this message answers" },
+            ...candidates.map((d) => ({
+              value: String(d.id),
+              label: `${String((d.subject as Row).id)} · ${String(d.question)}`,
+            })),
+          ]),
+          reason = input();
+        c.append(
+          field("Related request", choose),
+          field("Why does this message belong to that request?", reason),
+          button("Link reply to request", async () => {
+            if (!choose.value) throw new Error("Choose the related request.");
+            await api("/channels/resolve", {
+              receiptId: r.id,
+              deliveryId: choose.value,
+              reason: required(reason, "a matching reason"),
+            });
+            await show("Inbox");
+          }),
+        );
+      }
+      c.append(
+        button("Check matching again", async () => {
+          await api("/channels/resolve", {
+            receiptId: r.id,
+            reason: "Operator requested a fresh identity and request match",
+          });
+          await show("Inbox");
+        }),
+      );
+    }
+  }
 }
 async function knowledge() {
   const c = card("Approved knowledge");

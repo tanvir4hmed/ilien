@@ -164,6 +164,13 @@ export async function normalize(
           ).exec(r)?.[1],
       )
       .filter((x): x is string => !!x);
+    const genericAddressed = data.receipt.recipients.some((r) =>
+      ["requests", "inbox"].some(
+        (local) =>
+          r.toLowerCase() ===
+          `${local}@${process.env.MAIL_DOMAIN!.toLowerCase()}`,
+      ),
+    );
     const item: Incoming = {
       channel: "email",
       providerId: data.mail.messageId,
@@ -220,7 +227,11 @@ export async function normalize(
     )
       item.blockedReason = "automatic_reply";
     else if (item.media.length) item.blockedReason = "attachments_quarantined";
-    else if (!item.sender || addressed.length !== 1)
+    else if (
+      !item.sender ||
+      addressed.length > 1 ||
+      (!addressed.length && !genericAddressed)
+    )
       item.blockedReason = "ambiguous_email_identity_or_route";
     else if ((mail.text?.length ?? 0) > 16000)
       item.blockedReason = "body_too_large";
