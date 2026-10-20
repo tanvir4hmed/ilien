@@ -64,6 +64,8 @@ export async function handler(
       version: "0.6.0",
     });
   const consoleRequest = event.rawPath.startsWith("/console/");
+  if (consoleRequest && event.requestContext.http.method === "OPTIONS")
+    return { statusCode: 204, body: "" };
   const authorization = event.requestContext.authorizer;
   const claims =
     authorization && "jwt" in authorization
