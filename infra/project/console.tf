@@ -14,7 +14,7 @@ resource "aws_apigatewayv2_authorizer" "operators" {
   identity_sources = ["$request.header.Authorization"]
   jwt_configuration {
     issuer   = module.console.issuer
-    audience = [module.console.client_id]
+    audience = [module.console.client_id, module.console.guest_client_id]
   }
 }
 resource "aws_apigatewayv2_route" "console" {

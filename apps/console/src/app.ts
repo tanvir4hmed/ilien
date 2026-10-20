@@ -1,3 +1,4 @@
+import { scenarioFields, userGuide } from "./operator-guide.js";
 import { guestLogin, type GuestConfig } from "./guest-login.js";
 import {
   renderJourney,
@@ -14,6 +15,7 @@ type Config = {
   apiUrl: string;
   authDomain: string;
   clientId: string;
+  guestClientId?: string;
   redirectUri: string;
   redirectUris?: string[];
   guest?: GuestConfig | null;
@@ -37,6 +39,7 @@ const pageLabels: Record<string, string> = {
   Channels: "People & channels",
   Knowledge: "Reference library",
   Operations: "Advanced operations",
+  Help: "User guide",
   "Agent review": "AI suggestion",
 };
 const label = (value: unknown) => pageLabels[String(value)] ?? words(value);
@@ -284,7 +287,7 @@ function loginScreen(message?: string) {
     guestLogin(
       c,
       config.guest,
-      config.clientId,
+      config.guestClientId ?? config.clientId,
       async (accessToken, expiresIn) => {
         token = accessToken;
         expires = Date.now() + (expiresIn - 30) * 1000;
@@ -319,6 +322,7 @@ function shell() {
     "Tasks",
     "Simulator",
     "Activity",
+    "Help",
     ...(role === "admin" ? ["Settings"] : []),
   ]) {
     const b = button(label(name), () => show(name));
@@ -362,6 +366,7 @@ async function show(name: string) {
       Cases: cases,
       Tasks: pendingTasks,
       Activity: activity,
+      Help: async () => userGuide(content, (name) => void show(name)),
       Simulator: simulator,
       Channels: channels,
       Knowledge: knowledge,
@@ -399,7 +404,7 @@ function requestList(items: Row[], parent: HTMLElement) {
         `Updated ${date(r.updated_at)}${r.deadline ? ` · Due ${date(r.deadline)}` : ""}`,
         "muted",
       ),
-      button("Open request", () => casePage(String(r.id))),
+      button("Open map & request", () => casePage(String(r.id))),
     );
     parent.append(c);
   }
@@ -421,6 +426,14 @@ async function overview() {
     const c = card(String(title), grid);
     c.append(el("span", String(n), "metric"));
   }
+  const help = card("New to ILIEN?");
+  help.append(
+    el(
+      "p",
+      "Start a scenario, open its live map, and follow the conversation. The guide explains practice responses, real channels and every status.",
+    ),
+    button("Read the user guide", () => show("Help")),
+  );
   const welcome = card("Keep every conversation moving");
   welcome.append(
     el(
@@ -501,7 +514,7 @@ async function pendingTasks() {
         `${words(r.department)} · ${words(r.owner)} · ${String(r.subject)}`,
         "muted",
       ),
-      button("Open request", () => casePage(String(r.case_id))),
+      button("Open map & request", () => casePage(String(r.case_id))),
     );
     c.append(item);
   }
@@ -563,7 +576,14 @@ async function casePage(id: string) {
   heading.append(
     button("Read original request", () => evidence(state.sourceEvidenceId)),
   );
-  const map = card("Request journey"),
+  if (state.status === "blocked")
+    heading.append(
+      notice(
+        `${Date.parse(state.deadline) <= Date.now() ? "The response deadline has passed. " : ""}This request needs attention. ${journey.deliveries.length === 0 ? "No real channel messages have been sent. " : ""}Read the tasks below; a blocked outcome is not a completed request.`,
+      ),
+    );
+  heading.append(button("How to use this map", () => show("Help")));
+  const map = card("Live request map"),
     controls = el("div", "", "row"),
     mapHost = el("div"),
     live = input("", "checkbox"),
@@ -740,7 +760,21 @@ async function casePage(id: string) {
         `Source delivery: ${words(r.dispatch_state ?? "not recorded")} · Acknowledgement: ${words(r.acknowledgement ?? "not received")}`,
       ),
     );
-    summary(decode(r.result as Row | string), item);
+    const result = decode(r.result as Row | string);
+    summary(
+      {
+        outcome: words(result.outcome),
+        summary: result.summary,
+        created: date(result.generatedAt),
+        requirements: state.obligations.map((o) => ({
+          department: words(o.group),
+          question: o.question,
+          status: words(o.status),
+        })),
+      },
+      item,
+    );
+    if (role === "admin") details("Advanced result references", result, item);
     if (r.current && !r.acknowledgement && role !== "viewer") {
       const reason = input();
       item.append(
@@ -1080,6 +1114,18 @@ function formFields(
 ) {
   const readers: Record<string, () => unknown> = {};
   const labels: Record<string, string> = {
+    subject: "What this request concerns",
+    payload: "Request details",
+    id: "Reference",
+    type: "Item type",
+    revision: "Version",
+    siteId: "Factory reference",
+    materialLotId: "Material batch",
+    requiredQuantity: "Amount needed",
+    value: "Amount",
+    unit: "Unit",
+    neededBy: "Needed by",
+    requestedInformation: "Information to collect",
     statement: "Your information",
     reason: "Reason or supporting evidence",
     observedAt: "When was this observed?",
@@ -1284,7 +1330,14 @@ function formFields(
     );
 }
 async function simulator() {
-  const c = card("Start a practice request");
+  const c = card("1. Choose and describe a request");
+  c.append(
+    el(
+      "p",
+      "Fill in the business details below. After you start, ILIEN prepares the tasks and opens the request map.",
+    ),
+    button("Read the step-by-step guide", () => show("Help")),
+  );
   c.append(
     notice(
       "The source event is simulated. Connected channel sends are real if enabled recipients are configured. This form does not create real factory data.",
@@ -1344,16 +1397,18 @@ async function simulator() {
     if (payload?.neededBy)
       payload.neededBy = new Date(Date.now() + 86400000).toISOString();
     fields.replaceChildren(el("h3", words(event.eventType)));
-    read = formFields(event, fields, {
-      hidden: [
-        "eventId",
-        "occurredAt",
-        "contractVersion",
-        "payloadVersion",
-        "correlationId",
-        ...(custom ? [] : ["eventType"]),
-      ],
-    });
+    read =
+      scenarioFields(event, fields) ??
+      formFields(event, fields, {
+        hidden: [
+          "eventId",
+          "occurredAt",
+          "contractVersion",
+          "payloadVersion",
+          "correlationId",
+          ...(custom ? [] : ["eventType"]),
+        ],
+      });
   }
   choice.onchange = () =>
     void load(choice.value).catch((e) => toast(String(e)));
@@ -1395,7 +1450,7 @@ async function simulator() {
   if (role !== "viewer")
     c.append(
       button(
-        "Start request",
+        "Start request & open map",
         async () => {
           const original = read();
           const result = await api<Row>("/events", original);
@@ -1410,28 +1465,106 @@ async function simulator() {
             occurredAt: new Date().toISOString(),
           };
           fields.replaceChildren(el("h3", words(event.eventType)));
-          read = formFields(event, fields, {
-            hidden: [
-              "eventId",
-              "occurredAt",
-              "contractVersion",
-              "payloadVersion",
-              "correlationId",
-              ...(custom ? [] : ["eventType"]),
-            ],
-          });
-          if (role === "admin") details("Receipt reference", result, feedback);
+          read =
+            scenarioFields(event, fields) ??
+            formFields(event, fields, {
+              hidden: [
+                "eventId",
+                "occurredAt",
+                "contractVersion",
+                "payloadVersion",
+                "correlationId",
+                ...(custom ? [] : ["eventType"]),
+              ],
+            });
+          if (role === "admin")
+            details("Advanced receipt reference", result, feedback);
+          await openWhenReady(String(result.inboxId));
         },
         true,
       ),
     );
   c.append(button("Open requests", () => show("Cases")));
-  const inbox = card("Recently received events");
+  const inbox = card("Your recently started requests");
+  async function openWhenReady(inboxId: string) {
+    feedback.replaceChildren(notice("2. Request accepted. Preparing its map…"));
+    for (let attempt = 0; attempt < 8; attempt++) {
+      if (!feedback.isConnected || page !== "Simulator" || document.hidden)
+        return;
+      const data = await api<{ items: Row[] }>("/events");
+      const row = data.items.find((r) => r.id === inboxId);
+      if (row?.case_id) {
+        await casePage(String(row.case_id));
+        return;
+      }
+      if (
+        row?.disposition === "triage" &&
+        row?.status === "awaiting_coordination"
+      ) {
+        feedback.replaceChildren(
+          notice(
+            "This request needs routing review. It has no configured workflow yet, so no map has been created.",
+          ),
+          button("Read the user guide", () => show("Help")),
+        );
+        await refresh();
+        return;
+      }
+      if (attempt < 7) await new Promise((r) => setTimeout(r, 2500));
+    }
+    if (feedback.isConnected) {
+      feedback.replaceChildren(
+        notice(
+          "Your request is saved. Preparing the map is taking longer than usual. Check its status below; do not submit it again.",
+        ),
+        button("Check and open map", () => openWhenReady(inboxId)),
+      );
+      await refresh();
+    }
+  }
   async function refresh() {
-    inbox.replaceChildren(el("h2", "Recently received events"));
+    inbox.replaceChildren(el("h2", "Your recently started requests"));
     const data = await api<{ items: Row[] }>("/events");
-    table(data.items, ["event_type", "status", "disposition"], inbox);
-    inbox.append(button("Refresh received events", refresh));
+    for (const item of data.items) {
+      const row = el("article", "", "request-item");
+      const names: Record<string, string> = {
+        coordinating: "Request created",
+        accepted: "Preparing request",
+        awaiting_coordination: "Needs routing review",
+      };
+      row.append(
+        el(
+          "span",
+          item.case_status
+            ? words(item.case_status)
+            : (names[String(item.status)] ?? words(item.status)),
+          "badge",
+        ),
+        el("h3", words(item.event_type)),
+        el("p", `Received ${date(item.received_at)}`, "muted"),
+      );
+      if (item.case_id)
+        row.append(
+          button("Open live map", () => casePage(String(item.case_id))),
+        );
+      else if (item.status === "awaiting_coordination")
+        row.append(
+          el(
+            "p",
+            "No workflow is configured for this request. An administrator needs to review the routing.",
+          ),
+        );
+      else
+        row.append(
+          button("Check preparation", () => openWhenReady(String(item.id))),
+        );
+      inbox.append(row);
+    }
+    if (!data.items.length)
+      inbox.append(
+        el("p", "No requests yet. Start one using the form above.", "empty"),
+      );
+    inbox.append(button("Refresh request status", refresh));
   }
   await refresh();
 }

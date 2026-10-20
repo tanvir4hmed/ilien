@@ -80,7 +80,9 @@ export async function handler(
     if (
       !claims ||
       claims.token_use !== "access" ||
-      claims.client_id !== process.env.OPERATOR_CLIENT_ID ||
+      ![process.env.OPERATOR_CLIENT_ID, process.env.OPERATOR_GUEST_CLIENT_ID]
+        .filter(Boolean)
+        .includes(String(claims.client_id)) ||
       claims.iss !== process.env.OPERATOR_ISSUER ||
       typeof claims.sub !== "string" ||
       !z.guid().safeParse(claims.sub).success ||
@@ -369,7 +371,7 @@ export async function handler(
     ) {
       const items = await transaction(source.tenant_id, (tx) =>
         query(
-          "SELECT id,external_id,event_type,status,disposition,received_at FROM inbox_events WHERE connection_id=CAST(:connection AS uuid) ORDER BY received_at DESC LIMIT 50",
+          "SELECT i.id,i.external_id,i.event_type,i.status,i.disposition,i.received_at,c.id AS case_id,c.status AS case_status FROM inbox_events i LEFT JOIN LATERAL (SELECT id,status FROM coordination_cases WHERE inbox_id=i.id AND connection_id=i.connection_id ORDER BY updated_at DESC LIMIT 1) c ON true WHERE i.connection_id=CAST(:connection AS uuid) ORDER BY i.received_at DESC LIMIT 50",
           [param("connection", source.id)],
           tx,
         ),

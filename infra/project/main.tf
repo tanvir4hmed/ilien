@@ -68,7 +68,7 @@ module "api" {
   boundary_arn    = local.boundary
   artifact_bucket = "ilien-terraform-${local.account}-us-east-1"
   zip_path        = "../../dist/api.zip"
-  environment     = merge(local.common, { RELAY_FUNCTION = module.relay.name, RECONCILE_FUNCTION = module.reconcile.name, TENANT_ID = local.channel_env.TENANT_ID, SOURCE_ID = local.channel_env.SOURCE_ID, OPERATIONS_QUEUES = jsonencode(merge({ for k, v in local.work_queues : k => v.url }, { for k, v in local.dead_queues : "${k}-dead" => v.url })), OPERATIONS_DASHBOARD_URL = local.dashboard_url, OPERATOR_CLIENT_ID = module.console.client_id, OPERATOR_ISSUER = module.console.issuer })
+  environment     = merge(local.common, { RELAY_FUNCTION = module.relay.name, RECONCILE_FUNCTION = module.reconcile.name, TENANT_ID = local.channel_env.TENANT_ID, SOURCE_ID = local.channel_env.SOURCE_ID, OPERATIONS_QUEUES = jsonencode(merge({ for k, v in local.work_queues : k => v.url }, { for k, v in local.dead_queues : "${k}-dead" => v.url })), OPERATIONS_DASHBOARD_URL = local.dashboard_url, OPERATOR_CLIENT_ID = module.console.client_id, OPERATOR_GUEST_CLIENT_ID = module.console.guest_client_id, OPERATOR_ISSUER = module.console.issuer })
   policy          = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [{ Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = [module.relay.arn, module.reconcile.arn] }, { Effect = "Allow", Action = ["sqs:GetQueueAttributes"], Resource = concat([for v in local.work_queues : v.arn], [for v in local.dead_queues : v.arn]) }]) })
 }
 module "intake" {

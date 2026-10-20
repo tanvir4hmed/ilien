@@ -50,7 +50,24 @@ resource "aws_cognito_user_pool_client" "console" {
     id_token      = "minutes"
     refresh_token = "hours"
   }
-  explicit_auth_flows = ["ALLOW_REFRESH_TOKEN_AUTH", "ALLOW_USER_PASSWORD_AUTH"]
+  explicit_auth_flows = ["ALLOW_REFRESH_TOKEN_AUTH"]
+}
+resource "aws_cognito_user_pool_client" "shared" {
+  name                                 = "ilien-shared-sign-in"
+  user_pool_id                         = aws_cognito_user_pool.operators.id
+  generate_secret                      = false
+  allowed_oauth_flows_user_pool_client = false
+  explicit_auth_flows                  = ["ALLOW_USER_PASSWORD_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"]
+  prevent_user_existence_errors        = "ENABLED"
+  enable_token_revocation              = true
+  access_token_validity                = 15
+  id_token_validity                    = 15
+  refresh_token_validity               = 1
+  token_validity_units {
+    access_token  = "minutes"
+    id_token      = "minutes"
+    refresh_token = "hours"
+  }
 }
 resource "aws_s3_bucket" "console" {
   bucket = "ilien-console-${var.account}-us-east-1"
@@ -158,7 +175,7 @@ resource "aws_s3_object" "config" {
   content_type           = "application/json"
   cache_control          = "no-store"
   server_side_encryption = "AES256"
-  content                = jsonencode({ apiUrl = var.api_url, authDomain = "https://${aws_cognito_user_pool_domain.operators.domain}.auth.us-east-1.amazoncognito.com", clientId = aws_cognito_user_pool_client.console.id, redirectUri = "${local.public_url}/", redirectUris = [for origin in local.allowed_origins : "${origin}/"], cognitoEndpoint = "https://cognito-idp.us-east-1.amazonaws.com", guest = var.guest_username != "" && var.guest_password != "" ? { username = var.guest_username, password = var.guest_password } : null })
+  content                = jsonencode({ apiUrl = var.api_url, authDomain = "https://${aws_cognito_user_pool_domain.operators.domain}.auth.us-east-1.amazoncognito.com", clientId = aws_cognito_user_pool_client.console.id, guestClientId = aws_cognito_user_pool_client.shared.id, redirectUri = "${local.public_url}/", redirectUris = [for origin in local.allowed_origins : "${origin}/"], cognitoEndpoint = "https://cognito-idp.us-east-1.amazonaws.com", guest = var.guest_username != "" && var.guest_password != "" ? { username = var.guest_username, password = var.guest_password } : null })
 }
 variable "guest_username" {
   type    = string
@@ -174,4 +191,5 @@ variable "guest_password" {
 output "url" { value = "https://${aws_cloudfront_distribution.console.domain_name}" }
 output "issuer" { value = "https://cognito-idp.us-east-1.amazonaws.com/${aws_cognito_user_pool.operators.id}" }
 output "client_id" { value = aws_cognito_user_pool_client.console.id }
+output "guest_client_id" { value = aws_cognito_user_pool_client.shared.id }
 output "pool_id" { value = aws_cognito_user_pool.operators.id }

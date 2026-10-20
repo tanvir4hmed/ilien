@@ -329,6 +329,9 @@ export function renderJourney(
       focus.classList.toggle("selected");
     };
     tools.append(fit, full, focus);
+    requestAnimationFrame(() => {
+      if (canvas.isConnected) fit.click();
+    });
     view.append(tools);
     view.append(
       node(

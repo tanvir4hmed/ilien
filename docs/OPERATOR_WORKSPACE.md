@@ -90,3 +90,13 @@ Deployment reads `GUEST_USERNAME` (environment variable) and `GUEST_PASSWORD` (e
 Before restoring mandatory MFA, review the shared account's availability and enrollment separately. A publicly shared account is intentionally public access, not a substitute for individually authenticated staff.
 
 References: [Cognito InitiateAuth](https://docs.aws.amazon.com/cognito-user-identity-pools/latest/APIReference/API_InitiateAuth.html), [SDK authorization scopes](https://docs.aws.amazon.com/cognito/latest/developerguide/authentication-flows-public-server-side.html), [API Gateway scope validation](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-jwt-authorizer.html).
+
+## Guided start and finding the map
+
+The primary material/specification/maintenance examples use business-labelled fields instead of editable contract structure. Factory/type/metadata defaults stay under optional source details; other catalogue/custom events retain a labelled advanced form. **Start request & open map** submits one durable event, waits a bounded period for its associated case, and opens that case. If background work is delayed, **Check and open map** checks the same saved event without resubmitting. Unmapped inputs show **Needs routing review** and do not invent a case/map.
+
+The received-event API includes its actual `case_id` and `case_status`, preserving source ownership. The list offers **Open live map** and reflects current case state rather than treating an old `coordinating` input status as progress. Requests and Home use **Open map & request**. A blocked/deadline-passed case explains that no answer or unrecorded send can be assumed. Maps initially fit the available width; actual-size controls remain available.
+
+**User guide** in navigation explains start → map → conversation → response/verification → source outcome, status meanings and real-channel prerequisites. A printable source version is [USER_GUIDE.md](USER_GUIDE.md).
+
+The shared local form uses a dedicated secretless native-auth app client. Hosted PKCE continues on the original client. API authorizer and handler admit only the explicitly configured hosted/native client IDs from the same issuer, and still resolve server membership per request.
