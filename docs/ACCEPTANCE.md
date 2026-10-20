@@ -29,7 +29,7 @@ Provider IAM and tool-schema incompatibilities found during live exercise were r
 
 ## Automated checks
 
-`npm run test:channels` currently exercises 16 targeted regressions: Gmail quote separation, duplicate questions, whitespace-only citation grounding, tool allowlists and Nova schema shape, source field disclosure, AWS/Meta ID aliases, duplicate key ordering, greeting recognition, identity and ambiguity, cross-channel reminder correlation, stale requests, independent verification and dependency cycles. Build/type checks and publication checks also run. CI executes the regression suite.
+`npm run test:channels` exercises 16 channel and workflow regressions. `npm run test:ai` adds eight direct deterministic-gate regressions for invented evidence refs, source-plus-receipt grounding, negation/quantity preservation, exact receipt scope, allowed groups, prohibited effects, and wait/review proposals. Build/type checks and publication checks also run. CI executes both suites. These deterministic checks do not establish broad model accuracy or multilingual reliability.
 
 These checks do not establish general semantic accuracy, multilingual robustness, load capacity, recovery from every infrastructure failure or a completed restore exercise.
 

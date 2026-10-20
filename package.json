@@ -12,6 +12,7 @@
   ],
   "scripts": {
     "build": "tsc --noEmit && node scripts/build.mjs",
+    "test:ai": "node scripts/check-ai.mjs",
     "test:channels": "node scripts/check-channels.mjs",
     "publication:check": "node scripts/publication-check.mjs",
     "simulate": "node scripts/simulate.mjs"
