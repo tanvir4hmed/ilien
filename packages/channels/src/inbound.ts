@@ -21,6 +21,7 @@ import {
 import type { Incoming } from "./normalize.js";
 import { enqueueAgent } from "../../ai/src/store.js";
 import { projectProviderEvents } from "./events.js";
+import { authoredReplyText } from "./text.js";
 import {
   canonical,
   isGreeting,
@@ -48,6 +49,7 @@ export async function receive(
     );
     let evidence: string = randomUUID();
     const raw = item.raw;
+    const authored = authoredReplyText(item.text);
     if (item.eventType) {
       const key = hash(
         `${item.channel}/${item.providerId}/${item.eventType}/${item.timestamp}`,
@@ -166,7 +168,7 @@ export async function receive(
       !item.token &&
       !item.replyTo &&
       binding &&
-      !isGreeting(item.text)
+      !isGreeting(authored)
     ) {
       const open = rows<OpenDelivery>(
         await query(
@@ -221,7 +223,7 @@ export async function receive(
         tx,
       );
     if (lockedBinding?.enabled && !item.blockedReason) {
-      if (item.text.trim().toUpperCase() === "STOP") {
+      if (authored.toUpperCase() === "STOP") {
         await query(
           "UPDATE channel_bindings SET enabled=false WHERE id=CAST(:id AS uuid)",
           [param("id", binding!.id)],
@@ -252,12 +254,15 @@ export async function receive(
             : item.token || item.replyTo || resolution?.deliveryId
               ? "request_reference_not_found"
               : "no_open_request_for_participant";
-        if (isGreeting(item.text)) {
+        if (isGreeting(authored) || !authored) {
           status = "received";
-          reason = "greeting_received";
+          reason = authored
+            ? "greeting_received"
+            : "quoted_message_without_new_reply";
         }
         if (
-          !isGreeting(item.text) &&
+          authored &&
+          !isGreeting(authored) &&
           d &&
           d.actor_id === binding!.actor_id &&
           caseRow
@@ -271,7 +276,7 @@ export async function receive(
             if (!["accepted", "uncertain", "sending"].includes(d.status))
               throw new CoordinationError("request_not_sent");
             // Tokens correlate across channels; the independently consented actor binding still authorizes.
-            const body = item.text
+            const body = authored
               .replace(/^\s*ILIEN [a-f0-9]{32}\s*/, "")
               .split(/\r?\n(?:>|On .+wrote:)/)[0]!
               .trim();

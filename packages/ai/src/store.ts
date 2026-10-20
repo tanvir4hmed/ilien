@@ -33,6 +33,7 @@ import {
   type Run,
 } from "./contracts.js";
 import { pausedFor } from "../../operations/src/controls.js";
+import { authoredReplyText } from "../../channels/src/text.js";
 function fail(s: string): never {
   throw new CoordinationError(s);
 }
@@ -197,11 +198,17 @@ export async function buildContext(
     if (e)
       context.evidence.push({
         id: e.id,
-        text: e.channel_text ?? e.original_text,
-        sha256: e.channel_text !== null ? hash(e.channel_text) : e.sha256,
+        text:
+          e.channel_text !== null
+            ? authoredReplyText(e.channel_text)
+            : e.original_text,
+        sha256:
+          e.channel_text !== null
+            ? hash(authoredReplyText(e.channel_text))
+            : e.sha256,
         ...(e.channel_text !== null
           ? {
-              representation: "normalized_channel_text" as const,
+              representation: "authored_channel_text" as const,
               originalSha256: e.sha256,
             }
           : {}),
@@ -260,7 +267,7 @@ export async function buildContext(
       obligationRevision: d.obligation_revision,
       kind: d.request.contact.kind,
       replyRevision: d.request.contact.replyRevision,
-      text: decode(r.normalized).text,
+      text: authoredReplyText(decode(r.normalized).text),
     };
     const e = rows<{
       id: string;
@@ -278,7 +285,7 @@ export async function buildContext(
       id: e.id,
       text: context.receipt.text,
       sha256: hash(context.receipt.text),
-      representation: "normalized_channel_text",
+      representation: "authored_channel_text",
       originalSha256: e.sha256,
       origin: e.origin,
     });

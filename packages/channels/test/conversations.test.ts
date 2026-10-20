@@ -5,6 +5,7 @@ import { toolInput, toolsFor } from "../../ai/src/planner.js";
 import { communicationContext } from "../../domain-packs/src/communication.js";
 import { render } from "../src/outbound.js";
 import { groundedQuote } from "../../ai/src/contracts.js";
+import { authoredReplyText } from "../src/text.js";
 import { normalize } from "../src/normalize.js";
 import {
   canonical,
@@ -22,6 +23,41 @@ import {
 import type { CaseState } from "../../coordination/src/types.js";
 const now = new Date().toISOString();
 const later = new Date(Date.now() + 1800000).toISOString();
+test("quoted Gmail requests are not interpreted as a new participant request", () => {
+  const text =
+    "1100 metre passes; 100 remains quarantined.\n\nOn Tue, Oct 20 at 5:10 PM ILIEN <requests@example.com>\nwrote:\n\n> Confirm quality disposition.\n> Ask for the certificate.";
+  assert.equal(
+    authoredReplyText(text),
+    "1100 metre passes; 100 remains quarantined.",
+  );
+  assert.equal(
+    authoredReplyText("On Monday the inspection failed.\nPlease ask Quality."),
+    "On Monday the inspection failed.\nPlease ask Quality.",
+  );
+  assert.equal(authoredReplyText("hi\n\n> Previous request"), "hi");
+});
+test("a duplicated department question cannot create a new child", () => {
+  const initial = initialize(state(), textilePolicy, now);
+  assert.throws(
+    () =>
+      transition(
+        initial.state,
+        textilePolicy,
+        resolveActor(textilePolicy, "stores_owner"),
+        {
+          type: "add_child",
+          parentId: "stock",
+          obligationId: "duplicate",
+          group: "stores",
+          kind: "fact",
+          question: "How much usable stock?",
+        },
+        "bad-copy",
+        now,
+      ),
+    /duplicate_question_use_existing/,
+  );
+});
 test("citation grounding tolerates line wrapping without changing wording or quantities", () => {
   assert.equal(
     groundedQuote(

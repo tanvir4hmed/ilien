@@ -494,6 +494,16 @@ export function transition(
           fail("group_outside_service_scope", 403);
         if (state.obligations.some((o) => o.id === op.obligationId))
           fail("obligation_id_conflict");
+        const questionKey = (text: string) =>
+          text.replace(/\s+/gu, " ").trim().toLowerCase();
+        if (
+          state.obligations.some(
+            (o) =>
+              o.group === op.group &&
+              questionKey(o.question) === questionKey(op.question),
+          )
+        )
+          fail("duplicate_question_use_existing");
         const assigned = policy.actors.find(
           (a) => a.enabled && a.group === op.group && a.role === "respondent",
         );

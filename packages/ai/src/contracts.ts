@@ -6,7 +6,7 @@ import {
   type Policy,
 } from "../../coordination/src/types.js";
 export const MODEL_ID = "amazon.nova-lite-v1:0";
-export const PROMPT_VERSION = "coordination-review-4";
+export const PROMPT_VERSION = "coordination-review-5";
 export const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 export function groundedQuote(original: string, quote: string) {
   if (!quote.trim()) return false;
@@ -45,7 +45,7 @@ export type Evidence = {
   text: string;
   sha256: string;
   origin: string;
-  representation?: "normalized_channel_text";
+  representation?: "normalized_channel_text" | "authored_channel_text";
   originalSha256?: string;
 };
 export interface Context {
