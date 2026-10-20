@@ -305,7 +305,11 @@ function loginScreen(message?: string) {
       signIn,
       !config?.guest,
     ),
-    el("p", "Access is restricted to invited workspace members.", "muted"),
+    el(
+      "p",
+      "Guest access is available for the workspace walkthrough. Personal accounts require an invitation.",
+      "muted",
+    ),
   );
   root.append(c);
 }
