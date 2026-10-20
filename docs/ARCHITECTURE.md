@@ -24,7 +24,7 @@ flowchart LR
   AG --> DB
   API --> REVIEW[Exact proposal review]
   REVIEW --> CORE
-  BROWSER[Operator console on CloudFront] --> AUTH[Cognito code + PKCE + MFA]
+  BROWSER[Operator console on CloudFront] --> AUTH[Cognito code + PKCE]
   BROWSER --> JWT[API Gateway JWT + source membership]
   JWT --> API
   API --> RESULT[Source result polling + acknowledgement]

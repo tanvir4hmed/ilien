@@ -9,7 +9,7 @@ Deployed runtime/configuration commit: `9e30ac2`. [Successful delivery](https://
 - Approved-template WhatsApp path, opt-in conservative fallback and independent encrypted SNS result handback.
 - Initial rollout created 259 resources (mostly static fixture objects), changed 11 and destroyed none. Subsequent fixes and encryption updates completed without replacement.
 - Schema 5 migration and process health `product` / `0.5.0` succeeded.
-- Initial operator identity and membership provisioned with invitations suppressed. First sign-in/password change/MFA enrollment is owner-managed. Credentials are not repository assets.
+- Initial operator identity and membership provisioned with invitations suppressed. First sign-in/password change is owner-managed. MFA is temporarily disabled for onboarding; restore the Terraform MFA settings before the release security review. Credentials are not repository assets.
 
 Implementation fixes during delivery: source membership serialization now locks an update-authorized settings row; Cognito subjects accept hexadecimal GUID form without assuming RFC UUID variant bits. No application, browser interaction, inference or live-channel test ran. See [operator workspace](OPERATOR_WORKSPACE.md) for feature boundaries, custom-hostname setup, template readiness and source subscriber requirements.
 
