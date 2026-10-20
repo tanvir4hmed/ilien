@@ -23,6 +23,7 @@ import {
   MODEL_ID,
   PROMPT_VERSION,
   hash,
+  groundedQuote,
   decode,
   proposalSchema,
   type Context,
@@ -319,7 +320,8 @@ export function gate(context: Context, proposal: Proposal) {
   if (context.receipt)
     docs.set(context.receipt.evidenceId, context.receipt.text);
   for (const c of proposal.citations)
-    if (!docs.get(c.ref)?.includes(c.quote)) fail("ai_citation_mismatch");
+    if (!docs.has(c.ref) || !groundedQuote(docs.get(c.ref)!, c.quote))
+      fail("ai_citation_mismatch");
   if (
     !proposal.citations.some((c) =>
       context.evidence.some((e) => e.id === c.ref),

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { toolInput, toolsFor } from "../../ai/src/planner.js";
 import { communicationContext } from "../../domain-packs/src/communication.js";
 import { render } from "../src/outbound.js";
+import { groundedQuote } from "../../ai/src/contracts.js";
 import { normalize } from "../src/normalize.js";
 import {
   canonical,
@@ -21,6 +22,21 @@ import {
 import type { CaseState } from "../../coordination/src/types.js";
 const now = new Date().toISOString();
 const later = new Date(Date.now() + 1800000).toISOString();
+test("citation grounding tolerates line wrapping without changing wording or quantities", () => {
+  assert.equal(
+    groundedQuote(
+      "I cannot confirm quality\ndisposition yet.",
+      "I cannot confirm quality disposition yet.",
+    ),
+    true,
+  );
+  assert.equal(
+    groundedQuote("Stock is not ready: 1,200 kg.", "Stock is ready: 1,200 kg."),
+    false,
+  );
+  assert.equal(groundedQuote("Stock: 1,200 kg.", "Stock: 1200 kg."), false);
+  assert.equal(groundedQuote("Stock: 1200 kg.", "   "), false);
+});
 test("model tools do not expose policy or takeover operations", () => {
   const schema = JSON.stringify(toolsFor({}));
   assert.equal(schema.includes("amend_subject"), false);

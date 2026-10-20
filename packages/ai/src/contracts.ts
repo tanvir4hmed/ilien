@@ -8,6 +8,10 @@ import {
 export const MODEL_ID = "amazon.nova-lite-v1:0";
 export const PROMPT_VERSION = "coordination-review-4";
 export const hash = (s: string) => createHash("sha256").update(s).digest("hex");
+export function groundedQuote(original: string, quote: string) {
+  if (!quote.trim()) return false;
+  return original.replace(/\s+/gu, " ").includes(quote.replace(/\s+/gu, " "));
+}
 export const decode = <T>(s: T | string): T =>
   typeof s === "string" ? JSON.parse(s) : s;
 export const proposalSchema = z.strictObject({
