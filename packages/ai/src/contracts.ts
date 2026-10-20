@@ -41,6 +41,8 @@ export type Evidence = {
   text: string;
   sha256: string;
   origin: string;
+  representation?: "normalized_channel_text";
+  originalSha256?: string;
 };
 export interface Context {
   state: CaseState;

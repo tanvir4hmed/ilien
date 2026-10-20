@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { z } from "zod";
-import { toolInput } from "../../ai/src/planner.js";
+import { toolInput, toolsFor } from "../../ai/src/planner.js";
+import { communicationContext } from "../../domain-packs/src/communication.js";
+import { render } from "../src/outbound.js";
 import { normalize } from "../src/normalize.js";
 import {
   canonical,
@@ -19,6 +21,39 @@ import {
 import type { CaseState } from "../../coordination/src/types.js";
 const now = new Date().toISOString();
 const later = new Date(Date.now() + 1800000).toISOString();
+test("model tools do not expose policy or takeover operations", () => {
+  const schema = JSON.stringify(toolsFor({}));
+  assert.equal(schema.includes("amend_subject"), false);
+  assert.equal(schema.includes("takeover"), false);
+  assert.equal(schema.includes("add_child"), true);
+});
+test("source disclosures preserve quantities while omitting unrelated fields", () => {
+  const original = {
+    eventType: "manufacturing.material_readiness_requested",
+    payload: {
+      siteId: "site-a",
+      materialLotId: "lot-a",
+      requiredQuantity: { value: "1200.000", unit: "metre" },
+      neededBy: later,
+      internalPrice: "private",
+      apiKey: "never-disclose",
+    },
+  };
+  const disclosed = communicationContext(original, "stores");
+  assert.deepEqual(
+    disclosed.requiredQuantity,
+    original.payload.requiredQuantity,
+  );
+  assert.equal("internalPrice" in disclosed, false);
+  assert.equal("apiKey" in disclosed, false);
+  assert.deepEqual(communicationContext(original, "outside-policy"), {});
+  const d = delivery();
+  d.request.sourceContext = disclosed;
+  const text = render(d);
+  assert.match(text, /Material batch: lot-a/);
+  assert.match(text, /1200.000 metre/);
+  assert.equal(text.includes("never-disclose"), false);
+});
 test("Nova tool schema uses only provider-supported top-level fields", () => {
   const schema = toolInput(z.strictObject({ query: z.string().min(2) }));
   assert.deepEqual(Object.keys(schema).sort(), [

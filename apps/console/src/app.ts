@@ -592,12 +592,16 @@ async function casePage(id: string) {
   );
   if (deliveryIssues.length) {
     const attention = card("Messages need attention");
-    for (const d of deliveryIssues)
+    for (const d of deliveryIssues) {
+      const provider = d.provider_error
+        ? decode(d.provider_error as Row | string)
+        : null;
       attention.append(
         notice(
-          `${words(d.channel)} message ${d.status === "uncertain" ? "has an unconfirmed provider result; check it before retrying" : "could not be sent"}. ${words(d.reason)}. The related task is still waiting for a response.`,
+          `${words(d.channel)} message ${d.status === "uncertain" ? "has an unconfirmed provider result; check it before retrying" : "could not be delivered"}. ${provider?.message ? `${String(provider.message)}${provider.code ? ` (${String(provider.code)})` : ""}` : words(d.reason)}. The related task is still waiting for a response.`,
         ),
       );
+    }
     attention.append(button("People & channels", () => show("Channels")));
   }
   const map = card("Live request map"),

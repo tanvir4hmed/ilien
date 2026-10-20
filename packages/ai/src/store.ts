@@ -185,18 +185,25 @@ export async function buildContext(
       original_text: string;
       sha256: string;
       origin: string;
+      channel_text: string | null;
     }>(
       await query(
-        "SELECT id,original_text,sha256,origin FROM evidence_items WHERE id=CAST(:id AS uuid)",
-        [param("id", id)],
+        "SELECT e.id,e.original_text,e.sha256,e.origin,(SELECT normalized->>'text' FROM channel_receipts WHERE evidence_id=e.id AND case_id=CAST(:case AS uuid) AND connection_id=CAST(:source AS uuid) LIMIT 1) AS channel_text FROM evidence_items e WHERE e.id=CAST(:id AS uuid)",
+        [param("id", id), param("case", state.id), param("source", source.id)],
         tx,
       ),
     )[0];
     if (e)
       context.evidence.push({
         id: e.id,
-        text: e.original_text,
-        sha256: e.sha256,
+        text: e.channel_text ?? e.original_text,
+        sha256: e.channel_text !== null ? hash(e.channel_text) : e.sha256,
+        ...(e.channel_text !== null
+          ? {
+              representation: "normalized_channel_text" as const,
+              originalSha256: e.sha256,
+            }
+          : {}),
         origin: e.origin,
       });
   }
@@ -268,8 +275,10 @@ export async function buildContext(
     )[0]!;
     context.evidence.push({
       id: e.id,
-      text: e.original_text,
-      sha256: e.sha256,
+      text: context.receipt.text,
+      sha256: hash(context.receipt.text),
+      representation: "normalized_channel_text",
+      originalSha256: e.sha256,
       origin: e.origin,
     });
   }

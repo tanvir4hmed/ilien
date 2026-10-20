@@ -11,6 +11,7 @@ import {
   type Contact,
   type Policy,
 } from "../../coordination/src/types.js";
+import { communicationContext } from "../../domain-packs/src/communication.js";
 
 export interface Binding {
   id: string;
@@ -41,6 +42,7 @@ export interface Delivery {
     deadline: string;
     claim?: unknown;
     proposal?: unknown;
+    sourceContext?: Record<string, unknown>;
   };
 }
 export const decode = <T>(v: T | string): T =>
@@ -76,6 +78,18 @@ export async function createDelivery(
     (o) => o.id === contact.obligationId,
   );
   if (!obligation) throw new CoordinationError("obligation_not_found", 404);
+  const original = rows<{ original_text: string }>(
+    await query(
+      "SELECT original_text FROM evidence_items WHERE id=CAST(:id AS uuid)",
+      [param("id", state.sourceEvidenceId)],
+      tx,
+    ),
+  )[0];
+  if (!original) throw new CoordinationError("source_evidence_required");
+  const sourceContext = communicationContext(
+    JSON.parse(original.original_text),
+    obligation.group,
+  );
   const id = randomUUID();
   const result = rows<{ id: string }>(
     await query(
@@ -102,6 +116,7 @@ export async function createDelivery(
             subject: state.subject,
             obligationRevision: obligation.revision,
             deadline: state.deadline,
+            sourceContext,
             ...(obligation.proposal ? { proposal: obligation.proposal } : {}),
             ...(contact.kind === "verify_request"
               ? { claim: obligation.reply }
