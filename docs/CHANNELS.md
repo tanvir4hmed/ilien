@@ -101,6 +101,6 @@ Parameters are generated from the canonical contact, subject, deadline and optio
 
 `automaticFallback` is off by default. When enabled, a definitive provider rejection or unavailable session/template can create one intent on the same actor's other consented channel. It rechecks source policy version, actor, contact revision, case state and deadline; uniqueness prevents more than one attempt per contact/channel. Pending, accepted, sending or uncertain delivery is never a fallback trigger. A successful provider acceptance is not a business acknowledgement. Uncertain sends require later reconciliation; do not silently retry them.
 
-The pending-send selection no longer filters out rows with a null `attempt_at`; only stale in-progress sends use that age threshold. Actual send verification remains deferred.
+The pending-send selection no longer filters out rows with a null `attempt_at`; only stale in-progress sends use that age threshold. Targeted real SES send/reply verification has completed; the linked WhatsApp sender returned Meta131031. See [acceptance evidence](ACCEPTANCE.md).
 
 Reference: [AWS GetWhatsAppMessageTemplate](https://docs.aws.amazon.com/social-messaging/latest/APIReference/API_GetWhatsAppMessageTemplate.html).

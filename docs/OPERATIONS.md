@@ -97,4 +97,4 @@ The configured hourly safety sweep means lost event wakes can wait roughly one i
 
 References: [EventBridge retries and DLQ](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-rule-retry-policy.html), [Lambda SQS configuration](https://docs.aws.amazon.com/lambda/latest/dg/services-sqs-configure.html), [Lambda monitoring metrics](https://docs.aws.amazon.com/lambda/latest/dg/monitoring-metrics-types.html), [HTTP API metrics](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-metrics.html).
 
-Build/type, artifact integrity, dependency audit and Terraform validation are delivery checks. Application/browser, messaging, model, fault-injection/load, notification and restore acceptance remain deferred; no success or compliance percentage is claimed.
+Build/type, artifact integrity, dependency audit and Terraform validation are delivery checks. Targeted browser, SES messaging and review-gated model checks are recorded in [acceptance evidence](ACCEPTANCE.md). Broader fault-injection/load, notification and restore acceptance remain pending; no general success or compliance percentage is claimed.
