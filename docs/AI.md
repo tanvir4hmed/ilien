@@ -1,6 +1,6 @@
 # Bounded coordination agent
 
-This release implements a review-gated Bedrock agent. Runtime behavior, model quality and end-to-end safety have not been evaluated yet. Application tests and model probes remain deferred. A deployment health response is not evidence that a model selected a correct action.
+This release implements a review-gated Bedrock agent. Targeted live email/model exercises and deterministic regression checks have been performed. These are limited acceptance evidence, not a general model accuracy or end-to-end safety certification. See [acceptance evidence](ACCEPTANCE.md) for results and remaining limits. A deployment health response is not evidence that a model selected a correct action.
 
 ## Responsibilities
 
@@ -38,7 +38,7 @@ Only a correlated, enabled-actor receipt marked `needs_review / unstructured_rep
 
 ## Model and execution limits
 
-- Pinned model: `amazon.nova-lite-v1:0`, regional Bedrock Converse in us-east-1. Prompt/tool contract version: `coordination-review-3`. Tool schemas use Nova's supported top-level fields; each call must select an allowed tool, and the last call must submit a proposal/wait/review. The operation schema exposes only actions eligible for the current kind of run. Schema/grounding failures receive bounded tool-error feedback within the existing three-call budget. Runtime validation and operator review remain mandatory.
+- Pinned model: `amazon.nova-lite-v1:0`, regional Bedrock Converse in us-east-1. Prompt/tool contract version: `coordination-review-5`. Tool schemas use Nova's supported top-level fields; each call must select an allowed tool, and the last call must submit a proposal/wait/review. The operation schema exposes only actions eligible for the current kind of run. Schema/grounding failures receive bounded tool-error feedback within the existing three-call budget. Runtime validation and operator review remain mandatory.
 - At most three serial model calls per run, one requested tool per call, 1,024 output tokens per call, 22-second provider timeout and no SDK retry. An unsupported/invalid result stops for review; no hidden stronger-model fallback.
 - Serialized model request maximum 30,000 UTF-8 bytes; original base context maximum 19,000 bytes. Overlarge originals are not silently summarized or truncated. They require operator review. Context contains bounded case-linked evidence, not all historic conversations.
 - Tenant admission limits: 30 runs per rolling 24 hours; 12 per case per rolling 24 hours; 40 lifetime per case; at most two attempts for an identical case revision/receipt. These limits accommodate multi-branch cases and verification while bounding inference. Failed, rejected and interrupted runs still consume admission capacity. Repeated identical searches stop the loop.
@@ -101,8 +101,12 @@ The database remains canonical. Invalid model output, tool repetition, missing f
 
 Steps record requested tools, hashes, concise model-supplied reasons, provider usage and timing; private chain-of-thought blocks are not stored. Sensitive run context lives in tenant-scoped database records, not public logs. Context minimization/PII handling, per-component database privileges, configurable trace retention/deletion need further hardening before a customer rollout. Original channel objects are retained for explicit case-aware policy review rather than blanket expiry; historical expiry or object loss still cannot be repaired by retaining a hash.
 
-Pending authorized evaluation: ordinary and surprising prerequisites; Bangla/English negation, units and temporal qualifiers; prompt injection in messages/SOPs; unsupported claims; retrieval absence/conflict/revocation; wrong actor/group; stale proposal and takeover races; duplicate queue delivery; unknown inference outcome; no-progress/cost limits; human rejection; required child silence; false closure; cross-channel continuation. Compare with deterministic coordination using equal evidence. Measure useful outcomes, unsupported effects, unnecessary contacts, latency, tokens and review burden. No results or accuracy percentages are claimed.
+Broader evaluation still required: ordinary and surprising prerequisites; Bangla/English negation, units and temporal qualifiers; prompt injection in messages/SOPs; unsupported claims; retrieval absence/conflict/revocation; wrong actor/group; stale proposal and takeover races; duplicate queue delivery; unknown inference outcome; no-progress/cost limits; human rejection; required child silence; false closure; cross-channel continuation. Compare with deterministic coordination using equal evidence. Measure useful outcomes, unsupported effects, unnecessary contacts, latency, tokens and review burden. No general accuracy percentages are claimed. Targeted observations are recorded separately in the acceptance report.
 
 Implementation references checked 19 October 2026: [Bedrock client-side tool use](https://docs.aws.amazon.com/bedrock/latest/userguide/tool-use-client-side.html), [Converse API](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_Converse.html), [Nova tool definitions](https://docs.aws.amazon.com/nova/latest/userguide/tool-use-definition.html). A direct serial SDK loop preserves the application's existing state and effect boundary; no second agent/session engine is required.
 
 Operator identity now uses Cognito JWT plus server-side source membership; see [operator workspace](OPERATOR_WORKSPACE.md). New administrative and bound-decision operations are outside the agent action allowlist.
+
+## Authored messages and immutable originals
+
+Full incoming text, including quoted email history, remains immutable evidence. A separately marked authored-message view removes recognised quoted history before interpretation, so an old request is not treated as a new instruction. Original evidence hashes remain available. Citation grounding permits whitespace differences caused by MIME wrapping; it preserves words, punctuation, quantities and negation. Unknown formatting or an unsupported interpretation still requires review. A deterministic gate rejects duplicate questions for the same department.

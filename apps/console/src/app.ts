@@ -591,14 +591,23 @@ async function casePage(id: string) {
     ["blocked", "uncertain"].includes(String(d.status)),
   );
   if (deliveryIssues.length) {
-    const attention = card("Messages need attention");
+    const waitingIssues = deliveryIssues.filter((d) =>
+      state.status === "active" && state.obligations.some((o) =>
+        o.id === d.obligation_id && o.status === "waiting"),
+    );
+    const attention = card(waitingIssues.length ? "Messages need attention" : "Earlier delivery problems");
+    const seenIssues = new Set<string>();
     for (const d of deliveryIssues) {
       const provider = d.provider_error
         ? decode(d.provider_error as Row | string)
         : null;
+      const key = `${d.obligation_id}/${d.channel}/${d.status}/${JSON.stringify(provider ?? d.reason)}`;
+      if (seenIssues.has(key)) continue;
+      seenIssues.add(key);
+      const waiting = waitingIssues.includes(d);
       attention.append(
         notice(
-          `${words(d.channel)} message ${d.status === "uncertain" ? "has an unconfirmed provider result; check it before retrying" : "could not be delivered"}. ${provider?.message ? `${String(provider.message)}${provider.code ? ` (${String(provider.code)})` : ""}` : words(d.reason)}. The related task is still waiting for a response.`,
+          `${words(d.channel)} message ${d.status === "uncertain" ? "has an unconfirmed provider result; check it before retrying" : "could not be delivered"}. ${provider?.message ? `${String(provider.message)}${provider.code ? ` (${String(provider.code)})` : ""}` : words(d.reason)}. ${waiting ? "The related task is waiting for a response." : "This is delivery history; it does not establish how the task was answered. Read the recorded evidence below."}`,
         ),
       );
     }
@@ -692,7 +701,7 @@ async function casePage(id: string) {
       c.append(
         el(
           "p",
-          `Waiting for: ${o.dependencies.map((d) => state.obligations.find((n) => n.id === d)?.question ?? d).join("; ")}`,
+          `${o.dependencies.every((d) => state.obligations.find((n) => n.id === d)?.status === "verified") ? "Prerequisites verified" : "Waiting for"}: ${o.dependencies.map((d) => state.obligations.find((n) => n.id === d)?.question ?? d).join("; ")}`,
         ),
       );
     if (o.reply)
@@ -707,6 +716,8 @@ async function casePage(id: string) {
   }
   if (role !== "viewer") {
     caseActions(state, policy, id);
+  }
+  if (role !== "viewer" && state.status === "active") {
     const send = card("Send through a connected channel");
     send.append(
       el(
@@ -716,8 +727,20 @@ async function casePage(id: string) {
       ),
     );
     const bindings = await api<{ items: Row[] }>("/channels/bindings");
+    const offered = new Set<string>();
+    const openContacts = journey.contacts.filter((r) => {
+      const c = decode(r.contact as Row | string);
+      const o = state.obligations.find((o) => o.id === c.obligationId);
+      const key = `${String(c.obligationId)}/${String(c.actorId)}/${String(c.kind)}`;
+      const eligible = o && (c.kind === "verify_request"
+        ? o.status === "answered" && o.reply?.revision === c.replyRevision
+        : o.status === "waiting" && o.assignee === c.actorId);
+      if (!eligible || offered.has(key)) return false;
+      offered.add(key);
+      return true;
+    });
     const contact = options(
-        journey.contacts.map((r) => {
+        openContacts.map((r) => {
           const c = decode(r.contact as Row | string);
           return {
             value: String(r.id),
