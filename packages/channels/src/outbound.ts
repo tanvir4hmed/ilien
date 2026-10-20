@@ -215,6 +215,14 @@ export async function sendDelivery(tenant: string, id: string) {
     const status = (error as { $metadata?: { httpStatusCode?: number } })
       ?.$metadata?.httpStatusCode;
     const certain = !!status && status >= 400 && status < 500 && status !== 408;
+    const failure = error as Error & { $metadata?: { requestId?: string } };
+    // Provider diagnostics must be useful without publishing participant data.
+    console.error(JSON.stringify({
+      code: "channel_send_provider_failure", deliveryId: id, channel: d.channel,
+      providerCode: /^[A-Za-z0-9_.-]{1,100}$/.test(failure.name ?? "") ? failure.name : "ProviderError",
+      httpStatus: status, requestId: failure.$metadata?.requestId,
+      detail: String(failure.message ?? "").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,"[address]").replace(/\b\d{8,}\b/g,"[identifier]").slice(0,1000),
+    }));
     await transaction(tenant, (tx) =>
       query(
         "UPDATE channel_deliveries SET status=:status,reason=:reason WHERE id=CAST(:id AS uuid)",
