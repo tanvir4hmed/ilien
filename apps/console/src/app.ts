@@ -587,6 +587,19 @@ async function casePage(id: string) {
       ),
     );
   heading.append(button("How to use this map", () => show("Help")));
+  const deliveryIssues = journey.deliveries.filter((d) =>
+    ["blocked", "uncertain"].includes(String(d.status)),
+  );
+  if (deliveryIssues.length) {
+    const attention = card("Messages need attention");
+    for (const d of deliveryIssues)
+      attention.append(
+        notice(
+          `${words(d.channel)} message ${d.status === "uncertain" ? "has an unconfirmed provider result; check it before retrying" : "could not be sent"}. ${words(d.reason)}. The related task is still waiting for a response.`,
+        ),
+      );
+    attention.append(button("People & channels", () => show("Channels")));
+  }
   const map = card("Live request map"),
     controls = el("div", "", "row"),
     mapHost = el("div"),
@@ -839,7 +852,7 @@ function caseActions(state: CaseState, policy: Policy, id: string) {
   const c = card("Practice a response");
   c.append(
     notice(
-      "Simulation only: act as a participant to explore this case. These actions are labelled as role-play and do not send WhatsApp or email messages.",
+      "Act as a synthetic participant to explore this case. Your answer is labelled as role-play. Any new questions or verification requests may use connected real channels.",
     ),
   );
   const labels: Record<string, string> = {

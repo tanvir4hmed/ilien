@@ -172,7 +172,7 @@ export async function sendDelivery(tenant: string, id: string) {
             JSON.stringify({
               messaging_product: "whatsapp",
               recipient_type: "individual",
-              to: d.address,
+              to: `+${d.address.replace(/^\+/, "")}`,
               ...(template
                 ? {
                     type: "template",
@@ -192,6 +192,7 @@ export async function sendDelivery(tenant: string, id: string) {
       const result = await email.send(
         new SendEmailCommand({
           FromEmailAddress: `ILIEN <requests@${process.env.MAIL_DOMAIN!}>`,
+          FromEmailAddressIdentityArn: `arn:aws:ses:${process.env.AWS_REGION ?? "us-east-1"}:${process.env.AWS_ACCOUNT_ID!}:identity/${process.env.MAIL_DOMAIN!}`,
           Destination: { ToAddresses: [d.address] },
           ReplyToAddresses: [`r+${d.token}@${process.env.MAIL_DOMAIN!}`],
           ConfigurationSetName: "ilien",
@@ -217,12 +218,22 @@ export async function sendDelivery(tenant: string, id: string) {
     const certain = !!status && status >= 400 && status < 500 && status !== 408;
     const failure = error as Error & { $metadata?: { requestId?: string } };
     // Provider diagnostics must be useful without publishing participant data.
-    console.error(JSON.stringify({
-      code: "channel_send_provider_failure", deliveryId: id, channel: d.channel,
-      providerCode: /^[A-Za-z0-9_.-]{1,100}$/.test(failure.name ?? "") ? failure.name : "ProviderError",
-      httpStatus: status, requestId: failure.$metadata?.requestId,
-      detail: String(failure.message ?? "").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,"[address]").replace(/\b\d{8,}\b/g,"[identifier]").slice(0,1000),
-    }));
+    console.error(
+      JSON.stringify({
+        code: "channel_send_provider_failure",
+        deliveryId: id,
+        channel: d.channel,
+        providerCode: /^[A-Za-z0-9_.-]{1,100}$/.test(failure.name ?? "")
+          ? failure.name
+          : "ProviderError",
+        httpStatus: status,
+        requestId: failure.$metadata?.requestId,
+        detail: String(failure.message ?? "")
+          .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[address]")
+          .replace(/\b\d{8,}\b/g, "[identifier]")
+          .slice(0, 1000),
+      }),
+    );
     await transaction(tenant, (tx) =>
       query(
         "UPDATE channel_deliveries SET status=:status,reason=:reason WHERE id=CAST(:id AS uuid)",
