@@ -16,7 +16,7 @@ export function guestLogin(
     form = node("form"),
     email = node("input"),
     password = node("input"),
-    eye = node("button", "◉"),
+    eye = node("button", "👁"),
     feedback = node("p", "", "muted"),
     login = node("button", "Log in", "primary");
   use.type = "button";
@@ -62,6 +62,10 @@ export function guestLogin(
     eye.setAttribute("aria-pressed", String(visible));
   };
   use.onclick = () => {
+    challenge = undefined;
+    mfa.hidden = true;
+    code.required = false;
+    code.value = "";
     form.hidden = false;
     email.value = guest.username;
     password.value = guest.password;
