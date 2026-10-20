@@ -86,7 +86,9 @@ export async function handler(
       !z.guid().safeParse(claims.sub).success ||
       !String(claims.scope ?? "")
         .split(" ")
-        .includes("openid")
+        .some((scope) =>
+          ["openid", "aws.cognito.signin.user.admin"].includes(scope),
+        )
     )
       return response(401, { error: "invalid_operator_token" });
     principal = claims.sub;

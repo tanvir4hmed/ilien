@@ -4,6 +4,8 @@ module "console" {
   custom_domain       = var.app_domain
   custom_domain_ready = var.custom_domain_ready
   api_url             = aws_apigatewayv2_api.api.api_endpoint
+  guest_username      = var.guest_username
+  guest_password      = var.guest_password
 }
 resource "aws_apigatewayv2_authorizer" "operators" {
   api_id           = aws_apigatewayv2_api.api.id
@@ -20,7 +22,7 @@ resource "aws_apigatewayv2_route" "console" {
   route_key            = "ANY /console/{proxy+}"
   authorization_type   = "JWT"
   authorizer_id        = aws_apigatewayv2_authorizer.operators.id
-  authorization_scopes = ["openid"]
+  authorization_scopes = ["openid", "aws.cognito.signin.user.admin"]
   target               = "integrations/${aws_apigatewayv2_integration.api.id}"
 }
 resource "aws_apigatewayv2_route" "console_preflight" {
@@ -38,3 +40,12 @@ variable "custom_domain_ready" {
   default = false
 }
 output "web_dns_records" { value = module.console.web_dns_records }
+variable "guest_username" {
+  type    = string
+  default = ""
+}
+variable "guest_password" {
+  type      = string
+  default   = ""
+  sensitive = true
+}

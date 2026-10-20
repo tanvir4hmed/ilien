@@ -1,3 +1,4 @@
+import { guestLogin, type GuestConfig } from "./guest-login.js";
 import {
   renderJourney,
   summary,
@@ -15,6 +16,7 @@ type Config = {
   clientId: string;
   redirectUri: string;
   redirectUris?: string[];
+  guest?: GuestConfig | null;
 };
 type Row = Record<string, unknown>;
 const root = document.querySelector<HTMLDivElement>("#app")!;
@@ -278,8 +280,26 @@ function loginScreen(message?: string) {
     ),
   );
   if (message) c.append(notice(message, true));
+  if (config?.guest)
+    guestLogin(
+      c,
+      config.guest,
+      config.clientId,
+      async (accessToken, expiresIn) => {
+        token = accessToken;
+        expires = Date.now() + (expiresIn - 30) * 1000;
+        const me = await api<{ role: string }>("/me");
+        role = me.role;
+        page = "Overview";
+        await show("Overview");
+      },
+    );
   c.append(
-    button("Sign in to workspace", signIn, true),
+    button(
+      config?.guest ? "Sign in with your own account" : "Sign in to workspace",
+      signIn,
+      !config?.guest,
+    ),
     el("p", "Access is restricted to invited workspace members.", "muted"),
   );
   root.append(c);

@@ -22,6 +22,8 @@ jobs:
       TF_VAR_reconciliation_minutes: ${{ vars.RECONCILIATION_MINUTES || '60' }}
       TF_VAR_app_domain: ${{ vars.APP_DOMAIN }}
       TF_VAR_custom_domain_ready: ${{ vars.CUSTOM_DOMAIN_READY || 'false' }}
+      TF_VAR_guest_username: ${{ vars.GUEST_USERNAME }}
+      TF_VAR_guest_password: ${{ secrets.GUEST_PASSWORD }}
       TF_VAR_source_principal_arn: ${{ vars.SOURCE_PRINCIPAL_ARN }}
       TF_VAR_mail_domain: mail.${{ vars.APP_DOMAIN }}
       TF_VAR_whatsapp_phone_number_id: ${{ vars.WHATSAPP_PHONE_NUMBER_ID }}

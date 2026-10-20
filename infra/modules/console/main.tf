@@ -50,7 +50,7 @@ resource "aws_cognito_user_pool_client" "console" {
     id_token      = "minutes"
     refresh_token = "hours"
   }
-  explicit_auth_flows = ["ALLOW_REFRESH_TOKEN_AUTH"]
+  explicit_auth_flows = ["ALLOW_REFRESH_TOKEN_AUTH", "ALLOW_USER_PASSWORD_AUTH"]
 }
 resource "aws_s3_bucket" "console" {
   bucket = "ilien-console-${var.account}-us-east-1"
@@ -79,7 +79,7 @@ resource "aws_cloudfront_response_headers_policy" "console" {
   name = "ilien-console"
   security_headers_config {
     content_security_policy {
-      content_security_policy = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https://*.execute-api.us-east-1.amazonaws.com https://${aws_cognito_user_pool_domain.operators.domain}.auth.us-east-1.amazoncognito.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests"
+      content_security_policy = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https://*.execute-api.us-east-1.amazonaws.com https://cognito-idp.us-east-1.amazonaws.com https://${aws_cognito_user_pool_domain.operators.domain}.auth.us-east-1.amazoncognito.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests"
       override                = true
     }
     content_type_options { override = true }
@@ -158,7 +158,18 @@ resource "aws_s3_object" "config" {
   content_type           = "application/json"
   cache_control          = "no-store"
   server_side_encryption = "AES256"
-  content                = jsonencode({ apiUrl = var.api_url, authDomain = "https://${aws_cognito_user_pool_domain.operators.domain}.auth.us-east-1.amazoncognito.com", clientId = aws_cognito_user_pool_client.console.id, redirectUri = "${local.public_url}/", redirectUris = [for origin in local.allowed_origins : "${origin}/"] })
+  content                = jsonencode({ apiUrl = var.api_url, authDomain = "https://${aws_cognito_user_pool_domain.operators.domain}.auth.us-east-1.amazoncognito.com", clientId = aws_cognito_user_pool_client.console.id, redirectUri = "${local.public_url}/", redirectUris = [for origin in local.allowed_origins : "${origin}/"], cognitoEndpoint = "https://cognito-idp.us-east-1.amazonaws.com", guest = var.guest_username != "" && var.guest_password != "" ? { username = var.guest_username, password = var.guest_password } : null })
+}
+variable "guest_username" {
+  type    = string
+  default = ""
+}
+# Intentionally published only when the owner enables shared guest access.
+# Sensitive suppresses plan/log output; it does not make public config private.
+variable "guest_password" {
+  type      = string
+  default   = ""
+  sensitive = true
 }
 output "url" { value = "https://${aws_cloudfront_distribution.console.domain_name}" }
 output "issuer" { value = "https://cognito-idp.us-east-1.amazonaws.com/${aws_cognito_user_pool.operators.id}" }

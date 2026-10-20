@@ -23,6 +23,12 @@ export async function handler(event: unknown = {}) {
   const input = z
     .strictObject({
       operator: z.strictObject({ subject: z.guid() }).optional(),
+      additionalOperator: z
+        .strictObject({
+          subject: z.guid(),
+          role: z.enum(["admin", "operator", "viewer"]),
+        })
+        .optional(),
     })
     .parse(event);
   const secretId = process.env.APP_SECRET_ARN!;
@@ -169,6 +175,27 @@ export async function handler(event: unknown = {}) {
           param("tenant", process.env.TENANT_ID!),
           param("source", process.env.SOURCE_ID!),
           param("subject", input.operator.subject),
+        ],
+        tx,
+      );
+    }
+    if (input.additionalOperator) {
+      const existing = rows<{ connection_id: string }>(
+        await query(
+          "SELECT connection_id FROM operator_memberships WHERE subject=CAST(:subject AS uuid) FOR UPDATE",
+          [param("subject", input.additionalOperator.subject)],
+          tx,
+        ),
+      );
+      if (existing.some((m) => m.connection_id !== process.env.SOURCE_ID))
+        throw new Error("Operator already belongs to another workspace");
+      await query(
+        "INSERT INTO operator_memberships(tenant_id,connection_id,subject,role,enabled) VALUES(CAST(:tenant AS uuid),CAST(:source AS uuid),CAST(:subject AS uuid),:role,true) ON CONFLICT(tenant_id,subject) DO UPDATE SET role=EXCLUDED.role,enabled=true",
+        [
+          param("tenant", process.env.TENANT_ID!),
+          param("source", process.env.SOURCE_ID!),
+          param("subject", input.additionalOperator.subject),
+          param("role", input.additionalOperator.role),
         ],
         tx,
       );
