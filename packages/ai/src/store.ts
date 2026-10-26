@@ -36,6 +36,7 @@ import {
 import { pausedFor } from "../../operations/src/controls.js";
 import { authoredReplyText } from "../../channels/src/text.js";
 import { autonomousGate } from "./autonomy.js";
+import { caseHeld } from "../../operations/src/supervision.js";
 function fail(s: string): never {
   throw new CoordinationError(s);
 }
@@ -437,6 +438,7 @@ export async function executeAutonomousRun(source: Source, id: string) {
     if (run.state === "executed") return { state: "executed", duplicate: true };
     if (run.state !== "proposed" || !run.proposal || !run.context) return { state: run.state };
     if (await pausedFor(source, "agent", tx)) fail("agent_processing_paused");
+    if (await caseHeld(run.case_id, tx)) fail("case_integrity_review_required");
     const fresh = await buildContext(source, run, tx), original = decode(run.context);
     if (fresh.executionMode !== "autonomous" || fresh.policyHash !== original.policyHash)
       fail("ai_autonomous_configuration_changed");
