@@ -143,7 +143,13 @@ function advance(
   const wasBlocked = state.status === "blocked";
   if (["completed", "cancelled", "handed_off"].includes(state.status))
     return { contacts };
-  if (state.awaitingPlan) return { contacts };
+  if (state.awaitingPlan) {
+    if(Date.parse(state.deadline) <= Date.parse(now)) {
+      state.status="blocked";
+      return {contacts,result:outcome(state,true)};
+    }
+    return { contacts };
+  }
   for (const o of state.obligations) {
     const reporterAllowed =
       !o.reply ||
@@ -715,6 +721,9 @@ export function nextWake(
     Date.parse(state.deadline) <= Date.parse(now)
   )
     return null;
+  // Initial planning and decision assembly are event-driven, not one-second timers.
+  // A due root/question without a proposal must not continually invalidate AI runs.
+  if(state.awaitingPlan) return state.deadline;
   const times = [Date.parse(state.deadline)];
   for (const o of state.obligations) {
     if (o.reply)
@@ -728,6 +737,7 @@ export function nextWake(
       state.status !== "paused" &&
       !state.takeoverBy &&
       o.status === "waiting" &&
+      (o.kind !== "decision" || !!o.proposal) &&
       o.dependencies.every((id) => satisfied(node(state, id)))
     )
       times.push(Date.parse(o.nextContactAt));

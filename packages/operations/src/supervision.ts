@@ -72,7 +72,14 @@ function inspect(row: Projection) {
         o.dependencies.some((id) => !byId.get(id) || !satisfied(byId.get(id)!)))
     )
       issues.push("unverified_or_stale_requirement");
-    if(o.status === "accepted" && (!state.autonomous || o.acceptance!=="responsible_reply" || !o.reply || o.reply.subjectRevision!==state.subject.revision || o.dependencies.some(id=>!byId.get(id) || !satisfied(byId.get(id)!)) || (o.kind==="completion" && (o.reply.progress!=="ready" || o.requiredFacts?.some(key=>!o.reply!.facts?.some(f=>f.key===key)))))) issues.push("invalid_accepted_requirement");
+    if (o.status === "accepted" && (
+      !state.autonomous || o.acceptance !== "responsible_reply" || !o.reply ||
+      o.reply.subjectRevision !== state.subject.revision ||
+      o.dependencies.some(id => !byId.get(id) || !satisfied(byId.get(id)!)) ||
+      o.requiredFacts?.some(key => !o.reply!.facts?.some(f => f.key === key)) ||
+      (o.kind === "completion" && o.reply.progress !== "ready") ||
+      (o.kind === "decision" && (!o.proposal || o.decision?.choice !== "approve" || o.decision.proposalHash !== o.proposal.sha256))
+    )) issues.push("invalid_accepted_requirement");
   }
   const visited = new Set<string>(),
     path = new Set<string>();

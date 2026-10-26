@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { seedCase, textilePolicy } from "../../domain-packs/src/textile.js";
 import { sourceEventSchema } from "../../contracts/src/validation.js";
-import { initialize, transition, resolveActor } from "../src/engine.js";
+import { initialize, transition, resolveActor, nextWake } from "../src/engine.js";
 import type { CaseState, Operation } from "../src/types.js";
 import { renderProfile } from "../../channels/src/profiles.js";
 import type { Delivery } from "../../channels/src/intents.js";
@@ -132,4 +132,15 @@ test("an uncertain proposed reply becomes a bounded clarification, never accepte
  c.state=apply(s,"coordinator",p.operation).state;
  const escalated=clarificationFallback(c,{disposition:"review",operation:null,reason:"Still uncertain",citations:[],uncertainties:["Unknown"]});
  assert.equal(autonomousGate(c,escalated).type,"source_query");
+});
+
+test("planning and proposal assembly wait for events rather than invalidating model work with one-second ticks",()=>{
+ let s=fresh();assert.equal(nextWake(s,textilePolicy,now),s.deadline);
+ const expired=transition(s,textilePolicy,null,{type:"tick"},"clock",new Date(Date.parse(s.deadline)+1).toISOString());
+ assert.equal(expired.state.status,"blocked");assert.equal(expired.result?.terminal,true);
+ s=apply(s,"coordinator",{type:"route_initial",obligationId:"stock",group:"stores",question:"Confirm stock"}).state;
+ s=answer(s,"stock","800 units",[{key:"usable_quantity",value:"800",quote:"800 units"}]).state;
+ s=answer(s,"impact","16:00",[{key:"completion_time",value:"16:00",quote:"16:00"}]).state;
+ assert.equal(s.obligations[2]!.proposal,undefined);
+ assert.ok(Date.parse(nextWake(s,textilePolicy,now)!)>Date.parse(now)+1000);
 });
