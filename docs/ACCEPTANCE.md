@@ -1,5 +1,18 @@
 # Targeted acceptance evidence
 
+## Latest checked release —26 October2026
+
+Code719889c deployed successfully in GitHub Actions40289739578. All59 deterministic checks passed: AI12,channels16,simulation3,autonomy19,console9. Chrome confirmed guest sign-in, clean case tabs/settings, full map visibility and reload restoration without entering credentials again. The24-hour boundary is covered by a controlled-clock test, not a24-hour soak.
+
+A fresh partial-dispatch rehearsal completed with **four real SES/Gmail reply turns**, including a deadline-only continuation and conditional approval clarification. Original quantity evidence/expiry remained separate from the later deadline. The same exact proposal hash survived clarification and was explicitly approved; current communication result was published through SNS. A simulated source validated quantities and decision hash, acknowledged the exact result and replayed the receipt idempotently.
+
+**Transport limit:** the Stores WhatsApp leg was blocked before send by the session/template gate. Its800-metre allocation was an explicitly labelled synthetic participant command. An attempted email alternate correctly rejected reusing another actor's address. This is a hybrid acceptance, not a successful real WhatsApp round trip. No shipment or external factory action was executed. The new source case observed one initial model run and no duplicate source query; historical failed runs/source clarifications remain visible.
+
+The latest real Nova Pro dispatch exercise with simulated transport completed seven transitions,36440 input/1070 output tokens. Original fact citations and source identifiers are supplied from application-controlled provenance; exact numeric checks and finite context/tool/token limits remain enforced.
+
+## Earlier acceptance chronology
+
+
 Checked 20 October 2026 against the deployed AWS runtime. This report distinguishes real transport, simulated factory information and remaining external blockers. It is not a claim that every failure mode or model response has been evaluated.
 
 ## Exercised conversation

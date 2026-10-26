@@ -8,7 +8,7 @@ Use your personal workspace account or the owner-enabled shared guest account. *
 
 Open **Cases → Start case**. **Partial dispatch coordination** exercises email clarification, a WhatsApp allocation question and return-to-email approval; see the [scenario](COMMUNICATION_SCENARIO.md). **Production coordination** asks for order reference, material batch, amount, unit and needed-by time; it tracks quantity, schedule, approval and actual readiness. **Communication request** asks for a question, responsible team and response type. Other scenarios include legacy material readiness and revision acknowledgement. Source events are synthetic. You do not need to write code or JSON.
 
-Press **Start request & open map** once. ILIEN accepts the event and prepares the case asynchronously. It opens the map when ready. If delayed, use **Check and open map**; do not start a second request to retry the same one. Inputs without a configured workflow say **Needs routing review** rather than displaying an invented map.
+Press **Start request & open map** once. ILIEN accepts the event and prepares the case asynchronously. It opens the map when ready. If delayed, use **Check and open map**; do not start a second request to retry the same one. The case due time is the coordination response window; **Needed by** and a participant-reported dispatch deadline are separate business dates. Inputs without a configured workflow say **Needs routing review** rather than displaying an invented map.
 
 ## 3. Find an existing map
 
