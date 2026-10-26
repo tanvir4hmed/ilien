@@ -650,10 +650,12 @@ async function casePage(id: string) {
       const next = await api<Journey>(`/cases/${id}/journey`);
       if (disposed) return;
       const changed = next.state.revision !== state.revision;
-      if(changed && state.autonomous) { preferredJourneyView=mapHost.dataset.view ?? "Workflow map"; await casePage(id); return; }
       const changedHistory =
         JSON.stringify({ ...current, observedAt: "" }) !==
         JSON.stringify({ ...next, observedAt: "" });
+      // Provider receipts and source publishing change without a case revision.
+      // Keep the outcome cards and observer map consistent with the same snapshot.
+      if(changedHistory && state.autonomous) { preferredJourneyView=mapHost.dataset.view ?? "Workflow map"; await casePage(id); return; }
       current = next;
       if (changedHistory) draw();
       status.textContent = changed
