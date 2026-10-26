@@ -61,8 +61,8 @@ export type ProductConfiguration = z.infer<typeof configurationSchema>;
 export const defaultConfiguration: ProductConfiguration = {
   workflows: [],
   messageProfiles:[
-    {group:"stores",channel:"whatsapp",format:"human",version:"stores-v1",language:"en",style:"concise",sourceFields:["siteId","materialLotId","requiredQuantity","neededBy"],factKeys:["usable_quantity","available_quantity","completion_time"],fields:[]},
-    ...["production","planning","quality","procurement"].map(group=>({group,channel:"email" as const,format:"human" as const,version:"department-v1",language:"en" as const,style:"formal" as const,sourceFields:["siteId","materialLotId","requiredQuantity","neededBy"],factKeys:["usable_quantity","available_quantity","completion_time","completion_reference","delay_days"],fields:[]})),
+    {group:"stores",channel:"whatsapp",format:"human",version:"stores-v1",language:"en",style:"concise",sourceFields:["siteId","materialLotId","requiredQuantity","neededBy"],factKeys:["usable_quantity","available_quantity","completion_time","passing_quantity","quarantined_quantity","dispatch_deadline"],fields:[]},
+    ...["production","planning","quality","procurement"].map(group=>({group,channel:"email" as const,format:"human" as const,version:"department-v1",language:"en" as const,style:"formal" as const,sourceFields:["siteId","materialLotId","requiredQuantity","neededBy"],factKeys:["usable_quantity","available_quantity","completion_time","completion_reference","delay_days","passing_quantity","quarantined_quantity","dispatch_deadline"],fields:[]})),
   ],
   automaticFallback: false,
   whatsappTemplate: null,

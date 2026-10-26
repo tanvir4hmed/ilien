@@ -28,7 +28,7 @@ const email = new SESv2Client({ maxAttempts: 1 });
 
 export function render(d: Delivery) {
   if(d.request.profile) return renderProfile(d,d.request.profile);
-  if(d.request.autonomous || d.request.facts?.length || d.request.contact.kind==="decision_notice") return renderProfile(d,{group:"configured",channel:d.channel,format:"human",version:"default-v1",language:"en",style:"concise",sourceFields:Object.keys(d.request.sourceContext ?? {}),factKeys:["available_quantity","usable_quantity","completion_time","completion_reference","delay_days","quantity","unit","status"],fields:[]});
+  if(d.request.autonomous || d.request.facts?.length || d.request.contact.kind==="decision_notice") return renderProfile(d,{group:"configured",channel:d.channel,format:"human",version:"default-v1",language:"en",style:"concise",sourceFields:Object.keys(d.request.sourceContext ?? {}),factKeys:["available_quantity","usable_quantity","completion_time","completion_reference","delay_days","passing_quantity","quarantined_quantity","dispatch_deadline","quantity","unit","status"],fields:[]});
   const r = d.request;
   const labels: Record<string, string> = {
     siteId: "Factory",

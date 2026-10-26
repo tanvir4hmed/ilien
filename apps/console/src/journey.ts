@@ -89,6 +89,7 @@ export function renderJourney(
   host: HTMLElement,
   data: Journey,
   evidence: (id: string) => Promise<void>,
+  options: {mode?:"Workflow map"|"Communication flow"|"Activity";compact?:boolean} = {},
 ) {
   host.replaceChildren();
   const selected = host.dataset.view || "Workflow map";
@@ -96,6 +97,7 @@ export function renderJourney(
     view = node("div"),
     inspector = node("section", "", "journey-inspector");
   inspector.setAttribute("aria-live", "polite");
+  controls.hidden=!!options.mode;
   host.append(
     controls,
     node(
@@ -334,6 +336,7 @@ export function renderJourney(
     const fit = node("button", "Fit map to screen"),
       full = node("button", "Actual size"),
       focus = node("button", "Focus on pending work");
+    fit.dataset.fitMap="true";
     fit.onclick = () =>
       canvas.style.setProperty(
         "zoom",
@@ -353,11 +356,12 @@ export function renderJourney(
       canvas.classList.toggle("focus-pending");
       focus.classList.toggle("selected");
     };
-    tools.append(fit, full, focus);
+    tools.append(fit);
+    if(!options.compact)tools.append(full,focus);
     requestAnimationFrame(() => {
       if (canvas.isConnected) fit.click();
     });
-    view.append(tools);
+    view.prepend(tools);
     view.append(
       node(
         "p",
@@ -575,6 +579,7 @@ export function renderJourney(
     }
     view.append(list);
   }
+  if(options.mode){host.dataset.view=options.mode;({"Workflow map":workflow,"Communication flow":communication,Activity:timeline})[options.mode]();return;}
   const choices = [
     tab("Workflow map", workflow),
     tab("Communication flow", communication),

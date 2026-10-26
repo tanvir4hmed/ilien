@@ -743,3 +743,20 @@ blockquote {
   background: #eef8ff;
 }
 .journey-canvas.focus-pending .journey-node[data-status="accepted"] { opacity: .45; }
+
+/* The console observes a communication service; navigation follows the case. */
+[hidden] { display: none !important; }
+.workspace-tabs { display:flex; flex-wrap:wrap; gap:6px; border-bottom:1px solid #d8e2e5; padding:0 0 10px; margin:0 0 18px; position:sticky; top:0; background:#f4f6f8; z-index:4; }
+.workspace-tabs button { border-color:transparent; background:transparent; }
+.workspace-tabs button.active { color:#fff; background:#155950; border-color:#155950; }
+.workspace-panel { min-width:0; }
+.case-heading { margin-bottom:14px; }
+.case-heading > p:first-of-type { max-width:1000px; }
+.case-controls { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:12px; padding-top:12px; border-top:1px solid #e3e9ec; }
+.case-controls label { display:flex; align-items:center; gap:6px; margin:0; }
+.case-controls input[type=checkbox] { width:auto; }
+.journey-inspector:empty { display:none; }
+.connection-state { min-height:230px; }
+.connection-state::after { content:''; display:block; height:4px; background:linear-gradient(90deg,#15665b,#dcebc4,#15665b); background-size:200% 100%; animation:connection-progress 1.5s linear infinite; border-radius:4px; margin-top:24px; }
+@keyframes connection-progress { to {background-position:-200% 0;} }
+@media (prefers-reduced-motion:reduce) {.connection-state::after {animation:none;}}

@@ -259,7 +259,7 @@ async function persist(
             origin: "simulated",
             scope: "communication_only",
             status: state.status === "completed" ? "done" : state.status === "active" ? "in_progress" : state.status,
-            data: state.obligations.filter(o=>o.reply).map(o=>({requirementId:o.id,department:o.group,status:o.status,acceptance:o.acceptance ?? "independent",progress:o.reply!.progress,timeBasis:o.reply!.timeBasis ?? "observed",reportedAt:o.reply!.observedAt,validUntil:o.reply!.validUntil,facts:(o.reply!.facts ?? []).map(({key,value,unit})=>({key,value,unit})),evidenceId:o.reply!.evidenceId})),
+            data: state.obligations.filter(o=>o.reply).map(o=>({requirementId:o.id,department:o.group,status:o.status,acceptance:o.acceptance ?? "independent",progress:o.reply!.progress,timeBasis:o.reply!.timeBasis ?? "observed",reportedAt:o.reply!.observedAt,validUntil:o.reply!.validUntil,facts:(o.reply!.facts ?? []).map(({key,value,unit,evidenceId,reportedAt,validUntil})=>({key,value,unit,evidenceId,reportedAt,validUntil})),evidenceId:o.reply!.evidenceId})),
             sourceQuestions: (state.sourceQuestions ?? []).filter(q=>!q.answer).map(q=>({questionId:q.id,question:q.question})),
           }),
         ),

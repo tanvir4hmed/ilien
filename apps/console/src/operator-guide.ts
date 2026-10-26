@@ -21,8 +21,9 @@ export function scenarioFields(
   }
   const subject = event.subject as Row,
     payload = event.payload as Row;
+  const dispatch=event.eventType === "manufacturing.dispatch_exception_requested";
   const production=event.eventType === "manufacturing.production_coordination_requested";
-  const material = production ||
+  const material = dispatch || production ||
     event.eventType === "manufacturing.material_readiness_requested" ||
     event.eventType === "planning.upstream_supply_shifted";
   const revision = event.eventType === "plm.techpack_approved";
@@ -43,7 +44,7 @@ export function scenarioFields(
     readers: (() => void)[] = [];
   const group = node("section", "", "scenario-fields");
   host.append(group);
-  const heading = production ? "Coordinate quantity, timeline and production readiness" : material
+  const heading = dispatch ? "Coordinate a partial-dispatch exception" : production ? "Coordinate quantity, timeline and production readiness" : material
     ? "Check material availability"
     : revision
       ? "Confirm a specification change"
@@ -52,7 +53,7 @@ export function scenarioFields(
     node("h3", heading),
     node(
       "p",
-      production ? "ILIEN will contact stores, clarify the production timeline, obtain planning approval and track production-ready status. Observe the map; no operator approval is needed." : material
+      dispatch ? "Quality email → deadline clarification → stores WhatsApp → quality email approval → source result. Participant replies determine clarification and extra prerequisites. A blocked channel stays visible." : production ? "ILIEN will contact stores, clarify the production timeline, obtain planning approval and track production-ready status. Observe the map; no operator approval is needed." : material
         ? "Enter an order and the material you need. ILIEN will ask stores, quality, planning and procurement for information."
         : revision
           ? "Identify the specification and version that people need to acknowledge."
@@ -190,7 +191,7 @@ export function scenarioFields(
 export function userGuide(parent: HTMLElement, go: (page: string) => void) {
   const intro = node("section", "", "card");
   intro.append(
-    node("h2", "Your first request, step by step"),
+    node("h2", "Observe a communication case"),
     node(
       "p",
       "ILIEN brings conversations together around a request. It collects information and decisions; it does not operate factory systems.",
@@ -200,11 +201,11 @@ export function userGuide(parent: HTMLElement, go: (page: string) => void) {
   for (const [title, body] of [
     [
       "Start a scenario",
-      "Choose a material, specification or maintenance scenario. The source event is simulated. Fill the short form and press Start request & open map.",
+      "Open Cases → Start case. Choose the partial-dispatch rehearsal or another source scenario. Source input is simulated; connected channel messages are real when enabled.",
     ],
     [
       "Open the request map",
-      "ILIEN prepares the request in the background. Use Open live map when ready. Existing requests are under Requests → Open map & request. If routing is not configured, you will see Needs routing review instead.",
+      "The Case list is the single list of coordination cases. Start case contains the source form, not a second request list. Unmapped events appear separately under Preparing or unmapped source requests.",
     ],
     [
       "Read the workflow",
@@ -212,15 +213,15 @@ export function userGuide(parent: HTMLElement, go: (page: string) => void) {
     ],
     [
       "Follow each conversation",
-      "Switch to Communication flow to see recorded requests, outgoing messages, provider receipts and incoming replies. Activity shows the history in time order. Turn on Live updates to check for new activity while this page is visible.",
+      "Use the case tabs: Flow shows the dynamic map; Messages shows channel sends and replies; Outcome shows collected information and source receipt; History keeps evidence and AI decisions. Live controls stay together in the case header.",
     ],
     [
       "Choose practice or real communication",
-      "Practice a response records clearly labelled simulated information. For real messages, an admin first connects a consented person in Settings → People & channels. Then open a case, select a request and recipient, and confirm Send real message.",
+      "An admin connects consented recipients under Settings → People & channels. Autonomous cases send questions and interpret replies without internal operator approval. Legacy practice and recovery controls remain under History → Advanced.",
     ],
     [
       "Check the outcome",
-      "An answer must be verified before it satisfies a required task. Missing answers, expired deadlines or unavailable recipients can block a request. The outcome is sent back to its source; source acknowledgement is a separate step.",
+      "Accepted means the mission’s responsible-person rule was met. Verified means an independent check was required and completed. Missing evidence or unavailable channels remains unresolved. Outcome and source acknowledgement are separate records.",
     ],
   ]) {
     const item = node("li");
@@ -233,7 +234,6 @@ export function userGuide(parent: HTMLElement, go: (page: string) => void) {
   for (const [title, page] of [
     ["Start a scenario", "Simulator"],
     ["Open requests", "Cases"],
-    ["View tasks", "Tasks"],
   ]) {
     const b = node("button", title);
     b.onclick = () => go(page!);
@@ -253,6 +253,7 @@ export function userGuide(parent: HTMLElement, go: (page: string) => void) {
       "No suitable workflow is configured for this event or required information is missing.",
     ],
     ["Waiting", "A person or prerequisite has not answered yet."],
+    ["Accepted", "An authorized responsible reply met this mission’s configured rule. This is distinct from independent verification."],
     [
       "Answered",
       "Information was reported, but it has not yet passed verification.",
@@ -271,7 +272,7 @@ export function userGuide(parent: HTMLElement, go: (page: string) => void) {
     ],
     [
       "Completed",
-      "The required current evidence is verified. Source receipt/acceptance is still shown separately.",
+      "The mission’s required acceptance criteria were met at completion. Source receipt is shown separately; historical evidence retains its validity timestamps.",
     ],
   ]) {
     dl.append(node("dt", word), node("dd", meaning));
@@ -287,11 +288,11 @@ export function userGuide(parent: HTMLElement, go: (page: string) => void) {
     ),
     node(
       "p",
-      "Open Incoming messages to see every supported WhatsApp and email receipt. An administrator can connect a new sender to an authorised person with recorded consent. Replies to a sent message keep their request reference. A recognised sender with exactly one current outstanding request can reply naturally; several outstanding requests require an explicit reference or operator selection. Greetings open a channel conversation without answering a task.",
+      "Read each case’s Messages tab for its WhatsApp/email conversation. Settings → Unassigned messages is only for receipts that lack a case. Several concurrent cases require a thread or reference; no arbitrary match is guessed. A phone mentioned in an email does not automatically become an authorised recipient.",
     ),
     node(
       "p",
-      "Autonomous AI can apply supported, grounded steps without an internal operator click. Unresolved interpretation needs clarification; automatic clarification conversations are still being developed. Review mode requires checking cited evidence before approval. Opening a map does not run AI.",
+      "ILIEN can clarify missing information, correct an eligible department, introduce a prerequisite and relay a current business approval. Ambiguity does not become approval. Opening the observer map does not run AI. Browser sign-in lasts up to24 hours with short-lived access tokens refreshed automatically; signing out ends the local session.",
     ),
   );
   parent.append(limits);

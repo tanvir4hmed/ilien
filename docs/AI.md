@@ -115,3 +115,7 @@ Operator identity now uses Cognito JWT plus server-side source membership; see [
 ## Authored messages and immutable originals
 
 Full incoming text, including quoted email history, remains immutable evidence. A separately marked authored-message view removes recognised quoted history before interpretation, so an old request is not treated as a new instruction. Original evidence hashes remain available. Citation grounding permits whitespace differences caused by MIME wrapping; it preserves words, punctuation, quantities and negation. Unknown formatting or an unsupported interpretation still requires review. A deterministic gate rejects duplicate questions for the same department.
+
+## Partial replies and continuation
+
+Prompt `coordination-autonomy-11` asks the model to record clearly reported partial facts even when another required field is absent. Application code merges only unexpired facts from the same actor and subject revision, retaining each original evidence ID, report time and expiry. A later date-only reply cannot refresh earlier quantity evidence. Correction/withdrawal, rerouting and source changes invalidate retained facts and dependent decisions. A conditional approval triggers clarification of the existing exact proposal and does not create an approval. Proposal quantities and dates require supporting citations, including quarantine/reservation conditions. These controls bound effects; they do not establish universal semantic accuracy.

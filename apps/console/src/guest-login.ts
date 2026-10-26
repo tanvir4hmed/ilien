@@ -1,10 +1,11 @@
 import { node } from "./journey.js";
+import type { SignInTokens } from "./session.js";
 export type GuestConfig = { username: string; password: string };
 export function guestLogin(
   parent: HTMLElement,
   guest: GuestConfig,
   clientId: string,
-  authenticated: (accessToken: string, expiresIn: number) => Promise<void>,
+  authenticated: (tokens: SignInTokens) => Promise<void>,
 ) {
   const section = node("section", "", "guest-login"),
     intro = node(
@@ -97,6 +98,7 @@ export function guestLogin(
         body: JSON.stringify(payload),
         credentials: "omit",
         cache: "no-store",
+        signal: AbortSignal.timeout(10000),
       },
     );
     const data = await response.json();
@@ -153,7 +155,10 @@ export function guestLogin(
             throw new Error("Sign-in response was incomplete. Please retry.");
           password.value = "";
           code.value = "";
-          await authenticated(result.AccessToken, result.ExpiresIn);
+          form.hidden = true;
+          intro.textContent = "Signed in. Connecting to the communication service…";
+          use.hidden = true;
+          await authenticated({accessToken:result.AccessToken,refreshToken:result.RefreshToken,expiresIn:result.ExpiresIn});
           return;
         }
         if (data.ChallengeName === "SOFTWARE_TOKEN_MFA" && data.Session) {
@@ -175,6 +180,9 @@ export function guestLogin(
           "This account needs an additional setup step. Use your own account sign-in to complete it.",
         );
       } catch (error) {
+        form.hidden = false;
+        use.hidden = false;
+        intro.textContent = "Choose the workspace account and try signing in again.";
         feedback.textContent =
           error instanceof Error ? error.message : "Sign-in failed.";
       } finally {

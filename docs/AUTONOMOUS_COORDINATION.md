@@ -56,3 +56,7 @@ Activation, meaningful state changes and correlated replies trigger bounded mode
 Regression checks cover dependency completion, missing facts, corrections/stale approvals, clarification, policy-scoped rerouting, source questions, typed email, fabricated quantity and conditional approval. A real Nova Pro evaluation completed the production scenario with simulated transport. This demonstrates that scenario, not general reasoning reliability. Live transport outcomes are separate; see [acceptance evidence](ACCEPTANCE.md).
 
 Source input and factory actions are simulated; connected SES and AWS Social Messaging exchanges use real transport. Account restrictions, recipient verification and consent remain external prerequisites. Health responses and SDK calls alone are not proof of delivery or completed business outcomes. Per-component database credentials, broader multilingual/adversarial evaluation and customer-specific retention controls remain production hardening work.
+
+## Partial dispatch example
+
+`manufacturing.dispatch_exception_requested` adds a bounded inspection→allocation→decision pattern using existing groups and channels. Missing inspection facts can arrive over multiple emails, then Stores allocation changes the proposal, and Quality receives the exact business approval request. See the [exchange and adversarial probes](COMMUNICATION_SCENARIO.md). This does not execute dispatch or assert all catalogue events have deep workflows.

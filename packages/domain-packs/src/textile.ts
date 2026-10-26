@@ -82,6 +82,14 @@ export function template(event: SourceEvent): {
   branches: { id?: string; dependencies?: string[]; requiredFacts?:string[]; acceptance?: "responsible_reply"|"independent"; proposalStatement?: string; group: string; kind: string; question: string }[];
 } | null {
   if (event.payloadVersion !== "1.0" || !event.subject.revision) return null;
+  if(event.eventType === "manufacturing.dispatch_exception_requested") {
+    if(!materialPayload.safeParse(event.payload).success)return null;
+    return {workflow:"dispatch-exception-v1",autonomous:true,goal:"Coordinate an inspection exception, confirmed allocation and an exact authorized partial-dispatch decision; return the result to the requesting source without executing shipment.",branches:[
+      {id:"inspection",group:"quality",kind:"fact",requiredFacts:["passing_quantity","quarantined_quantity","dispatch_deadline"],question:"Report passing and quarantined quantities for the referenced lot and the exact dispatch deadline with timezone. Preserve limitations; ask for missing information rather than assuming release."},
+      {id:"allocation",group:"stores",kind:"fact",dependencies:["inspection"],requiredFacts:["usable_quantity"],question:"Using the reported inspection disposition and deadline, confirm the usable quantity actually available for allocation now. Keep reserved or unavailable material separate. This is an information request, not a stock release command."},
+      {id:"approval",group:"quality",kind:"decision",dependencies:["allocation"],question:"Approve or reject the exact partial-dispatch proposal and its quantity, deadline and quarantine conditions. Conditional agreement requires clarification. Approval is reported to the source; ILIEN does not execute shipment."},
+    ]};
+  }
   if (event.eventType === "manufacturing.production_coordination_requested") {
     if(!materialPayload.safeParse(event.payload).success) return null;
     return {workflow:"production-coordination-v1",autonomous:true,goal:"Coordinate available quantity, schedule impact and an authorized plan; track production-ready evidence and return structured progress to the source.",branches:[

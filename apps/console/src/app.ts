@@ -1,5 +1,6 @@
 import { scenarioFields, userGuide } from "./operator-guide.js";
 import { guestLogin, type GuestConfig } from "./guest-login.js";
+import { WorkspaceSession, SessionError, SESSION_KEY } from "./session.js";
 import { authoredReplyText } from "../../../packages/channels/src/text.js";
 import {
   renderJourney,
@@ -25,22 +26,23 @@ type Config = {
 type Row = Record<string, unknown>;
 const root = document.querySelector<HTMLDivElement>("#app")!;
 let config: Config,
-  token = "",
-  expires = 0,
+  session: WorkspaceSession,
   role = "viewer",
   page = "Overview";
 let content: HTMLElement;
 let stopLive: (() => void) | undefined;
 let preferredJourneyView = "Workflow map";
+let preferredCaseTab = "Flow";
+let currentCaseId="";
 const pageLabels: Record<string, string> = {
   Overview: "Home",
-  Cases: "Requests",
+  Cases: "Cases",
   Tasks: "Tasks",
-  Simulator: "Start a scenario",
+  Simulator: "Cases",
   Activity: "Activity",
   Settings: "Settings",
   Channels: "People & channels",
-  Inbox: "Incoming messages",
+  Inbox: "Unassigned messages",
   Knowledge: "Reference library",
   Operations: "Advanced operations",
   Help: "User guide",
@@ -61,6 +63,24 @@ function fold(title: string, parent: HTMLElement) {
   d.append(el("summary", title));
   parent.append(d);
   return d;
+}
+function panelTabs(parent:HTMLElement,names:string[],selected=names[0]!,change?:(name:string)=>void) {
+  const nav=el("div","","workspace-tabs"),panels=new Map<string,HTMLElement>(),buttons=new Map<string,HTMLButtonElement>(),id=`tabs-${crypto.randomUUID()}`;
+  nav.setAttribute("role","tablist");parent.append(nav);
+  const activate=(name:string,notify=true)=>{for(const [key,panel] of panels){panel.hidden=key!==name;const b=buttons.get(key)!;b.setAttribute("aria-selected",String(key===name));b.tabIndex=key===name?0:-1;b.classList.toggle("active",key===name);}if(notify)change?.(name);};
+  for(const [index,name] of names.entries()){const b=button(name,()=>activate(name));b.id=`${id}-tab-${index}`;b.setAttribute("role","tab");const panel=el("section","","workspace-panel");panel.id=`${id}-panel-${index}`;panel.setAttribute("role","tabpanel");panel.setAttribute("aria-labelledby",b.id);b.setAttribute("aria-controls",panel.id);b.onkeydown=event=>{const offset=event.key==="ArrowRight"?1:event.key==="ArrowLeft"?-1:0;const next=event.key==="Home"?0:event.key==="End"?names.length-1:offset?(index+offset+names.length)%names.length:-1;if(next>=0){event.preventDefault();activate(names[next]!);buttons.get(names[next]!)?.focus();}};panels.set(name,panel);buttons.set(name,b);nav.append(b);parent.append(panel);}
+  activate(panels.has(selected)?selected:names[0]!,false);return {panels,activate};
+}
+
+function workspaceTabs(active:string) {
+  const nav=el("div","","workspace-tabs");nav.setAttribute("role","tablist");
+  for(const [name,title] of [["Cases","Case list"],["Simulator","Start case"]]) {const b=button(title!,()=>show(name!));b.setAttribute("role","tab");b.setAttribute("aria-selected",String(name===active));b.classList.toggle("active",name===active);nav.append(b);}
+  content.append(nav);
+}
+function tuningTabs(active:string) {
+  const nav=el("div","","workspace-tabs");nav.setAttribute("role","tablist");
+  for(const [name,title] of [["Channels","People & channels"],["Settings","Rules & profiles"],["Knowledge","Knowledge"],["Operations","Recovery"],["Inbox","Unassigned messages"]]){const b=button(title!,()=>show(name!));b.setAttribute("role","tab");b.setAttribute("aria-selected",String(name===active));b.classList.toggle("active",name===active);nav.append(b);}
+  content.append(nav);
 }
 function required(n: HTMLInputElement | HTMLTextAreaElement, title: string) {
   if (!n.value.trim()) throw new Error(`Please enter ${title.toLowerCase()}.`);
@@ -196,15 +216,12 @@ function table(
   parent.append(wrap);
 }
 async function api<T = unknown>(path: string, body?: unknown): Promise<T> {
-  if (!token || Date.now() > expires) {
-    token = "";
-    loginScreen();
-    throw new Error("Session expired. Sign in again.");
-  }
+  let access:string;
+  try {access=await session.accessToken();}catch(error){if(error instanceof SessionError && error.ended){stopLive?.();loginScreen(error.message);}throw error;}
   const request = () => fetch(`${config.apiUrl}/console/v1${path}`, {
     method: body === undefined ? "GET" : "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${access}`,
       ...(body === undefined ? {} : { "Content-Type": "application/json" }),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -212,6 +229,7 @@ async function api<T = unknown>(path: string, body?: unknown): Promise<T> {
     credentials: "omit",
   });
   let response = await request();
+  if(body===undefined && response.status===401) {access=await session.accessToken(true);response=await request();}
   // Aurora can resume after inactivity. Retry reads only; never replay a mutation.
   for(let attempt=0;body===undefined && response.status===503 && attempt<3;attempt++) {
     await new Promise(resolve=>setTimeout(resolve,2000*(attempt+1)));
@@ -270,9 +288,10 @@ async function signIn() {
   }).toString();
   location.assign(url);
 }
-function signOut() {
-  token = "";
-  expires = 0;
+async function signOut() {
+  stopLive?.();
+  connectingScreen("Signing out…");
+  await session.logout();
   sessionStorage.removeItem("ilien-pkce");
   const url = new URL("/logout", config.authDomain);
   url.search = new URLSearchParams({
@@ -280,6 +299,23 @@ function signOut() {
     logout_uri: config.redirectUri,
   }).toString();
   location.assign(url);
+}
+function connectingScreen(message="Signed in. Opening the communication workspace…") {
+  root.replaceChildren();
+  const c=el("main","","card login connection-state");
+  c.append(el("div","ILIEN","brand"),el("h1","Connecting workspace"),el("p",message,"muted"));
+  c.setAttribute("role","status");root.append(c);
+}
+async function openWorkspace() {
+  connectingScreen();
+  try {
+    const me=await api<{role:string}>("/me");role=me.role;
+    await show("Cases");
+  }catch(error){
+    if(error instanceof SessionError && error.ended)return;
+    root.replaceChildren();const c=el("main","","card login");
+    c.append(el("h1","Workspace connection paused"),notice(error instanceof Error?error.message:"Unable to connect",true),button("Retry connection",openWorkspace,true),button("Sign out",signOut));root.append(c);
+  }
 }
 function loginScreen(message?: string) {
   root.replaceChildren();
@@ -299,13 +335,9 @@ function loginScreen(message?: string) {
       c,
       config.guest,
       config.guestClientId ?? config.clientId,
-      async (accessToken, expiresIn) => {
-        token = accessToken;
-        expires = Date.now() + (expiresIn - 30) * 1000;
-        const me = await api<{ role: string }>("/me");
-        role = me.role;
-        page = "Overview";
-        await show("Overview");
+      async (tokens) => {
+        session.accept(config.guestClientId ?? config.clientId,tokens);
+        await openWorkspace();
       },
     );
   c.append(
@@ -329,20 +361,15 @@ function shell() {
     nav = el("nav");
   side.append(
     el("div", "ILIEN", "brand"),
-    el("div", "Coordination workspace", "muted"),
+    el("div", "Communication service", "muted"),
   );
   for (const name of [
-    "Overview",
     "Cases",
-    "Tasks",
-    "Simulator",
-    "Activity",
-    "Inbox",
-    "Help",
     ...(role === "admin" ? ["Settings"] : []),
+    "Help",
   ]) {
     const b = button(label(name), () => show(name));
-    if (page === name) b.classList.add("active");
+    if (page === name || (name==="Cases" && page==="Simulator") || (name==="Settings" && ["Channels","Inbox","Knowledge","Operations"].includes(page))) b.classList.add("active");
     nav.append(b);
   }
   side.append(
@@ -371,6 +398,7 @@ function shell() {
   root.append(layout);
 }
 async function show(name: string) {
+  if(["Overview","Tasks","Activity"].includes(name))name="Cases";
   stopLive?.();
   stopLive = undefined;
   page = name;
@@ -391,6 +419,8 @@ async function show(name: string) {
       Operations: operations,
     };
     content.replaceChildren();
+    if(["Cases","Simulator"].includes(name))workspaceTabs(name);
+    if(role==="admin" && ["Settings","Channels","Inbox","Knowledge","Operations"].includes(name))tuningTabs(name);
     await tasks[name]!();
   } catch (e) {
     content.append(
@@ -472,7 +502,7 @@ async function overview() {
   );
 }
 async function cases() {
-  const data = await api<{ items: Row[] }>("/cases");
+  const [data,events] = await Promise.all([api<{items:Row[]}>("/cases"),api<{items:Row[]}>("/events")]);
   const c = card("Find a request"),
     search = input(),
     status = options(
@@ -511,6 +541,8 @@ async function cases() {
     list,
   );
   render();
+  const pending=events.items.filter(event=>!event.case_id);
+  if(pending.length){const queued=fold(`Preparing or unmapped source requests (${pending.length})`,content);for(const event of pending)queued.append(el("p",`${words(event.event_type)} · ${words(event.status)} · ${date(event.received_at)}`));queued.append(button("Check status",()=>show("Cases")));}
 }
 async function pendingTasks() {
   const data = await api<{ items: Row[] }>("/tasks");
@@ -550,6 +582,7 @@ async function activity() {
   requestList(data.items, c);
 }
 async function casePage(id: string) {
+  if(currentCaseId!==id){preferredCaseTab="Flow";currentCaseId=id;}
   stopLive?.();
   stopLive = undefined;
   page = "Cases";
@@ -568,12 +601,18 @@ async function casePage(id: string) {
       `Due ${date(state.deadline)} · Source: ${state.origin === "simulated" ? "Simulated event" : "Recorded request"}`,
       "muted",
     ),
-    button("Refresh request", () => casePage(id)),
-    button("Back to requests", () => show("Cases")),
+    button("Back to cases", () => show("Cases")),
   );
+  heading.classList.add("case-heading");
+  const sections=panelTabs(content,["Flow","Messages","Outcome","History"],preferredCaseTab,name=>{
+    preferredCaseTab=name;
+    if(name==="Flow")requestAnimationFrame(()=>sections.panels.get("Flow")!.querySelector<HTMLButtonElement>("[data-fit-map]")?.click());
+  });
+  const flowPanel=sections.panels.get("Flow")!,messagesPanel=sections.panels.get("Messages")!,outcomePanel=sections.panels.get("Outcome")!,historyPanel=sections.panels.get("History")!;
   const evidenceHost = el("div");
   async function evidence(evidenceId: string) {
     const data = await api<Row>(`/cases/${id}/evidence/${evidenceId}`);
+    sections.activate("History");
     evidenceHost.replaceChildren(el("h3", "Original evidence"));
     let original: unknown = data.original_text;
     try {
@@ -591,7 +630,7 @@ async function casePage(id: string) {
     );
     evidenceHost.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
-  heading.append(
+  historyPanel.append(
     button("Read original request", () => evidence(state.sourceEvidenceId)),
   );
   if (state.status === "blocked")
@@ -600,10 +639,9 @@ async function casePage(id: string) {
         `${Date.parse(state.deadline) <= Date.now() ? "The response deadline has passed. " : ""}This request needs attention. ${journey.deliveries.length === 0 ? "No real channel messages have been sent. " : ""}Read the tasks below; a blocked outcome is not a completed request.`,
       ),
     );
-  heading.append(button("How to use this map", () => show("Help")));
   const questions=(state.sourceQuestions ?? []).filter(q=>!q.answer);
   if(questions.length) {
-    const pending=card("Waiting for source clarification");
+    const pending=card("Waiting for source clarification",flowPanel);
     pending.append(el("p","ILIEN has returned these questions to the requesting source. Source responses resume the same case automatically.","muted"));
     for(const q of questions)pending.append(el("p",q.question));
   }
@@ -615,7 +653,7 @@ async function casePage(id: string) {
       state.status === "active" && state.obligations.some((o) =>
         o.id === d.obligation_id && o.status === "waiting"),
     );
-    const attention = card(waitingIssues.length ? "Messages need attention" : "Earlier delivery problems");
+    const attention = card(waitingIssues.length ? "Messages need attention" : "Earlier delivery problems",waitingIssues.length?flowPanel:historyPanel);
     const seenIssues = new Set<string>();
     for (const d of deliveryIssues) {
       const provider = d.provider_error
@@ -633,7 +671,7 @@ async function casePage(id: string) {
     }
     attention.append(button("People & channels", () => show("Channels")));
   }
-  const map = card("Live request map"),
+  const map = card("Live communication map",flowPanel),
     controls = el("div", "", "row"),
     mapHost = el("div"),
     live = input("", "checkbox"),
@@ -642,7 +680,12 @@ async function casePage(id: string) {
     timer: ReturnType<typeof setTimeout> | undefined,
     refreshing = false;
   let current = journey;
-  const draw = () => renderJourney(mapHost, current, evidence);
+  const messagesHost=el("div"),historyHost=el("div");messagesPanel.append(messagesHost);historyPanel.append(historyHost);
+  const draw = () => {
+    renderJourney(mapHost,current,evidence,{mode:"Workflow map",compact:true});
+    renderJourney(messagesHost,current,evidence,{mode:"Communication flow",compact:true});
+    renderJourney(historyHost,current,evidence,{mode:"Activity",compact:true});
+  };
   mapHost.dataset.view=preferredJourneyView;
   async function refresh() {
     if (refreshing || disposed || document.hidden) return;
@@ -684,23 +727,23 @@ async function casePage(id: string) {
       : "Updates are off";
     schedule();
   };
-  if(state.autonomous) {live.checked=true;status.textContent="Watching autonomous coordination";schedule();}
+  live.checked=true;status.textContent="Live · checks every 10 seconds";schedule();
   stopLive = () => {
     disposed = true;
     if (timer) clearTimeout(timer);
   };
   controls.append(
-    button("Update map", refresh),
-    field("Live updates", live),
+    field("Live", live),
     status,
+    button("Refresh", refresh),
   );
-  map.append(controls, mapHost);
+  controls.classList.add("case-controls");heading.append(controls);map.append(mapHost);
   draw();
-  content.append(evidenceHost);
+  historyPanel.append(evidenceHost);
   const requiredWork = state.obligations.filter(
     (o) => o.required && !["verified","accepted"].includes(o.status),
   );
-  const next = card("What needs to happen next");
+  const next = card("Responsibilities",outcomePanel);
   next.append(
     el(
       "p",
@@ -740,10 +783,10 @@ async function casePage(id: string) {
     if (o.decision) details("Decision", o.decision, c);
   }
   if (role !== "viewer" && !state.autonomous) {
-    caseActions(state, policy, id);
+    caseActions(state, policy, id,fold("Advanced case controls",historyPanel));
   }
   if (role !== "viewer" && state.status === "active" && !state.autonomous) {
-    const send = card("Send through a connected channel");
+    const send = card("Send through a connected channel",fold("Advanced delivery controls",historyPanel));
     send.append(
       el(
         "p",
@@ -817,7 +860,9 @@ async function casePage(id: string) {
       ),
     );
   }
-  const outcomes = card("Outcome and source response");
+  const outcomes = card("Outcome and source response",outcomePanel);
+  outcomePanel.prepend(outcomes);
+  const earlierResults=journey.results.some(r=>!r.current)?fold("Earlier source results",historyPanel):null;
   if (!journey.results.length)
     outcomes.append(el("p", "No outcome has been recorded yet.", "empty"));
   for (const r of journey.results) {
@@ -830,6 +875,10 @@ async function casePage(id: string) {
       ),
     );
     const result = decode(r.result as Row | string);
+    if(r.current && Array.isArray(result.data)) {
+      const information=(result.data as Row[]).flatMap(record=>Array.isArray(record.facts)?(record.facts as Row[]).map(fact=>({information:words(fact.key),value:`${String(fact.value)}${fact.unit?` ${String(fact.unit)}`:""}`,department:words(record.department)})):[]);
+      if(information.length)table(information,["information","value","department"],item);
+    }
     summary(
       {
         outcome: words(result.outcome),
@@ -855,9 +904,9 @@ async function casePage(id: string) {
         }),
       );
     }
-    outcomes.append(item);
+    if(r.current)outcomes.append(item);else earlierResults?.append(item);
   }
-  const ai = card("AI assistance");
+  const ai = card("AI decisions",historyPanel);
   ai.append(
     el(
       "p",
@@ -889,15 +938,11 @@ async function casePage(id: string) {
         configuration: state.configurationVersion,
         sourceEvidenceId: state.sourceEvidenceId,
       },
-      heading,
+      historyPanel,
     );
-  requestAnimationFrame(() => {
-    if (map.isConnected && page === "Cases")
-      map.scrollIntoView({ block: "start", behavior: "auto" });
-  });
 }
-function caseActions(state: CaseState, policy: Policy, id: string) {
-  const c = card("Practice a response");
+function caseActions(state: CaseState, policy: Policy, id: string,parent:HTMLElement=content) {
+  const c = card("Practice a response",parent);
   c.append(
     notice(
       "Act as a synthetic participant to explore this case. Your answer is labelled as role-play. Any new questions or verification requests may use connected real channels.",
@@ -1581,6 +1626,7 @@ async function simulator() {
     workflowSupported: boolean;
   }[];
   const choice = options([
+    {value:"dispatch-exception",label:"Partial dispatch · email, WhatsApp and return to email"},
     {value:"production-coordination",label:"Autonomous coordination · quantity, schedule, approval and production readiness"},
     {value:"generic-communication",label:"Custom communication · information, approval or completion"},
     {
@@ -1693,7 +1739,7 @@ async function simulator() {
           const result = await api<Row>("/events", original);
           feedback.replaceChildren(
             notice(
-              "Request received. Processing continues in the background. Open Requests or refresh the received-event list below.",
+              "Request received. Processing continues in the background. Open the Case list tab to see its status.",
             ),
           );
           event = {
@@ -1726,7 +1772,6 @@ async function simulator() {
     catalogue,
     customButton,
   );
-  const inbox = card("Your recently started requests");
   async function openWhenReady(inboxId: string) {
     feedback.replaceChildren(notice("2. Request accepted. Preparing its map…"));
     for (let attempt = 0; attempt < 8; attempt++) {
@@ -1748,7 +1793,6 @@ async function simulator() {
           ),
           button("Read the user guide", () => show("Help")),
         );
-        await refresh();
         return;
       }
       if (attempt < 7) await new Promise((r) => setTimeout(r, 2500));
@@ -1756,59 +1800,14 @@ async function simulator() {
     if (feedback.isConnected) {
       feedback.replaceChildren(
         notice(
-          "Your request is saved. Preparing the map is taking longer than usual. Check its status below; do not submit it again.",
+          "Your request is saved. Preparing the map is taking longer than usual. Check the Case list tab; do not submit it again.",
         ),
         button("Check and open map", () => openWhenReady(inboxId)),
       );
-      await refresh();
     }
   }
-  async function refresh() {
-    inbox.replaceChildren(el("h2", "Your recently started requests"));
-    const data = await api<{ items: Row[] }>("/events");
-    for (const item of data.items) {
-      const row = el("article", "", "request-item");
-      const names: Record<string, string> = {
-        coordinating: "Request created",
-        accepted: "Preparing request",
-        awaiting_coordination: "Needs routing review",
-      };
-      row.append(
-        el(
-          "span",
-          item.case_status
-            ? words(item.case_status)
-            : (names[String(item.status)] ?? words(item.status)),
-          "badge",
-        ),
-        el("h3", words(item.event_type)),
-        el("p", `Received ${date(item.received_at)}`, "muted"),
-      );
-      if (item.case_id)
-        row.append(
-          button("Open live map", () => casePage(String(item.case_id))),
-        );
-      else if (item.status === "awaiting_coordination")
-        row.append(
-          el(
-            "p",
-            "No workflow is configured for this request. An administrator needs to review the routing.",
-          ),
-        );
-      else
-        row.append(
-          button("Check preparation", () => openWhenReady(String(item.id))),
-        );
-      inbox.append(row);
-    }
-    if (!data.items.length)
-      inbox.append(
-        el("p", "No requests yet. Start one using the form above.", "empty"),
-      );
-    inbox.append(button("Refresh request status", refresh));
-  }
-  await refresh();
 }
+
 function jsonForm(
   parent: HTMLElement,
   title: string,
@@ -1857,76 +1856,35 @@ function jsonForm(
   );
 }
 async function channels() {
-  const configuration = await api<{ policy: Policy }>("/configuration");
-  const c = card("People & communication channels");
-  c.append(button("Open incoming messages", () => show("Inbox")));
-  c.append(
-    el(
-      "p",
-      "Bindings require recorded consent. Creating a binding can enable real delivery for future contacts. No personal contact is added automatically.",
-      "muted",
-    ),
-  );
-  const row = el("div", "", "row"),
-    target = el("div");
-  for (const section of [
-    "bindings",
-    "deliveries",
-    "receipts",
-    "delivery-events",
-  ])
-    row.append(
-      button(section, async () => {
-        target.replaceChildren();
-        const data = await api<{ items: Row[] }>(`/channels/${section}`);
-        if (!data.items.length)
-          target.append(el("p", "No records yet.", "empty"));
-        for (const item of data.items)
-          details(
-            `${words(item.channel ?? item.actor_id ?? section)} · ${words(item.status ?? "")} · ${date(item.created_at)}`,
-            item,
-            target,
-          );
-      }),
-    );
-  c.append(row, target);
-  if (role === "admin")
-    jsonForm(
-      c,
-      "Add or update a consented binding",
-      "/channels/bindings",
-      {
-        actorId: "",
-        channel: "email",
-        address: "",
-        consentRef: "",
-        enabled: false,
-        priority: 10,
-      },
-      {
-        actorId: configuration.policy.actors
-          .filter((a) => a.enabled)
-          .map((a) => a.id),
-      },
-    );
-  c.append(button("Open a request to send a message", () => show("Cases")));
+  const [configuration,bindings]=await Promise.all([api<{policy:Policy}>("/configuration"),api<{items:Row[]}>("/channels/bindings")]);
+  const tabs=panelTabs(content,["Connected people",...(role==="admin"?["Add or update"]:[])]);
+  const list=card("People & channels",tabs.panels.get("Connected people")!);
+  list.append(el("p","Recipients are scoped to a responsibility and require recorded consent. Conversation history belongs inside each case.","muted"));
+  table(bindings.items,["actor_id","channel","address","enabled","priority"],list);
+  list.append(button("Refresh people",()=>show("Channels")));
+  if(role==="admin"){
+    const create=card("Connect a consented recipient",tabs.panels.get("Add or update")!);
+    jsonForm(create,"Add or update binding","/channels/bindings",{actorId:"",channel:"email",address:"",consentRef:"",enabled:false,priority:10},{actorId:configuration.policy.actors.filter(a=>a.enabled).map(a=>a.id)});
+  }
 }
+
 async function inbox() {
   const [data, configuration] = await Promise.all([
     api<{ items: Row[] }>("/channels/inbox"),
     api<{ policy: Policy }>("/configuration"),
   ]);
-  const intro = card("Incoming messages");
+  const intro = card("Unassigned messages");
+  const unassigned=data.items.filter(r=>!r.caseId);
   intro.append(
     el(
       "p",
-      "Every received WhatsApp or email message stays here, including messages waiting for a known person or request. Connecting a sender requires an authorised person and recorded consent.",
+      "Only messages without a case are shown here. Assigned conversations stay in their case’s Messages tab. Connecting a sender requires an authorised person and recorded consent.",
     ),
     button("Refresh messages", () => show("Inbox")),
     button("Manage people & channels", () => show("Channels")),
   );
-  if (!data.items.length)
-    intro.append(el("p", "No messages received yet.", "empty"));
+  if (!unassigned.length)
+    intro.append(el("p", "No messages need case assignment.", "empty"));
   const explanations: Record<string, string> = {
     identity_or_correlation_required:
       "Connect this sender to a person, then check for a matching request.",
@@ -1949,7 +1907,7 @@ async function inbox() {
     consent_withdrawn:
       "The sender asked to stop receiving messages. This channel is disabled.",
   };
-  for (const r of data.items) {
+  for (const r of unassigned) {
     const c = card(
       `${words(r.channel)} · ${r.actorId ? words(r.actorId) : "New sender"}`,
     );
@@ -2082,7 +2040,8 @@ async function inbox() {
   }
 }
 async function knowledge() {
-  const c = card("Approved knowledge");
+  const tabs=panelTabs(content,["Documents",...(role==="admin"?["Publish","Revoke"]:[])]);
+  const c = card("Approved knowledge",tabs.panels.get("Documents")!);
   c.append(
     el(
       "p",
@@ -2097,7 +2056,7 @@ async function knowledge() {
     c,
   );
   if (role === "admin") {
-    jsonForm(c, "Publish a version", "/ai/knowledge", {
+    jsonForm(tabs.panels.get("Publish")!, "Publish a version", "/ai/knowledge", {
       action: "publish",
       documentKey: "",
       version: 1,
@@ -2107,7 +2066,7 @@ async function knowledge() {
       effectiveAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 2592000000).toISOString(),
     });
-    jsonForm(c, "Revoke a document", "/ai/knowledge", {
+    jsonForm(tabs.panels.get("Revoke")!, "Revoke a document", "/ai/knowledge", {
       action: "revoke",
       id: "",
       reason: "",
@@ -2126,13 +2085,8 @@ async function settings() {
       "Manage recipients, approved reference material and workflow rules. Only workspace administrators can change these settings.",
     ),
   );
-  intro.append(
-    button("People & channels", () => show("Channels")),
-    button("Reference library", () => show("Knowledge")),
-  );
-  if (role === "admin")
-    intro.append(button("Advanced operations", () => show("Operations")));
-  const c = card("Workflow rules");
+  const tabs=panelTabs(content,["Workflows","AI controls","Access"]);
+  const c = card("Workflow rules",tabs.panels.get("Workflows")!);
   const configSummary = configuration.configuration as { workflows?: Row[] };
   for (const rule of configSummary.workflows ?? [])
     c.append(el("p", `${words(rule.eventType)} → ${words(rule.workflow)}`));
@@ -2147,82 +2101,19 @@ async function settings() {
         "muted",
       ),
     );
-    c.append(
-      button("Prepare maintenance workflow", () => {
-        const policy = structuredClone(configuration.policy) as Policy;
-        policy.version = `textile-${Date.now()}`;
-        if (!policy.groups.includes("maintenance"))
-          policy.groups.push("maintenance");
-        for (const r of ["respondent", "verifier"] as const)
-          if (
-            !policy.actors.some(
-              (a) => a.group === "maintenance" && a.role === r && a.enabled,
-            )
-          )
-            policy.actors.push({
-              id: `maintenance_${r}`,
-              group: "maintenance",
-              role: r,
-              enabled: true,
-            });
-        const cfg = structuredClone(configuration.configuration) as {
-          workflows: Row[];
-        };
-        cfg.workflows = cfg.workflows.filter(
-          (w) => w.eventType !== "maintenance.breakdown_logged",
-        );
-        cfg.workflows.push({
-          eventType: "maintenance.breakdown_logged",
-          workflow: "maintenance-escalation-v1",
-          goal: "Collect verified inspection, spare-part availability and scheduling impact. No maintenance or machine command is authorized.",
-          requiredPayloadKeys: ["siteId", "machineId", "faultCode"],
-          branches: [
-            {
-              group: "maintenance",
-              kind: "evidence",
-              question:
-                "Report the current inspection finding and supporting evidence for the exact machine revision.",
-            },
-            {
-              group: "procurement",
-              kind: "fact",
-              question:
-                "Confirm availability and lead time for the parts identified by the inspection; request a child clarification if part identity is missing.",
-            },
-            {
-              group: "planning",
-              kind: "fact",
-              question:
-                "Report the schedule impact after inspection and parts information is available; establish dependencies as needed.",
-            },
-          ],
-        });
-        jsonForm(
-          c,
-          "Maintenance configuration: preview before publishing",
-          "/configuration",
-          {
-            action: "preview",
-            expectedRevision: configuration.revision,
-            policy,
-            configuration: cfg,
-          },
-        );
-      }),
-    );
     jsonForm(c, "Preview or publish configuration", "/configuration", {
       action: "preview",
       expectedRevision: configuration.revision,
       policy: configuration.policy,
       configuration: configuration.configuration,
     });
-    jsonForm(c, "Update AI controls", "/ai/settings", {
+    jsonForm(tabs.panels.get("AI controls")!, "Update AI controls", "/ai/settings", {
       enabled: ai.enabled,
       autoReceipts: ai.auto_receipts,
       executionMode: ai.execution_mode,
       expectedRevision: ai.revision,
     });
-    const m = card("Workspace access");
+    const m = card("Workspace access",tabs.panels.get("Access")!);
     table(
       (await api<{ items: Row[] }>("/members")).items,
       ["subject", "role", "enabled", "created_at"],
@@ -2244,14 +2135,15 @@ async function operations() {
     retention: Row[];
     caseChecks: Row[];
   }>("/operations");
-  const c = card("Recovery & processing controls");
+  const sections=panelTabs(content,["Status","Controls","Retention","Audit"]);
+  const c = card("Recovery & processing controls",sections.panels.get("Controls")!);
   c.append(
     notice(
       "Recovery changes require an operator reason and are audited. Pausing stops new work at the next gate; in-flight provider/model calls may already have happened. Uncertain outcomes require evidence review.",
     ),
   );
   details("Current controls", data.controls, c);
-  const queues = card("Queue health");
+  const queues = card("Queue health",sections.panels.get("Status")!);
   queues.append(
     button("Refresh queue counts", async () => {
       const snapshot = await api<{
@@ -2279,17 +2171,17 @@ async function operations() {
   table(
     data.work,
     ["lane", "id", "state", "attempts", "created_at"],
-    card("Pending and interrupted work"),
+    card("Pending and interrupted work",sections.panels.get("Status")!),
   );
   table(
     data.caseChecks,
     ["case_id", "checked_revision", "status", "issues", "checked_at"],
-    card("Independent structural supervision"),
+    card("Independent structural supervision",sections.panels.get("Status")!),
   );
   table(
     data.deliveries,
     ["id", "channel", "status", "reason", "queue_attempts"],
-    card("Delivery attention"),
+    card("Delivery attention",sections.panels.get("Status")!),
   );
   const mutation = (title: string, body: Row) =>
     jsonForm(c, title, "/operations", {
@@ -2324,7 +2216,7 @@ async function operations() {
     targetId: "",
     evidenceRef: "",
   });
-  const r = card("Retention review");
+  const r = card("Retention review",sections.panels.get("Retention")!);
   r.append(
     el(
       "p",
@@ -2343,12 +2235,12 @@ async function operations() {
     details(
       `${String(row.action)} · ${String(row.created_at)}`,
       row,
-      card("Recovery audit"),
+      card("Recovery audit",sections.panels.get("Audit")!),
     );
   content.append(button("Refresh operations", () => show("Operations")));
 }
 async function boot() {
-  config = await fetch("/config.json", { cache: "no-store" }).then((r) => {
+  config = await fetch("/config.json", { cache: "no-store", signal: AbortSignal.timeout(10000) }).then((r) => {
     if (!r.ok) throw new Error("Workspace configuration unavailable");
     return r.json();
   });
@@ -2359,6 +2251,8 @@ async function boot() {
     config.redirectUri = localCallback;
   } else if (config.redirectUri !== localCallback)
     throw new Error("Sign-in origin does not match workspace configuration.");
+  session=new WorkspaceSession(localStorage,[config.clientId,...(config.guestClientId?[config.guestClientId]:[])]);
+  window.addEventListener("storage",event=>{if(event.key===SESSION_KEY && event.newValue===null){session.clear();stopLive?.();loginScreen("Signed out in another tab.");}});
   const params = new URLSearchParams(location.search),
     code = params.get("code");
   if (params.has("error")) {
@@ -2367,7 +2261,7 @@ async function boot() {
     return;
   }
   if (!code) {
-    loginScreen();
+    if(session.available)await openWorkspace();else loginScreen();
     return;
   }
   const saved = sessionStorage.getItem("ilien-pkce");
@@ -2388,14 +2282,12 @@ async function boot() {
       code_verifier: flow.verifier,
     }),
     credentials: "omit",
+    signal: AbortSignal.timeout(10000),
   });
   if (!response.ok) throw new Error("Sign-in exchange failed.");
   const result = await response.json();
-  token = result.access_token;
-  expires = Date.now() + (result.expires_in - 30) * 1000;
-  const me = await api<{ role: string }>("/me");
-  role = me.role;
-  await show("Overview");
+  session.accept(config.clientId,{accessToken:result.access_token,refreshToken:result.refresh_token,expiresIn:result.expires_in});
+  await openWorkspace();
 }
 void boot().catch((e) =>
   loginScreen(e instanceof Error ? e.message : "Unable to start workspace"),

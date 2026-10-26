@@ -14,6 +14,7 @@ export function communicationContext(
       "manufacturing.material_readiness_requested",
       "planning.upstream_supply_shifted",
       "manufacturing.production_coordination_requested",
+      "manufacturing.dispatch_exception_requested",
     ].includes(event.eventType)
       ? ["siteId", "materialLotId", "requiredQuantity", "neededBy"]
       : event.eventType === "maintenance.breakdown_logged"

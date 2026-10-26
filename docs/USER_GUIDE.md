@@ -2,25 +2,25 @@
 
 ## 1. Sign in
 
-Use your personal workspace account or the owner-enabled shared guest account. **Use guest account** fills the shared email/password; **Log in** authenticates it. Eye reveals the password and Copy buttons copy the respective fields. Shared full-access accounts are public access when enabled.
+Use your personal workspace account or the owner-enabled shared guest account. **Use guest account** fills the shared email/password; **Log in** authenticates it. Eye reveals the password and Copy buttons copy the respective fields. Sign-in can be restored after reload for up to 24 hours from the original login; access tokens last 15 minutes and refresh silently. Sign out revokes the refresh token. Network failures preserve the session for Retry; they do not fabricate a successful connection. Shared full-access accounts are public access when enabled.
 
-## 2. Start a request
+## 2. Start a case
 
-Open **Start a scenario**. **Production coordination** asks for order reference, material batch, amount, unit and needed-by time; it tracks quantity, schedule, approval and actual readiness. **Communication request** asks for a question, responsible team and response type. Other scenarios include legacy material readiness and revision acknowledgement. Source events are synthetic. You do not need to write code or JSON.
+Open **Cases → Start case**. **Partial dispatch coordination** exercises email clarification, a WhatsApp allocation question and return-to-email approval; see the [scenario](COMMUNICATION_SCENARIO.md). **Production coordination** asks for order reference, material batch, amount, unit and needed-by time; it tracks quantity, schedule, approval and actual readiness. **Communication request** asks for a question, responsible team and response type. Other scenarios include legacy material readiness and revision acknowledgement. Source events are synthetic. You do not need to write code or JSON.
 
 Press **Start request & open map** once. ILIEN accepts the event and prepares the case asynchronously. It opens the map when ready. If delayed, use **Check and open map**; do not start a second request to retry the same one. Inputs without a configured workflow say **Needs routing review** rather than displaying an invented map.
 
 ## 3. Find an existing map
 
-Use **Requests → Open map & request**, or **Start a scenario → Your recently started requests → Open live map**. Home also lists recent requests. Maps are inside a case, not in the source input form.
+Use **Cases → Case list → Open map & request**. Create and list occupy adjacent tabs; the create form has no duplicate recent list. Maps belong to a case.
 
 ## 4. Read the map
 
-- **Workflow map:** source, ILIEN, required tasks and dependencies. Arrows mean prerequisite → dependent work. Nodes change when actual tasks/dependencies change.
-- **Communication flow:** recorded requests, real channel sends, provider receipts and replies, linked by actual message/case references.
-- **Activity:** time-ordered case actions, AI review states, messages, evidence and outcomes.
+- **Flow:** source, ILIEN, required tasks and dependencies. Arrows mean prerequisite → dependent work. Nodes change when actual tasks/dependencies change.
+- **Messages:** recorded requests, real channel sends, provider receipts and replies, linked by actual message/case references.
+- **History:** time-ordered case actions, AI review states, messages, evidence and outcomes.
 
-Click a box or communication to inspect details and original evidence. Use Fit map to screen or Actual size. Live updates defaults on for autonomous missions and checks every ten seconds while the tab is visible. The map follows actual tasks, dependencies, sends and replies; it is not a prerecorded route.
+Click a box or communication to inspect details and original evidence. Use Fit map to screen. Live updates defaults on for autonomous missions and checks every ten seconds while the tab is visible. The map follows actual tasks, dependencies, sends and replies; it is not a prerecorded route.
 
 ## 5. Practice a response
 
@@ -44,7 +44,7 @@ A task box alone is not a sent message. **No channel send recorded** means no re
 
 ## 8. Review the outcome
 
-Outcome shows current versus earlier results, pending requirements, source delivery and source acknowledgement. A published report does not prove the source accepted it. ILIEN communicates the collected outcome; factory actions remain with the source system.
+The **Outcome** tab shows current results, required responsibilities, source delivery and source acknowledgement. **History** retains earlier results, evidence and AI decisions. A published report does not prove the source accepted it. ILIEN communicates the collected outcome; factory actions remain with the source system.
 
 ## 9. AI and settings
 

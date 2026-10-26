@@ -182,3 +182,37 @@ test("earlier source outcome cards preserve their recorded requirement states",(
  assert.deepEqual(recordedRequirements(current),[{requirement:"request",status:"Accepted"}]);
  assert.equal(earlier.requirements[0]!.reasonCode,"waiting");
 });
+
+test("an email clarification adds only the missing deadline and preserves each earlier fact's evidence and expiry",()=>{
+ const event=sourceEventSchema.parse(JSON.parse(readFileSync('packages/contracts/examples/dispatch-exception.event.json','utf8')));
+ let s=seedCase(event,{id:'dispatch-test',inboxId:'inbox-test',sourceId:'source-test',sourceEvidenceId:'source'},textilePolicy,now)!;
+ s=apply(s,'coordinator',{type:'route_initial',obligationId:'inspection',group:'quality',question:'Confirm inspection and deadline'}).state;
+ const originalRevision=s.revision;
+ s=answer(s,'inspection','1100 metre passes; 100 metre quarantined',[{key:'passing_quantity',value:'1100',unit:'metre',quote:'1100 metre passes'},{key:'quarantined_quantity',value:'100',unit:'metre',quote:'100 metre quarantined'}]).state;
+ assert.equal(s.obligations[0]!.status,'waiting');
+ const newer=new Date(Date.parse(now)+120000).toISOString(),expiry=new Date(Date.parse(later)+120000).toISOString(),o=s.obligations[0]!;
+ const effect=transition(s,textilePolicy,resolveActor(textilePolicy,o.assignee),{type:'reply',obligationId:o.id,expectedObligationRevision:o.revision,statement:'Deadline16:00 Dhaka today',subjectRevision:'1',observedAt:newer,validUntil:expiry,facts:[{key:'dispatch_deadline',value:'16:00 Dhaka today',quote:'Deadline16:00 Dhaka today'}]},'deadline-reply',newer);
+ const facts=effect.state.obligations[0]!.reply!.facts!;
+ assert.equal(effect.state.obligations[0]!.status,'accepted');assert.equal(facts.length,3);
+ assert.equal(facts.find(f=>f.key==='passing_quantity')!.evidenceId,`evidence-${originalRevision}`);
+ assert.equal(facts.find(f=>f.key==='dispatch_deadline')!.evidenceId,'deadline-reply');
+ assert.equal(effect.state.obligations[0]!.reply!.validUntil,later,'A new reply must not renew older facts');
+ assert.ok(effect.contacts.some(c=>c.obligationId==='allocation'));
+});
+
+test("decision clarification keeps exact proposed terms but removes any earlier approval",()=>{
+ const s=approved(),proposal=s.obligations.find(o=>o.id==='approval')!.proposal!;
+ const effect=apply(s,'coordinator',{type:'clarify',obligationId:'approval',question:'Is that an unconditional approval of the exact current proposal?',reason:'Conditional reply'});
+ const o=effect.state.obligations.find(o=>o.id==='approval')!;
+ assert.equal(o.proposal!.sha256,proposal.sha256);assert.equal(o.decision,undefined);assert.equal(o.status,'waiting');
+ assert.ok(effect.contacts.some(c=>c.obligationId==='approval'&&c.kind==='ask'));
+});
+
+test("withdrawn or rerouted facts cannot silently survive as current clarification context",()=>{
+ let s=fresh();s=apply(s,'coordinator',{type:'route_initial',obligationId:'stock',group:'stores',question:'Confirm stock'}).state;
+ s=answer(s,'stock','800 units',[{key:'usable_quantity',value:'800',quote:'800 units'}]).state;
+ const withdrawn=apply(s,'coordinator',{type:'clarify',obligationId:'stock',question:'Provide the corrected usable quantity',reason:'Earlier quantity is incorrect',discardFacts:true}).state;
+ assert.deepEqual(withdrawn.obligations[0]!.retainedFacts,[]);assert.equal(withdrawn.obligations[0]!.reply,undefined);
+ const rerouted=apply(s,'coordinator',{type:'reroute',obligationId:'stock',group:'procurement',reason:'Confirmed new owner'}).state;
+ assert.equal(rerouted.obligations[0]!.retainedFacts,undefined);assert.equal(rerouted.obligations[0]!.reply,undefined);
+});

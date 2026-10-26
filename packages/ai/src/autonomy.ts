@@ -31,7 +31,7 @@ export function clarificationFallback(context: Context, proposal: Proposal): Pro
   }
   return {
     disposition:"propose",reason:"The bound response needs clarification; no business answer is inferred.",
-    operation:{type:"clarify",obligationId:task.id,question,reason:"Ambiguous participant reply"},
+    operation:{type:"clarify",obligationId:task.id,question,reason:"Ambiguous participant reply",discardFacts:true},
     citations:[{ref:receipt.evidenceId,quote:receipt.text.slice(0,500)}],uncertainties:proposal.uncertainties,
   };
 }

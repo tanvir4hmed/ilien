@@ -10,7 +10,7 @@ export const operationSchema = z.discriminatedUnion("type", [
   z.strictObject({type:z.literal("source_query"), questionId:id, question:text}),
   z.strictObject({type:z.literal("source_response"), questionId:id, answer:text}),
   z.strictObject({type:z.literal("route_initial"), obligationId:id, group:id, question:text}),
-  z.strictObject({type:z.literal("clarify"), obligationId:id, question:text, reason:text}),
+  z.strictObject({type:z.literal("clarify"), obligationId:id, question:text, reason:text,discardFacts:z.boolean().optional()}),
   z.strictObject({type:z.literal("reroute"), obligationId:id, group:id, reason:text}),
   z.strictObject({type:z.literal("relay_decision"), obligationId:id, decisionId:id}),
   z.strictObject({
@@ -140,11 +140,12 @@ export interface Reply {
   validUntil: string;
   subjectRevision: string;
   timeBasis?: "observed" | "received";
-  facts?: Fact[];
+  facts?: ReportedFact[];
   progress?: "in_progress" | "ready";
   statusQuote?: string;
 }
 export interface Obligation {
+  retainedFacts?: ReportedFact[];
   id: string;
   group: string;
   kind: string;
@@ -185,6 +186,7 @@ export interface Obligation {
   verificationRequested?: boolean;
   nextContactAt: string;
 }
+export type ReportedFact = Fact & {evidenceId:string;actorId:string;subjectRevision:string;reportedAt:string;validUntil:string};
 export interface CaseState {
   autonomous?: boolean;
   awaitingPlan?: boolean;

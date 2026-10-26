@@ -2,7 +2,7 @@
 
 ## Access
 
-Terraform provisions a private S3 origin, CloudFront HTTPS endpoint, Cognito user pool and API Gateway JWT authorizer. Console requests use `/console/v1/*`; existing machine API routes retain AWS IAM authentication. The normal hosted sign-in uses authorization code with PKCE, a secretless app client, 15-minute access tokens and password sign-in. Authenticator MFA is temporarily disabled by an explicit operator-onboarding configuration; restore `mfa_configuration = "ON"` and software-token `enabled = true` in Terraform before the release security review. Registration is admin-only; recovery is admin-only. The browser keeps its access token only in memory and a short-lived one-use PKCE verifier/state in session storage. Reloading starts a new sign-in, which can reuse the hosted session.
+Terraform provisions a private S3 origin, CloudFront HTTPS endpoint, Cognito user pool and API Gateway JWT authorizer. Console requests use `/console/v1/*`; existing machine API routes retain AWS IAM authentication. The normal hosted sign-in uses authorization code with PKCE, a secretless app client, 15-minute access tokens and password sign-in. Authenticator MFA is temporarily disabled by an explicit operator-onboarding configuration; restore `mfa_configuration = "ON"` and software-token `enabled = true` in Terraform before the release security review. Registration is admin-only; recovery is admin-only. The browser keeps access tokens only in memory and a one-use PKCE verifier/state in session storage. A rotating refresh token in local storage restores sign-in after reload, up to an absolute 24 hours from the original login. Cognito clients enforce 24-hour refresh validity and a 10-second rotation grace period; rotation does not extend the original expiry. Concurrent requests share a refresh. Revoked/expired sessions clear; transient connection failures offer Retry. Sign out clears local state immediately and attempts token revocation. See the security limitations below.
 
 An identity alone grants no workspace access. `operator_memberships` binds a verified Cognito subject to one source and tenant. Enabled membership is resolved server-side on every request. Roles: viewer (read), operator (case work, simulation and AI review), admin (also configuration, channel consent, knowledge and membership administration). Simulator actor selection represents authenticated synthetic role-play, not identity proof for a real employee. Member administrators bind existing Cognito subjects; account creation and password reset use privileged Cognito administration. The first membership is installed through the privileged migration function; no public bootstrap endpoint exists.
 
@@ -10,15 +10,14 @@ Static assets and public client configuration contain no staff credentials, API 
 
 ## Operator screens
 
-The everyday workspace uses plain-language forms and summaries rather than JSON editors.
+ILIEN is an autonomous communication service; this browser is its observer and administrative tuning console.
 
-- **Home:** recent requests, bounded counts, and shortcuts to outstanding work.
-- **Requests:** search and status filtering; subject, goal, responsibility and due date.
-- **Tasks:** shared workspace tasks waiting for a response or verification, with the responsible person shown. This is not a claim of personal assignment to the signed-in operator. Limited to the latest 100 pending tasks.
-- **Start a scenario:** guided source-event forms and searchable synthetic event catalogue. Nothing fires on load. Unmapped events enter routing review; a sample is not proof of integration. Connected recipients may cause real messaging when a request runs.
-- **Activity:** select a request to inspect its workflow, communication flow and chronological history.
-- **Incoming messages:** read original WhatsApp/email text, recognise a sender with recorded consent, resolve ambiguous request links, and review AI or human interpretations without replacing external evidence. Greetings are recognised conversations, not business answers. Several open requests require a reference or explicit operator selection.
-- **Settings (admin):** people/channels, approved references, configuration and membership. Recovery and infrastructure controls are under **Advanced operations**, outside everyday navigation.
+- **Cases:** adjacent Case list / Start case tabs. Source simulation has no duplicate recent list and fires only on explicit submission.
+- **Case:** Flow / Messages / Outcome / History tabs, one live/refresh control area. Flow is the dynamic dependency graph, Messages the case-scoped transport trace, Outcome the current source result, History the audit/evidence and earlier outcomes.
+- **Settings:** People & channels, Rules & profiles, Knowledge, Recovery and Unassigned messages. Matched messages stay with their case. People and knowledge lists are separate from creation forms. Recovery has Status / Controls / Retention / Audit tabs.
+- **Guide:** terminology, normal flow, acceptance and truthful provider states.
+
+Advanced legacy simulation/review actions remain available where that case's configured mode permits them. Autonomous missions do not require an internal operator to press Send or approve an AI interpretation.
 
 ### Request journey
 
@@ -30,9 +29,9 @@ The graph is derived from the current case, not a hardcoded scenario:
 - **Workflow map** lays out obligations by prerequisite depth. Child requests and dependencies change the graph. Arrows mean prerequisite to dependent work, not an invented chronological send order. Source and outcome nodes are based on recorded case/results.
 - **Communication flow** joins actual contacts to outbound sends, provider events and replies using their recorded IDs. Different channels remain within the same case. Missing links are labelled, never guessed.
 - **Activity** combines the recorded case actions, AI reviews, sends, replies, provider events and results by time. Simulated response evidence is labelled separately from external evidence.
-- Selecting a step opens readable details and original evidence where available. Fit-to-screen, actual-size and pending-work focus controls support walkthroughs without inventing progress animations.
+- Selecting a step opens readable details and original evidence where available. Fit-to-screen supports walkthroughs without inventing progress animations.
 - Message bodies are explicitly previews, capped at 2,000 characters; original inbound evidence remains accessible. Each history category is capped at the latest 100 records and reports truncation. This is a bounded recent history, not an unlimited audit export. Current task status can reflect older evidence outside that window.
-- Live updates are **opt in**, every ten seconds, only while the tab is visible. Navigating away cancels updates. No AI runs while watching. The selected view persists; new case revisions prompt the operator to refresh before changing work.
+- Live updates default on for autonomous cases, every ten seconds, only while the tab is visible. Navigating away cancels updates. No AI runs while watching. The selected view persists; new case revisions prompt the operator to refresh before changing work.
 
 Sending, provider acceptance, confirmed delivery, received reply, verified answer, published result and source acknowledgement are different states. No receipt is fabricated and provider acceptance is not labelled as delivery. Source simulation, participant role-play and real channel activity remain explicitly distinguishable.
 
@@ -50,13 +49,13 @@ The authenticated source is simulated in this installation; no unrestricted self
 
 Configured event mappings reuse one deterministic engine with bounded required top-level payload fields and branch definitions. They are not arbitrary executable code or a semantic payload validator. Built-in material readiness retains its typed payload checks. Unknown/custom payload semantics must be validated by the source or a future domain-specific validator.
 
-Settings offers a **Prepare maintenance workflow** preset: it adds maintenance respondent/verifier roles and maps `maintenance.breakdown_logged` to inspection, parts and scheduling-impact branches. Preview and publish it, then use the maintenance simulator example. This does not silently change existing policies. Material readiness and revision acknowledgement remain built-in mappings. Branch dependencies are established explicitly or by reviewed agent proposals; the preset does not claim that independent initial questions are already resolved.
+New workflows are configured explicitly with scoped groups, validated fields and consented recipients. Built-in source fixtures do not prove arbitrary producer integration.
 
 ## Amendments and bound decisions
 
 Coordinator `amend_subject` requires a new subject revision, revised goal and reason. It increments mission revision, retains amendment evidence IDs, invalidates replies/decisions and preserves the original source evidence/journal. This adjusts coordination scope, never source operational state.
 
-A decision obligation requires coordinator `attach_proposal` with a stable proposal ID, increasing revision and exact statement. The server hashes ID, version, statement and subject revision. Assigned respondent `decide` must present that hash, current obligation and subject versions, approve/reject, reason and bounded observation/validity times. Independent verification is still required. Ordinary fact replies cannot satisfy decision obligations. Verified decisions appear in result decision references, including choice and hash; rejection is a collected decision, not permission to execute the rejected action. AI cannot propose amendment, configuration adoption, proposal attachment or decision acceptance. Structured channel `decide` is subject to the same exact-contact scope and deterministic checks.
+A decision obligation requires coordinator `attach_proposal` with a stable proposal ID, increasing revision and exact statement. The server hashes ID, version, statement and subject revision. Assigned respondent `decide` must present that hash, current obligation and subject versions, approve/reject, reason and bounded observation/validity times. Acceptance follows the mission policy: configured independent checks remain required; responsible-reply autonomous missions use their explicitly selected acceptance rule. Ordinary fact replies cannot satisfy decision obligations. Verified decisions appear in result decision references, including choice and hash; rejection is a collected decision, not permission to execute the rejected action. AI cannot amend source scope or adopt configuration. Autonomous tools may assemble a grounded proposal and record a bound participant’s explicit decision; they cannot grant approval themselves. Structured channel `decide` is subject to the same exact-contact scope and deterministic checks.
 
 ## Source handback
 
@@ -105,3 +104,7 @@ The shared local form uses a dedicated secretless native-auth app client. Hosted
 ## Autonomous observer experience
 
 Production coordination and generic communication missions run without normal internal operator approval. Their case view defaults to live updates and hides role-play, manual sending, manual AI invocation and simulated source acknowledgement controls. The observer still sees tasks, clarification/source questions, current evidence, machine decisions, channel activity and source outcomes. Legacy workflows retain their practice/review controls. Accepted participant reports have a distinct map state from independently verified evidence.
+
+## Browser session security limits
+
+Persistent browser sign-in necessarily stores a bearer refresh token in JavaScript-accessible storage in this implementation. CSP and no third-party scripts reduce exposure but do not eliminate XSS or compromised-device risk. No password or access JWT is persisted by the session module. A server-side HttpOnly cookie session is future hardening; do not claim equivalent protection. Shared public guest access remains unsuitable for confidential data. MFA remains temporarily disabled by owner configuration.

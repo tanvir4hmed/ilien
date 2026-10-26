@@ -44,25 +44,33 @@ resource "aws_cognito_user_pool_client" "console" {
   enable_token_revocation              = true
   access_token_validity                = 15
   id_token_validity                    = 15
-  refresh_token_validity               = 1
+  refresh_token_validity               = 24
+  refresh_token_rotation {
+    feature                    = "ENABLED"
+    retry_grace_period_seconds = 10
+  }
   token_validity_units {
     access_token  = "minutes"
     id_token      = "minutes"
     refresh_token = "hours"
   }
-  explicit_auth_flows = ["ALLOW_REFRESH_TOKEN_AUTH"]
+  explicit_auth_flows = ["ALLOW_USER_SRP_AUTH"]
 }
 resource "aws_cognito_user_pool_client" "shared" {
   name                                 = "ilien-shared-sign-in"
   user_pool_id                         = aws_cognito_user_pool.operators.id
   generate_secret                      = false
   allowed_oauth_flows_user_pool_client = false
-  explicit_auth_flows                  = ["ALLOW_USER_PASSWORD_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"]
+  explicit_auth_flows                  = ["ALLOW_USER_PASSWORD_AUTH"]
   prevent_user_existence_errors        = "ENABLED"
   enable_token_revocation              = true
   access_token_validity                = 15
   id_token_validity                    = 15
-  refresh_token_validity               = 1
+  refresh_token_validity               = 24
+  refresh_token_rotation {
+    feature                    = "ENABLED"
+    retry_grace_period_seconds = 10
+  }
   token_validity_units {
     access_token  = "minutes"
     id_token      = "minutes"

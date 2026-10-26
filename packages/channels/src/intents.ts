@@ -104,7 +104,7 @@ export async function createDelivery(
   const needed=new Set<string>();
   const collect=(id:string)=>{if(needed.has(id))return;needed.add(id);for(const dep of state.obligations.find(o=>o.id===id)?.dependencies ?? []) collect(dep);};
   for(const dep of obligation.dependencies) collect(dep);
-  const facts=contact.kind === "decision_update" ? [] : state.obligations.filter(o=>needed.has(o.id) && ["accepted","verified"].includes(o.status)).flatMap(o=>(o.reply?.facts ?? []).map(f=>({...f,evidenceId:o.reply!.evidenceId,actorId:o.reply!.actorId})));
+  const facts=contact.kind === "decision_update" ? [] : state.obligations.filter(o=>needed.has(o.id) && ["accepted","verified"].includes(o.status)).flatMap(o=>(o.reply?.facts ?? []).map(f=>({...f,evidenceId:f.evidenceId ?? o.reply!.evidenceId,actorId:f.actorId ?? o.reply!.actorId})));
   const id = randomUUID();
   const result = rows<{ id: string }>(
     await query(

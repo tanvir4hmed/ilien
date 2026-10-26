@@ -43,7 +43,7 @@ export async function approvedTemplate(
     d.request.deadline,
     d.request.claim || d.request.proposal
       ? JSON.stringify({ claim: d.request.claim, proposal: d.request.proposal })
-      : "None",
+      : JSON.stringify((d.request.facts ?? []).filter(f=>d.request.profile?.factKeys.includes(f.key)).map(({key,value,unit})=>({key,value,unit}))),
   ];
   const parameters = values.map((text) => ({
     type: "text",

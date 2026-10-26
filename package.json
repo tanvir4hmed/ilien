@@ -16,6 +16,7 @@
     "test:channels": "node scripts/check-channels.mjs",
     "test:simulation": "node scripts/check-simulation.mjs",
     "test:autonomy": "node scripts/check-autonomy.mjs",
+    "test:console": "node scripts/check-console.mjs",
     "publication:check": "node scripts/publication-check.mjs",
     "simulate": "node scripts/simulate.mjs"
   },

@@ -1,0 +1,26 @@
+{
+  "contractVersion": "1.0",
+  "eventId": "sample-dispatch-exception-001",
+  "eventType": "manufacturing.dispatch_exception_requested",
+  "payloadVersion": "1.0",
+  "occurredAt": "2026-10-26T09:00:00+06:00",
+  "correlationId": "sample-dispatch-001",
+  "subject": {
+    "type": "production_order",
+    "id": "DISPATCH-001",
+    "revision": "1"
+  },
+  "payload": {
+    "siteId": "sample-site-001",
+    "materialLotId": "LOT-TX-204",
+    "requiredQuantity": {
+      "value": "1200",
+      "unit": "metre"
+    },
+    "neededBy": "2026-10-29T16:00:00+06:00",
+    "requestedInformation": [
+      "usable_stock",
+      "allocation"
+    ]
+  }
+}

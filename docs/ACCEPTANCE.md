@@ -66,3 +66,9 @@ After validating the exact completed result through the authenticated source pol
 This acknowledgement confirms receipt of the historical result. It does not assert that a real external factory consumed the SNS message, refresh the report's evidence validity, or authorize stock release. The participant's report had a recorded validity window; acknowledgement arrived later. No operational action was executed.
 
 A UI inspection also found that earlier outcome cards projected current task statuses. They now render each result's recorded requirements, preserving the distinction between the earlier waiting/in-progress snapshot and the later accepted/completed snapshot. A regression checks that history is not rewritten.
+
+## Communication workspace continuation —26 October2026
+
+Build,Terraform formatting/validation and56 deterministic checks pass: AI12,channels16,simulation3,autonomy17,console8. New checks cover partial fact provenance/expiry, deadline-only continuation, exact-proposal clarification, withdrawal/reroute invalidation and absolute24-hour browser session restoration, rotation, connection failures and logout races. The24-hour boundary uses a controlled clock; this is not a24-hour real-time soak.
+
+A real Nova Pro partial-dispatch rehearsal completed seven transitions with simulated transport: partial inspection→deadline-only reply→800 metre allocation→grounded proposal→conditional clarification→explicit approval→completed communication. Usage51992 input/1450 output tokens. Initial attempts correctly failed grounding/uncertainty checks and led to clearer all-number citation instructions. This is one targeted model exercise, not a general accuracy claim or live multi-channel acceptance.

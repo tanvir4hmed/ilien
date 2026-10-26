@@ -8,6 +8,7 @@ import {
   type Operation,
   type Outcome,
   type Policy,
+  type ReportedFact,
 } from "./types.js";
 const fail = (code: string, status = 409): never => {
   throw new CoordinationError(code, status);
@@ -49,6 +50,7 @@ function invalidate(
   const o = node(state, id);
   o.status = "waiting";
   delete o.reply;
+  delete o.retainedFacts;
   delete o.decision;
   // A changed prerequisite invalidates the proposed business terms as well.
   // They must be assembled again from the current dependency evidence.
@@ -97,6 +99,10 @@ function fresh(o: Obligation, now: string, policy: Policy) {
     Date.parse(o.reply.observedAt) >=
       Date.parse(now) - policy.evidenceAgeSeconds * 1000
   );
+}
+function knownFacts(o:Obligation,state:CaseState,now:string):ReportedFact[] {
+  const candidates=[...(o.retainedFacts ?? []),...(o.reply?.facts ?? []).map(f=>({...f,evidenceId:f.evidenceId ?? o.reply!.evidenceId,actorId:f.actorId ?? o.reply!.actorId,subjectRevision:f.subjectRevision ?? o.reply!.subjectRevision,reportedAt:f.reportedAt ?? o.reply!.observedAt,validUntil:f.validUntil ?? o.reply!.validUntil}))];
+  return [...new Map(candidates.filter(f=>f.actorId===o.assignee && f.subjectRevision===state.subject.revision && Date.parse(f.validUntil)>Date.parse(now)).map(f=>[f.key,f])).values()];
 }
 function rememberDecisionNotices(state:CaseState,contacts:Contact[]) {
   for(const c of contacts.filter(c=>c.kind==="decision_notice" && c.decisionId && c.decisionHash)) {
@@ -394,7 +400,10 @@ export function transition(
         const o = node(state,op.obligationId);
         if ((o.clarificationCount ?? 0) >= 4) fail("clarification_limit_source_attention");
         if (o.question.trim().toLowerCase() === op.question.trim().toLowerCase()) fail("duplicate_clarification");
+        const retained=knownFacts(o,state,now),proposal=o.proposal;
         invalidate(state,o.id,now);
+        o.retainedFacts=op.discardFacts ? [] : retained;
+        if(proposal && o.dependencies.every(id=>satisfied(node(state,id))))o.proposal=proposal;
         o.question = op.question;
         o.clarificationCount = (o.clarificationCount ?? 0)+1;
         break;
@@ -532,6 +541,9 @@ export function transition(
             Date.parse(op.observedAt) + policy.evidenceAgeSeconds * 1000
         )
           fail("invalid_evidence_validity");
+        const collected=op.type==="reply" && state.autonomous ? new Map(knownFacts(o,state,now).map(f=>[f.key,f])) : new Map<string,ReportedFact>();
+        if(op.type==="reply")for(const fact of op.facts ?? [])collected.set(fact.key,{...fact,evidenceId,actorId:actor!.id,subjectRevision:op.subjectRevision,reportedAt:op.observedAt,validUntil:op.validUntil});
+        if(collected.size>12)fail("collected_fact_limit");
         invalidateParents(state, o.id, now);
         o.revision++;
         o.reply = {
@@ -541,11 +553,12 @@ export function transition(
           statement:
             op.type === "decide" ? `${op.choice}: ${op.reason}` : op.statement,
           observedAt: op.observedAt,
-          validUntil: op.validUntil,
+          validUntil: new Date(Math.min(Date.parse(op.validUntil),...[...collected.values()].map(f=>Date.parse(f.validUntil)))).toISOString(),
           subjectRevision: op.subjectRevision,
           timeBasis: op.timeBasis ?? "observed",
-          ...(op.type === "reply" ? {facts:op.facts,progress:op.progress,statusQuote:op.statusQuote} : {}),
+          ...(op.type === "reply" ? {facts:[...collected.values()],progress:op.progress,statusQuote:op.statusQuote} : {}),
         };
+        delete o.retainedFacts;
         if (op.type === "decide")
           o.decision = {
             proposalHash: op.proposalHash,
@@ -560,7 +573,7 @@ export function transition(
         if (o.kind === "completion" && op.type === "reply" && op.progress !== "ready") {
           o.status="waiting"; o.nextContactAt=now; o.reminders=0;
         }
-        const missing=op.type === "reply" ? (o.requiredFacts ?? []).filter(key=>!op.facts?.some(f=>f.key===key)) : [];
+        const missing=op.type === "reply" ? (o.requiredFacts ?? []).filter(key=>!o.reply!.facts?.some(f=>f.key===key)) : [];
         if(state.autonomous && missing.length && (o.kind!=="completion" || (op.type==="reply" && op.progress==="ready"))) {
           o.status="waiting";o.nextContactAt=now;o.reminders=0;
           o.question=`Please confirm ${missing.map(k=>k.replaceAll("_"," ")).join(", ")} for ${state.subject.id}. Preserve quantities, units, timing and uncertainty; no completion is inferred from missing information.`;
