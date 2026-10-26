@@ -13,6 +13,7 @@ import { autonomousGate, clarificationFallback } from "../../ai/src/autonomy.js"
 import { autonomousTools, autonomousToolProposal } from "../../ai/src/tools.js";
 import { hash, serializeProposal } from "../../ai/src/contracts.js";
 import { messageProfileSchema } from "../../contracts/src/communication.js";
+import { recordedRequirements } from "../../../apps/console/src/journey.js";
 const now=new Date().toISOString(), later=new Date(Date.now()+1800000).toISOString();
 function fresh() {
  const event=sourceEventSchema.parse(JSON.parse(readFileSync("packages/contracts/examples/production-coordination.event.json","utf8")));
@@ -172,4 +173,12 @@ test("a wrong-department refusal cannot satisfy the task or invent a replacement
  assert.throws(()=>autonomousGate(c,autonomousToolProposal("coordinate_record_answer",{reason:"Refusal",statement:text,facts:[]},c)),/ai_wrong_department_requires_routing/);
  assert.equal(autonomousGate(c,autonomousToolProposal("coordinate_reroute",{reason:"Quality explicitly identified",group:"quality"},c)).type,"reroute");
  assert.throws(()=>autonomousGate(c,autonomousToolProposal("coordinate_reroute",{reason:"Guess",group:"procurement"},c)),/ai_route_owner_not_identified/);
+});
+
+test("earlier source outcome cards preserve their recorded requirement states",()=>{
+ const earlier={requirements:[{requirementId:"request",status:"missing",reasonCode:"waiting"}]};
+ const current={requirements:[{requirementId:"request",status:"satisfied",reasonCode:"accepted"}]};
+ assert.deepEqual(recordedRequirements(earlier),[{requirement:"request",status:"Waiting"}]);
+ assert.deepEqual(recordedRequirements(current),[{requirement:"request",status:"Accepted"}]);
+ assert.equal(earlier.requirements[0]!.reasonCode,"waiting");
 });

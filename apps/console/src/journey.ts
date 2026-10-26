@@ -18,6 +18,14 @@ export const words = (value: unknown): string =>
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/[_.-]+/g, " ")
     .replace(/^./, (s) => s.toUpperCase());
+/** A result is a historical snapshot; never project today's tasks onto an older result. */
+export function recordedRequirements(result: RecordRow) {
+  const requirements=Array.isArray(result.requirements) ? result.requirements : [];
+  return requirements.map((value: unknown) => {
+    const item=value && typeof value === "object" ? value as RecordRow : {};
+    return {requirement:String(item.requirementId ?? item.id ?? "Unknown"),status:words(item.reasonCode ?? item.status ?? "not recorded")};
+  });
+}
 export const instant = (value: unknown): number => {
   let text = String(value ?? "");
   if (/^\d{4}-\d\d-\d\d[ T]\d\d:\d\d:\d\d(?:\.\d+)?$/.test(text))

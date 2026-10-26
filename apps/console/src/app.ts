@@ -3,6 +3,7 @@ import { guestLogin, type GuestConfig } from "./guest-login.js";
 import { authoredReplyText } from "../../../packages/channels/src/text.js";
 import {
   renderJourney,
+  recordedRequirements,
   summary,
   words,
   date,
@@ -834,11 +835,7 @@ async function casePage(id: string) {
         outcome: words(result.outcome),
         summary: result.summary,
         created: date(result.generatedAt),
-        requirements: state.obligations.map((o) => ({
-          department: words(o.group),
-          question: o.question,
-          status: words(o.status),
-        })),
+        requirements: recordedRequirements(result),
       },
       item,
     );

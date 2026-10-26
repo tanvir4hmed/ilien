@@ -58,3 +58,11 @@ The owner replied through Gmail to the fresh autonomous quality request. The ext
 The accepted structured facts are `passing_quantity=1100 metre`, `quarantined_quantity=100 metre`, and `release_authorization=not authorized`. The required fact keys were satisfied, and the information-collection mission completed automatically. This is acceptance of the responsible participant's report, not an independently verified factory inspection or permission to release stock. Original quoted email history was retained separately from the authored-message interpretation.
 
 The current result has `status=done`, `outcome=completed`, `missionTerminal=true`, `scope=communication_only`, and no unresolved source questions. Its SNS dispatch is published. The previous in-progress result remains historical. Source acknowledgement is still absent; downstream source consumption or operational action is not claimed. This completes one real SES send → Gmail reply → autonomous extraction/acceptance → source-result publication. Real multidepartment WhatsApp/email negotiation remains separate acceptance work.
+
+### Requesting-source simulator acknowledgement
+
+After validating the exact completed result through the authenticated source polling API, a simulated requesting source acknowledged that result ID. The same acknowledgement was replayed and returned duplicate=true without another effect. Chrome showed Completed, accepted quality information, Published source delivery and Accepted source acknowledgement; the communication trace showed the actual email delivery and applied external reply.
+
+This acknowledgement confirms receipt of the historical result. It does not assert that a real external factory consumed the SNS message, refresh the report's evidence validity, or authorize stock release. The participant's report had a recorded validity window; acknowledgement arrived later. No operational action was executed.
+
+A UI inspection also found that earlier outcome cards projected current task statuses. They now render each result's recorded requirements, preserving the distinction between the earlier waiting/in-progress snapshot and the later accepted/completed snapshot. A regression checks that history is not rewritten.
