@@ -11,8 +11,8 @@ for (let attempt = 1; attempt <= maxAttempts; attempt++) {
   const result = JSON.parse(
     Buffer.from(response.Payload ?? []).toString("utf8"),
   );
-  if (!response.FunctionError && result.schemaVersion === 8) {
-    console.log("Database schema version 8 applied.");
+  if (!response.FunctionError && result.schemaVersion === 9) {
+    console.log("Database schema version 9 applied.");
     break;
   }
   // Never print error messages, SQL, credentials, or raw Lambda payloads.

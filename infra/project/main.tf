@@ -246,9 +246,10 @@ module "agent" {
   artifact_bucket      = "ilien-terraform-${local.account}-us-east-1"
   zip_path             = "../../dist/agent.zip"
   timeout              = 120
-  environment          = local.common
+  environment          = merge(local.common, { RELAY_FUNCTION = module.relay.name })
   policy = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [
     { Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], Resource = module.agent_queue.arn },
+    { Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = module.relay.arn },
     { Effect = "Allow", Action = ["bedrock:InvokeModel"], Resource = "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0" }
   ]) })
 }

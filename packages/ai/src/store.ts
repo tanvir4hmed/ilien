@@ -22,6 +22,7 @@ import {
 import {
   MODEL_ID,
   PROMPT_VERSION,
+  RUN_LIMITS,
   hash,
   groundedQuote,
   decode,
@@ -34,6 +35,7 @@ import {
 } from "./contracts.js";
 import { pausedFor } from "../../operations/src/controls.js";
 import { authoredReplyText } from "../../channels/src/text.js";
+import { autonomousGate } from "./autonomy.js";
 function fail(s: string): never {
   throw new CoordinationError(s);
 }
@@ -42,7 +44,7 @@ const args = (source: Source) => [
   param("source", source.id),
 ];
 export async function settings(source: Source, tx: string) {
-  return rows<{ enabled: boolean; auto_receipts: boolean; revision: number }>(
+  return rows<{ enabled: boolean; auto_receipts: boolean; revision: number; execution_mode: "autonomous" | "review" }>(
     await query(
       "SELECT * FROM ai_settings WHERE connection_id=CAST(:source AS uuid) FOR SHARE",
       [param("source", source.id)],
@@ -120,9 +122,9 @@ export async function enqueueAgent(
   )[0]!;
   // A material case has four branches plus independent verification/children.
   // Admission must allow that complete bounded workflow, not stop at branch 3.
-  if (count.daily >= 30 || count.case_daily >= 12 || count.case_total >= 40)
+  if (count.daily >= RUN_LIMITS.tenantDaily || count.case_daily >= RUN_LIMITS.caseDaily || count.case_total >= RUN_LIMITS.caseLifetime)
     return { state: "budget_exhausted" };
-  if (count.same_input >= 2) return { state: "no_progress_limit" };
+  if (count.same_input >= RUN_LIMITS.sameInput) return { state: "no_progress_limit" };
   const id = randomUUID();
   await query(
     "INSERT INTO ai_runs(tenant_id,connection_id,case_id,id,receipt_id,expected_revision,request_key,model_id,prompt_version,settings_revision) VALUES(CAST(:tenant AS uuid),CAST(:source AS uuid),CAST(:case AS uuid),CAST(:id AS uuid),CAST(NULLIF(:receipt,'') AS uuid),CAST(:revision AS int),:key,:model,:prompt,CAST(:settings AS int))",
@@ -165,6 +167,7 @@ export async function buildContext(
   );
   if (!actor) fail("ai_coordinator_unavailable");
   const context: Context = {
+    executionMode: cfg.execution_mode,
     state,
     policy,
     policyHash: hash(JSON.stringify(policy)),
@@ -396,6 +399,10 @@ export async function runDetail(source: Source, id: string) {
     if (!run) fail("ai_run_not_found");
     return {
       run,
+      execution: rows(await query(
+        "SELECT actor_id,proposal_hash,policy_hash,settings_revision,case_revision,operation,created_at FROM ai_executions WHERE run_id=CAST(:id AS uuid)",
+        [param("id", id)], tx,
+      ))[0] ?? null,
       steps: rows(
         await query(
           "SELECT step,observation,created_at FROM ai_steps WHERE run_id=CAST(:id AS uuid) ORDER BY step",
@@ -413,6 +420,70 @@ export async function runDetail(source: Source, id: string) {
         )[0] ?? null,
     };
   });
+}
+
+/** Idempotent application transaction; machine execution is never recorded as a human review. */
+export async function executeAutonomousRun(source: Source, id: string) {
+  return transaction(source.tenant_id, async (tx) => {
+    const initial = rows<Run>(await query(
+      "SELECT * FROM ai_runs WHERE id=CAST(:id AS uuid) AND connection_id=CAST(:source AS uuid)",
+      [...args(source), param("id", id)], tx,
+    ))[0];
+    if (!initial) fail("ai_run_not_found");
+    await getCase(source, initial.case_id, tx, true);
+    const run = rows<Run>(await query(
+      "SELECT * FROM ai_runs WHERE id=CAST(:id AS uuid) FOR UPDATE", [param("id", id)], tx,
+    ))[0]!;
+    if (run.state === "executed") return { state: "executed", duplicate: true };
+    if (run.state !== "proposed" || !run.proposal || !run.context) return { state: run.state };
+    if (await pausedFor(source, "agent", tx)) fail("agent_processing_paused");
+    const fresh = await buildContext(source, run, tx), original = decode(run.context);
+    if (fresh.executionMode !== "autonomous" || fresh.policyHash !== original.policyHash)
+      fail("ai_autonomous_configuration_changed");
+    for (const k of [...original.knowledge].sort((a,b) => a.document_key.localeCompare(b.document_key))) {
+      await query("SELECT pg_advisory_xact_lock(hashtextextended(:key,0))::text", [param("key", `knowledge/${source.tenant_id}/${source.id}/${k.document_key}`)], tx);
+      const valid = rows(await query(
+        "SELECT id FROM ai_knowledge k WHERE id=CAST(:id AS uuid) AND connection_id=CAST(:source AS uuid) AND sha256=:hash AND NOT revoked AND effective_at<=now() AND expires_at>now() AND NOT EXISTS(SELECT 1 FROM ai_knowledge n WHERE n.connection_id=k.connection_id AND n.document_key=k.document_key AND n.version>k.version AND n.effective_at<=now()) FOR SHARE OF k",
+        [...args(source), param("id", k.id), param("hash", k.sha256)], tx,
+      ));
+      if (!valid.length || !fresh.policy.groups.includes(k.group_id)) fail("ai_knowledge_changed");
+    }
+    fresh.knowledge = original.knowledge;
+    const proposal = proposalSchema.parse(decode(run.proposal));
+    if (hash(JSON.stringify(proposal)) !== run.proposal_hash) fail("ai_proposal_hash_mismatch");
+    const operation = autonomousGate(fresh, proposal);
+    const applied = await applyCommand(source, run.case_id, JSON.stringify({
+      commandId: run.id, expectedRevision: run.expected_revision, actorId: fresh.actorId, operation,
+    }), tx, fresh.receipt?.evidenceId ?? fresh.state.sourceEvidenceId);
+    await query(
+      "INSERT INTO ai_executions(tenant_id,run_id,actor_id,proposal_hash,policy_hash,settings_revision,case_revision,operation) VALUES(CAST(:tenant AS uuid),CAST(:id AS uuid),:actor,:hash,:policy,CAST(:settings AS int),CAST(:revision AS int),CAST(:operation AS jsonb))",
+      [...args(source), param("id", id), param("actor", fresh.actorId), param("hash", run.proposal_hash!), param("policy", fresh.policyHash), param("settings", String(run.settings_revision)), param("revision", String(applied.revision)), param("operation", JSON.stringify(operation))], tx,
+    );
+    if (fresh.receipt) await query("UPDATE channel_receipts SET status='applied',reason='autonomous_grounded_interpretation' WHERE id=CAST(:id AS uuid)", [param("id", fresh.receipt.id)], tx);
+    await query("UPDATE ai_runs SET state='executed',reason='autonomous_policy_gated_execution',updated_at=now() WHERE id=CAST(:id AS uuid)", [param("id", id)], tx);
+    return { state: "executed", revision: applied.revision, duplicate: false };
+  });
+}
+
+/** One durable run per meaningful revision; idle waiting never polls a model. */
+export async function enqueueAutonomousCase(source: Source, caseId: string, tx: string) {
+  const cfg = await settings(source, tx);
+  if (!cfg?.enabled || cfg.execution_mode !== "autonomous") return;
+  const state = await getCase(source, caseId, tx);
+  await enqueueAgent(source, caseId, null, `autonomous/${caseId}/${state.revision}`, tx);
+}
+
+/** A concurrent branch may advance the case before a queued reply is interpreted. */
+export async function refreshStaleRun(source: Source, run: Run, tx: string) {
+  const cfg = await settings(source, tx);
+  if (!cfg?.enabled || cfg.execution_mode !== "autonomous" || cfg.revision !== run.settings_revision) return;
+  const state = await getCase(source, run.case_id, tx);
+  if (state.status !== "active" || state.revision === run.expected_revision) return;
+  if (run.receipt_id && !rows(await query(
+    "SELECT id FROM channel_receipts WHERE id=CAST(:id AS uuid) AND case_id=CAST(:case AS uuid) AND connection_id=CAST(:source AS uuid) AND status='needs_review' AND reason='unstructured_reply'",
+    [...args(source), param("id", run.receipt_id), param("case", run.case_id)], tx,
+  )).length) return;
+  await enqueueAgent(source, run.case_id, run.receipt_id, `refresh/${run.id}/${state.revision}`, tx, !!run.receipt_id);
 }
 const reviewSchema = z.strictObject({
   proposalHash: z.string().regex(/^[a-f0-9]{64}$/),

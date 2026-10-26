@@ -1352,7 +1352,8 @@ function formFields(
     consentRef: "Consent reference",
     address: "Email address or international phone number",
     expectedRevision: "Settings version",
-    autoReceipts: "Request AI review for incoming replies",
+    autoReceipts: "Process incoming replies with AI",
+    executionMode: "AI execution mode",
     intakePaused: "Pause new requests",
     agentPaused: "Pause AI reviews",
     outboundPaused: "Pause outgoing messages",
@@ -2200,6 +2201,7 @@ async function settings() {
     jsonForm(c, "Update AI controls", "/ai/settings", {
       enabled: ai.enabled,
       autoReceipts: ai.auto_receipts,
+      executionMode: ai.execution_mode,
       expectedRevision: ai.revision,
     });
     const m = card("Workspace access");

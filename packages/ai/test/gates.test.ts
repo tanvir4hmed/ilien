@@ -4,6 +4,7 @@ import { textilePolicy } from "../../domain-packs/src/textile.js";
 import type { CaseState } from "../../coordination/src/types.js";
 import { gate } from "../src/store.js";
 import type { Context, Proposal } from "../src/contracts.js";
+import { autonomousGate } from "../src/autonomy.js";
 
 const now = new Date().toISOString();
 const later = new Date(Date.now() + 30 * 60_000).toISOString();
@@ -153,4 +154,31 @@ test("wait and review dispositions must carry no effectful operation", () => {
   assert.throws(() => gate(context(), p), /ai_nonproposal_operation/);
   p.operation = null;
   assert.doesNotThrow(() => gate(context(), p));
+});
+
+test("autonomous execution requires server-selected autonomous mode", () => {
+  assert.throws(() => autonomousGate(context(), childProposal()), /autonomous_mode_required/);
+  const c = context();
+  c.executionMode = "autonomous";
+  assert.equal(autonomousGate(c, childProposal()).type, "add_child");
+});
+
+test("unresolved uncertainty cannot become an autonomous effect", () => {
+  const c = context(); c.executionMode = "autonomous";
+  const p = childProposal(); p.uncertainties = ["The exact lot is ambiguous."];
+  assert.throws(() => autonomousGate(c, p), /autonomous_clarification_required/);
+});
+
+test("autonomous mode retains evidence and authority gates", () => {
+  const c = context(); c.executionMode = "autonomous";
+  const p = childProposal(); p.citations[1]!.ref = "invented";
+  assert.throws(() => autonomousGate(c, p), /ai_citation_mismatch/);
+  const forbidden = childProposal({ type: "pause", reason: "Bypass all waiting." });
+  assert.throws(() => autonomousGate(c, forbidden), /ai_receipt_operation_forbidden/);
+});
+
+test("waiting does not create an autonomous operation or inference loop", () => {
+  const c = context(); c.executionMode = "autonomous";
+  const p: Proposal = { disposition: "wait", operation: null, reason: "Await the current question.", citations: [], uncertainties: [] };
+  assert.throws(() => autonomousGate(c, p), /autonomous_no_effect/);
 });

@@ -1,6 +1,6 @@
 # Architecture overview
 
-ILIEN implements intake, deterministic coordination and real AWS WhatsApp/SES adapters. A bounded Bedrock planner with mandatory operator review is implemented; the operator UI uses Cognito identity and server-side workspace membership. Latest CI determines deployed status; [acceptance evidence](ACCEPTANCE.md) distinguishes targeted checks from remaining production assurance.
+ILIEN implements intake, deterministic coordination and real AWS WhatsApp/SES adapters. The bounded Bedrock planner supports autonomous policy-gated execution and explicit review mode; [current scope and unfinished autonomous capabilities](AUTONOMOUS_COORDINATION.md) are documented. The workspace uses Cognito identity and server-side membership. Latest CI determines deployed status; [acceptance evidence](ACCEPTANCE.md) distinguishes targeted checks from remaining assurance.
 
 ```mermaid
 flowchart LR
@@ -22,6 +22,8 @@ flowchart LR
   AQ --> AG[Bounded agent worker]
   AG --> BR[Bedrock Converse]
   AG --> DB
+  AG --> EXEC[Autonomous execution gate + machine audit]
+  EXEC --> CORE
   API --> REVIEW[Exact proposal review]
   REVIEW --> CORE
   BROWSER[Operator console on CloudFront] --> AUTH[Cognito code + PKCE]
@@ -43,7 +45,7 @@ Machine source identity is resolved from trusted IAM context. Browser operators 
 
 Built-in workflows validate their versioned payload contracts; administrator-configured mappings enforce configured required top-level fields, not arbitrary domain semantics. Unknown or minimal catalogue payloads stay triage. Verified simulated claims satisfy required dependencies; changed evidence invalidates dependent claims. Results describe communication outcomes, never implicit factory actions. Contact snapshots remain separate from provider delivery intents, incoming evidence and transport events. Enabled consented bindings allow real sends. [Coordination API](COORDINATION.md) documents exact behavior and bounds.
 
-The bounded AI worker proposes next steps through the same authority/version/evidence gates after exact-proposal operator review. See [AI architecture and limits](AI.md). The channel module supplies operator-attested identity bindings, fixed disclosure/rendering, provider receipts and conservative uncertain-send handling; scheduled reconciliation is implemented; targeted conversation acceptance is recorded separately, while recovery/load validation remains pending. See [channels](CHANNELS.md). Existing simulation role-play must not be reused as production authorization.
+The bounded AI worker proposes next steps through the same authority/version/evidence gates. Autonomous mode applies eligible grounded operations without internal operator approval; review mode retains exact-proposal review. See [AI architecture and limits](AI.md). The channel module supplies administrator-attested identity bindings, fixed disclosure/rendering, provider receipts and conservative uncertain-send handling. Scheduled reconciliation is implemented; targeted conversation acceptance is recorded separately, while recovery/load validation remains pending. See [channels](CHANNELS.md). Existing simulation role-play must not be reused as production authorization.
 
 Infrastructure is modular Terraform delivered by GitHub Actions with short-lived OIDC credentials and content-addressed private Lambda artifacts. Aurora is private and encrypted; Data API avoids permanent app connection pools. There is one configured tenant, one database writer and no automatic regional failover. No production scalability, security certification or tested tenant-isolation claim is made.
 

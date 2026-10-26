@@ -20,6 +20,7 @@ import {
   type Policy,
 } from "./types.js";
 import { createDelivery } from "../../channels/src/intents.js";
+import { enqueueAutonomousCase } from "../../ai/src/store.js";
 export type Source = { tenant_id: string; id: string; origin: string };
 const digest = (raw: string) => createHash("sha256").update(raw).digest("hex");
 function decode<T>(value: T | string): T {
@@ -275,6 +276,10 @@ async function persist(
     );
   const wake = nextWake(state, policy, now);
   if (wake) await enqueue(tenant, state, wake, tx);
+  const operation = JSON.parse(raw) as { type?: string; operation?: { type?: string } };
+  const type = operation.operation?.type ?? operation.type;
+  if (type && ["activate", "reply", "verify", "decide", "add_child", "link_dependency", "reassign", "reopen"].includes(type))
+    await enqueueAutonomousCase({ tenant_id: tenant, id: state.sourceId, origin: state.origin }, state.id, tx);
 }
 async function enqueue(
   tenant: string,

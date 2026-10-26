@@ -7,7 +7,9 @@ import {
 } from "../../persistence/src/database.js";
 import { getCase, type Source } from "../../coordination/src/service.js";
 import { CoordinationError } from "../../coordination/src/types.js";
-import { buildContext, gate, retrieve } from "./store.js";
+import {
+  buildContext, gate, retrieve, executeAutonomousRun, refreshStaleRun, settings,
+} from "./store.js";
 import {
   MODEL_ID,
   PROMPT_VERSION,
@@ -58,7 +60,7 @@ export async function processRun(tenant: string, id: string) {
       );
       return null;
     }
-    if (run.state !== "pending") return null;
+    if (!["pending", "proposed"].includes(run.state)) return null;
     let context: Context;
     try {
       if (run.model_id !== MODEL_ID || run.prompt_version !== PROMPT_VERSION)
@@ -66,13 +68,17 @@ export async function processRun(tenant: string, id: string) {
       context = await buildContext(source, run, tx);
     } catch (e) {
       if (!(e instanceof CoordinationError)) throw e;
+      const config = await settings(source, tx);
       await query(
-        "UPDATE ai_runs SET state='needs_review',reason=:reason,updated_at=now() WHERE id=CAST(:id AS uuid)",
-        [param("id", id), param("reason", e.code)],
+        "UPDATE ai_runs SET state=:state,reason=:reason,updated_at=now() WHERE id=CAST(:id AS uuid)",
+        [param("id", id), param("reason", e.code), param("state", e.code === "ai_stale_context" ? "stale" : config?.execution_mode === "autonomous" ? "needs_clarification" : "needs_review")],
         tx,
       );
+      if (e.code === "ai_stale_context") await refreshStaleRun(source, run, tx);
       return null;
     }
+    if (run.state === "proposed")
+      return context.executionMode === "autonomous" ? { source, run, context, resume: true } : null;
     await query(
       "UPDATE ai_runs SET state='running',lease_token=CAST(:lease AS uuid),started_at=now(),context=CAST(:context AS jsonb),context_hash=:hash,updated_at=now() WHERE id=CAST(:id AS uuid)",
       [
@@ -83,7 +89,7 @@ export async function processRun(tenant: string, id: string) {
       ],
       tx,
     );
-    return { source, run, context };
+    return { source, run, context, resume: false };
   });
   if (!claimed) return;
   const { source, run, context } = claimed;
@@ -96,6 +102,10 @@ export async function processRun(tenant: string, id: string) {
         throw new CoordinationError("ai_policy_changed");
     });
   try {
+    if (claimed.resume) {
+      await executeAutonomousRun(source, id);
+      return;
+    }
     const result = await plan(context, run.model_id, {
       validate: (proposal) => gate(context, proposal),
       stillCurrent: current,
@@ -145,7 +155,7 @@ export async function processRun(tenant: string, id: string) {
           ? "proposed"
           : result.proposal.disposition === "wait"
             ? "waiting"
-            : "needs_review";
+            : context.executionMode === "autonomous" ? "needs_clarification" : "needs_review";
       await query(
         "UPDATE ai_runs SET state=:state,reason=:reason,proposal=CAST(:proposal AS jsonb),proposal_hash=:hash,context=CAST(:context AS jsonb),context_hash=:contextHash,input_tokens=CAST(:input AS int),output_tokens=CAST(:output AS int),updated_at=now() WHERE id=CAST(:id AS uuid) AND state='running' AND lease_token=CAST(:lease AS uuid)",
         [
@@ -153,7 +163,7 @@ export async function processRun(tenant: string, id: string) {
           param(
             "reason",
             result.proposal.disposition === "propose"
-              ? "operator_semantic_review_required"
+              ? context.executionMode === "autonomous" ? "autonomous_validation_pending" : "operator_semantic_review_required"
               : result.proposal.disposition,
           ),
           param("proposal", raw),
@@ -168,6 +178,9 @@ export async function processRun(tenant: string, id: string) {
         tx,
       );
     });
+    if (context.executionMode === "autonomous") {
+      await executeAutonomousRun(source, id);
+    }
   } catch (error) {
     const reason =
       error instanceof CoordinationError
@@ -176,18 +189,20 @@ export async function processRun(tenant: string, id: string) {
           ? error.message
           : "model_or_validation_unavailable";
     // An unknown provider outcome consumes the reserved allowance; never blindly re-run inference.
-    await transaction(tenant, (tx) =>
-      query(
-        "UPDATE ai_runs SET state='needs_review',reason=:reason,context=CAST(:context AS jsonb),context_hash=:hash,updated_at=now() WHERE id=CAST(:id AS uuid) AND state='running' AND lease_token=CAST(:lease AS uuid)",
+    await transaction(tenant, async (tx) => {
+      await query(
+        "UPDATE ai_runs SET state=:state,reason=:reason,context=CAST(:context AS jsonb),context_hash=:hash,updated_at=now() WHERE id=CAST(:id AS uuid) AND state IN ('running','proposed') AND (lease_token=CAST(:lease AS uuid) OR state='proposed')",
         [
           param("id", id),
           param("lease", lease),
           param("reason", reason),
+          param("state", reason === "ai_stale_context" ? "stale" : context.executionMode === "autonomous" ? "needs_clarification" : "needs_review"),
           param("context", JSON.stringify(context)),
           param("hash", hash(JSON.stringify(context))),
         ],
         tx,
-      ),
-    );
+      );
+      if (reason === "ai_stale_context") await refreshStaleRun(source, run, tx);
+    });
   }
 }

@@ -275,7 +275,7 @@ export function userGuide(parent: HTMLElement, go: (page: string) => void) {
     ),
     node(
       "p",
-      "AI suggestions are optional and require review. Opening a map does not run AI. Do not approve a suggestion without checking its cited evidence.",
+      "Autonomous AI can apply supported, grounded steps without an internal operator click. Unresolved interpretation needs clarification; automatic clarification conversations are still being developed. Review mode requires checking cited evidence before approval. Opening a map does not run AI.",
     ),
   );
   parent.append(limits);

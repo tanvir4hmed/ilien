@@ -47,4 +47,4 @@ Outcome shows current versus earlier results, pending requirements, source deliv
 
 ## 9. AI and settings
 
-AI assistance is optional, bounded and review-gated. Check the reason and quoted evidence before approving an exact suggestion. Looking at a map does not invoke a model. Admin Settings contains people/channels, references, workflow rules and advanced operations. Do not change these simply to clear a blocked status.
+AI coordination is bounded and can run in autonomous or review mode. Autonomous mode applies supported grounded steps without an internal operator click; unresolved interpretation is shown as Needs clarification. Automatic clarification conversations are still being implemented. Review mode requires checking the original evidence before approving the exact suggestion. Looking at a map does not invoke a model. Admin Settings contains people/channels, references, workflow rules and advanced operations. Do not change these simply to clear a blocked status. See [current autonomous capabilities](AUTONOMOUS_COORDINATION.md).

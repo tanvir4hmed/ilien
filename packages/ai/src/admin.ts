@@ -68,16 +68,18 @@ export async function adminWrite(
         .strictObject({
           enabled: z.boolean(),
           autoReceipts: z.boolean(),
+          executionMode: z.enum(["autonomous", "review"]).optional(),
           expectedRevision: z.number().int().positive(),
         })
         .parse(JSON.parse(raw));
       const updated = rows(
         await query(
-          "UPDATE ai_settings SET enabled=CAST(:enabled AS boolean),auto_receipts=CAST(:auto AS boolean),revision=revision+1 WHERE connection_id=CAST(:source AS uuid) AND revision=CAST(:revision AS int) RETURNING enabled,auto_receipts,revision",
+          "UPDATE ai_settings SET enabled=CAST(:enabled AS boolean),auto_receipts=CAST(:auto AS boolean),execution_mode=coalesce(NULLIF(:mode,''),execution_mode),revision=revision+1 WHERE connection_id=CAST(:source AS uuid) AND revision=CAST(:revision AS int) RETURNING enabled,auto_receipts,execution_mode,revision",
           [
             ...parameters,
             param("enabled", String(input.enabled)),
             param("auto", String(input.autoReceipts)),
+            param("mode", input.executionMode ?? ""),
             param("revision", String(input.expectedRevision)),
           ],
           tx,
