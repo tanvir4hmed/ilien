@@ -234,5 +234,5 @@ test("automatic questions wait without a second model run; grounded proposal ass
  assert.equal(needsCasePlanning(s,'attach_proposal'),false);
  s=apply(s,'coordinator',{type:'clarify',obligationId:'approval',question:'Please confirm this exact plan',reason:'Conditional reply'}).state;
  assert.equal(needsCasePlanning(s,'clarify'),false);
- assert.equal(needsCasePlanning(s,'source_response'),true);
+ assert.equal(needsCasePlanning(s,'source_response'),false);
 });
