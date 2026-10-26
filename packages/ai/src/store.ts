@@ -1,3 +1,4 @@
+import {needsCasePlanning} from "./scheduling.js";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
@@ -517,10 +518,11 @@ export async function executeAutonomousRun(source: Source, id: string) {
 }
 
 /** One durable run per meaningful revision; idle waiting never polls a model. */
-export async function enqueueAutonomousCase(source: Source, caseId: string, tx: string) {
+export async function enqueueAutonomousCase(source: Source, caseId: string, tx: string, trigger?:string) {
   const cfg = await settings(source, tx);
   if (!cfg?.enabled || cfg.execution_mode !== "autonomous") return;
   const state = await getCase(source, caseId, tx);
+  if(!needsCasePlanning(state,trigger))return;
   await enqueueAgent(source, caseId, null, `autonomous/${caseId}/${state.revision}`, tx);
 }
 

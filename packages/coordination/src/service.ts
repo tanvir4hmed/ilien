@@ -282,7 +282,7 @@ async function persist(
   const operation = JSON.parse(raw) as { type?: string; operation?: { type?: string } };
   const type = operation.operation?.type ?? operation.type;
   if (type && ["activate", "reply", "verify", "decide", "add_child", "link_dependency", "reassign", "reopen","route_initial","clarify","reroute","attach_proposal","relay_decision","source_response"].includes(type))
-    await enqueueAutonomousCase({ tenant_id: tenant, id: state.sourceId, origin: state.origin }, state.id, tx);
+    await enqueueAutonomousCase({ tenant_id: tenant, id: state.sourceId, origin: state.origin }, state.id, tx, type);
 }
 async function enqueue(
   tenant: string,

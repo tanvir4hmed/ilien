@@ -1,3 +1,4 @@
+import {needsCasePlanning} from "../../ai/src/scheduling.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -219,4 +220,19 @@ test("withdrawn or rerouted facts cannot silently survive as current clarificati
  assert.deepEqual(withdrawn.obligations[0]!.retainedFacts,[]);assert.equal(withdrawn.obligations[0]!.reply,undefined);
  const rerouted=apply(s,'coordinator',{type:'reroute',obligationId:'stock',group:'procurement',reason:'Confirmed new owner'}).state;
  assert.equal(rerouted.obligations[0]!.retainedFacts,undefined);assert.equal(rerouted.obligations[0]!.reply,undefined);
+});
+
+test("automatic questions wait without a second model run; grounded proposal assembly still wakes",()=>{
+ let s=fresh();assert.equal(needsCasePlanning(s,'activate'),true);
+ s=apply(s,'coordinator',{type:'route_initial',obligationId:'stock',group:'stores',question:'Confirm usable quantity'}).state;
+ assert.equal(needsCasePlanning(s,'route_initial'),false);
+ s=answer(s,'stock','800 units',[{key:'usable_quantity',value:'800',unit:'units',quote:'800 units'}]).state;
+ assert.equal(needsCasePlanning(s,'reply'),false);
+ s=answer(s,'impact','16:00',[{key:'completion_time',value:'16:00',quote:'16:00'}]).state;
+ assert.equal(needsCasePlanning(s,'reply'),true);
+ s=apply(s,'coordinator',{type:'attach_proposal',obligationId:'approval',proposalId:'p',proposalRevision:1,statement:'800 units by 16:00',reason:'Grounded plan'}).state;
+ assert.equal(needsCasePlanning(s,'attach_proposal'),false);
+ s=apply(s,'coordinator',{type:'clarify',obligationId:'approval',question:'Please confirm this exact plan',reason:'Conditional reply'}).state;
+ assert.equal(needsCasePlanning(s,'clarify'),false);
+ assert.equal(needsCasePlanning(s,'source_response'),true);
 });
