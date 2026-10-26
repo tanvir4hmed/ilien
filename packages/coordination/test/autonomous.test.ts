@@ -11,6 +11,7 @@ import { contactCurrent } from "../../channels/src/intents.js";
 import { gate } from "../../ai/src/store.js";
 import { autonomousGate, clarificationFallback } from "../../ai/src/autonomy.js";
 import { autonomousTools, autonomousToolProposal } from "../../ai/src/tools.js";
+import { hash, serializeProposal } from "../../ai/src/contracts.js";
 import { messageProfileSchema } from "../../contracts/src/communication.js";
 const now=new Date().toISOString(), later=new Date(Date.now()+1800000).toISOString();
 function fresh() {
@@ -143,4 +144,12 @@ test("planning and proposal assembly wait for events rather than invalidating mo
  s=answer(s,"impact","16:00",[{key:"completion_time",value:"16:00",quote:"16:00"}]).state;
  assert.equal(s.obligations[2]!.proposal,undefined);
  assert.ok(Date.parse(nextWake(s,textilePolicy,now)!)>Date.parse(now)+1000);
+});
+
+test("persisted proposal hashing survives JSONB key reordering but detects changed terms",()=>{
+ const p={operation:{question:"Confirm 800 units",group:"stores",obligationId:"stock",type:"route_initial"},uncertainties:[],citations:[{quote:"800",ref:"source"}],reason:"Start",disposition:"propose"};
+ const reorder=(v:unknown):unknown=>Array.isArray(v)?v.map(reorder):v && typeof v==='object'?Object.fromEntries(Object.entries(v).reverse().map(([k,x])=>[k,reorder(x)])):v;
+ assert.equal(hash(serializeProposal(p)),hash(serializeProposal(reorder(p))));
+ const changed=structuredClone(p);changed.operation.question="Confirm 8000 units";
+ assert.notEqual(hash(serializeProposal(p)),hash(serializeProposal(changed)));
 });

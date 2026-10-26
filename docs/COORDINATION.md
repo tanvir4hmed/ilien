@@ -1,12 +1,12 @@
 # Deterministic coordination API
 
-This release implements coordination without a model or live communication provider. Every participant is a **simulated role**, selected by the authenticated configured source. This is a simulator capability, not production human authentication, delegation or proof of a real person's identity. Only a server-configured, enabled simulated connection with a coordination policy can use it. Never enable this capability for an untrusted client.
+The deterministic core applies authorized state transitions independently of model/provider availability. The authenticated source API also supports labelled simulated role-play; this is privileged simulator access, not proof of a real employee's identity. Actual channel replies use configured consented participant bindings. The bounded agent uses the same core through its execution gate. See [autonomous mission behavior](AUTONOMOUS_COORDINATION.md).
 
 ## Activation and scope
 
 Submit `packages/contracts/examples/material-readiness.event.json` through the existing signed event endpoint. A validated `1.0` payload activates four required branches: stores, quality, planning and procurement. Each begins with a simulated ask. `revision-acknowledgement.event.json` activates production and quality acknowledgement branches for an exact revision. The `planning.upstream_supply_shifted` alias requires the same material payload contract. Minimal catalogue payloads, missing revisions and unknown events remain triage; they do not create guessed workflows. Newly created events activate workflows; historical processed intake is not replayed automatically.
 
-The configured source/site is a synthetic sample. Domain templates live in `packages/domain-packs`; generic state transitions live in `packages/coordination`. `coordination_policies` stores server-owned settings, actor eligibility and bounds. No caller can publish a policy through the API. Configuration version mismatch requires review; it is not silently adopted by an active case.
+The configured source/site is a synthetic sample. Domain templates live in `packages/domain-packs`; transitions live in `packages/coordination`. Server-owned configuration stores actor eligibility and bounds; authorized admins can preview and publish it through the configuration API. Active cases do not silently adopt a different configuration version.
 
 ## Access and CLI
 
@@ -59,13 +59,13 @@ Example shape (replace UUID and revisions using the current case; choose current
 | `report` | `reason` | Coordinator; explicit nonterminal partial/blocked report. Never waives required evidence. |
 | `cancel` / `handoff` | `reason` | Coordinator; terminal result and stops future contact/timer work. Handoff reports transfer needed; it does not claim another system accepted ownership. |
 
-Kinds: `fact`, `decision`, `acknowledgement`, `evidence`, `commitment`. These describe communication requirements. Textual decisions do not become executable approvals; formal `decisionRefs` remain empty in this release.
+Kinds: `fact`, `decision`, `acknowledgement`, `evidence`, `commitment`, `completion`. Explicit decisions bind a current proposal hash through `decide`; current authorized decisions appear in `decisionRefs`. Free-form prose and silence do not grant executable authority.
 
 ## State and proof
 
 A reply moves an obligation to `answered`. It triggers a simulated verification request once prerequisites are verified. Verification records the exact reply revision and verifier evidence. Changes to a prerequisite invalidate all ancestors that may depend on it; originals remain in the immutable evidence and claim/journal tables. A child answer does not automatically finish its parent: the parent must supply a fresh answer and verification after prerequisites finish.
 
-Cases complete only when every required obligation is verified and current at that transition. Verification here means an authorized simulated independent attestation, not measured physical truth or semantic proof. The source objective and subject revision are fixed within a case; a different source revision requires a new source event/case. Completed cases require explicit reopening before corrections; previously issued results remain historical.
+Cases complete when every required obligation satisfies its configured acceptance rule and all source questions are answered. Legacy independent rules require current verifier evidence; autonomous responsible-reply rules mark supported reports accepted. Completion tracking additionally requires explicit readiness and configured fact keys. Neither rule proves physical truth. Amendments and corrections preserve history and invalidate dependent evidence. Completed cases require explicit reopening before corrections.
 
 Results follow the versioned coordination-result shape: mission/case IDs and revisions, outcome, terminal flag, requirement evidence, unresolved obligations and a communication-only limitation. The case is the single mission in this release. Results are stored atomically with the transition and are available by authenticated polling. No arbitrary HTTP callback or operational command is issued. A later case revision supersedes earlier results.
 
@@ -86,10 +86,14 @@ Defaults: one-hour deadline, five-minute contact interval, one reminder followed
 
 Timers use a separate SQS queue/worker and durable `coordination_jobs`. A worker wake checks the current case revision; obsolete wakes do nothing. Delays above SQS's 15-minute per-message limit are continued as fresh durable jobs. No model runs while waiting. No active cases means no timer loop. Long-lived active cases still incur queue/Lambda/database costs and can reduce Aurora auto-pause savings.
 
-API commands and initial intake commit work before requesting relay wake. Retry a failed response using the same command bytes: the committed command is not replayed, and the wake is retried. Worker wake failures return a failed SQS batch item. Relay leases recover interrupted dispatch when re-invoked. A wholly exhausted async relay retry still needs authorized manual reconciliation; scheduled global reconciliation is not implemented. The relay processes at most 25 intake/timer jobs per lane and 100 eligible channel intents per invocation. Dead-letter and backlog handling follow the runbook. No globally exactly-once external delivery is claimed.
+API commands and intake commit work before relay wake. Retry a failed response using the same command bytes: committed effects are not replayed. Worker wake failures return a failed SQS batch item. Relay leases and scheduled reconciliation recover eligible interrupted work; uncertain provider outcomes remain explicit review rather than blind resend. The relay processes bounded batches. No globally exactly-once external delivery is claimed. Initial routing and missing-proposal assembly wait for event-driven model work rather than scheduling one-second ticks that invalidate that work.
 
 Database updates serialize on the case row, use optimistic expected revisions and commit snapshot, relational obligation/dependency projections, immutable journal/claims, contacts, results and timer intents together. No model/network call happens inside that transaction. Source originals are never overwritten. The snapshot is the authoritative aggregate; relational summaries are projections updated in the same transaction. Cross-case dependencies and arbitrary workflow migration are not supported in this release.
 
 ## Verification status
 
-Application tests and live event-flow checks are deferred by the owner. No runtime correctness, load, isolation, semantic accuracy, real channel delivery or model quality claim follows from compilation/deployment. Required later checks include nested joins, stale correction, expired evidence, denied roles, missing children, queue/wake failures, cancellation, replay, source acknowledgement and tenant isolation.
+Meaningful checks are authorized. Targeted deterministic suites and real-model synthetic scenarios are recorded in [acceptance evidence](ACCEPTANCE.md). Compilation/deployment alone proves neither model quality nor delivery. Broader load/isolation, adversarial interpretation, replay/crash and customer-specific integration assurance remain separate work.
+
+## Autonomous command additions
+
+`route_initial` starts an awaiting mission; `clarify` asks the same participant a missing question; `reroute` selects an eligible responsible group; `attach_proposal` creates exact proposed business terms; `decide` records a hash-bound authorized approval/rejection; `relay_decision` communicates current approved terms. `source_query` requests missing source data and `source_response` records the authenticated source answer. The model cannot emit `source_response` or administrative controls. All use the same command/revision envelope and immutable journal.

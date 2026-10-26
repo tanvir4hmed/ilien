@@ -27,6 +27,7 @@ import {
   groundedQuote,
   decode,
   proposalSchema,
+  serializeProposal,
   type Context,
   type Evidence,
   type Knowledge,
@@ -495,7 +496,7 @@ export async function executeAutonomousRun(source: Source, id: string) {
     }
     fresh.knowledge = original.knowledge;
     const proposal = proposalSchema.parse(decode(run.proposal));
-    if (hash(JSON.stringify(proposal)) !== run.proposal_hash) fail("ai_proposal_hash_mismatch");
+    if (hash(serializeProposal(proposal)) !== run.proposal_hash) fail("ai_proposal_hash_mismatch");
     const operation = autonomousGate(fresh, proposal);
     const applied = await applyCommand(source, run.case_id, JSON.stringify({
       commandId: run.id, expectedRevision: run.expected_revision, actorId: executionActor(fresh,operation), operation,

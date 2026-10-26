@@ -14,6 +14,7 @@ import {
   MODEL_ID,
   PROMPT_VERSION,
   hash,
+  serializeProposal,
   decode,
   type Run,
   type Context,
@@ -151,7 +152,7 @@ export async function processRun(tenant: string, id: string) {
       if (fresh.policyHash !== context.policyHash)
         throw new CoordinationError("ai_policy_changed");
       gate(context, result.proposal);
-      const raw = JSON.stringify(result.proposal);
+      const raw = serializeProposal(result.proposal);
       const status =
         result.proposal.disposition === "propose"
           ? "proposed"

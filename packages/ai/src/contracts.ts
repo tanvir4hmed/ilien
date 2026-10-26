@@ -34,6 +34,8 @@ export const proposalSchema = z.strictObject({
     .max(8),
   uncertainties: z.array(z.string().min(1).max(200)).max(8),
 });
+/** Normalize schema field order before hashing; PostgreSQL JSONB may reorder keys. */
+export const serializeProposal = (value: unknown) => JSON.stringify(proposalSchema.parse(value));
 export type Proposal = z.infer<typeof proposalSchema>;
 export type Knowledge = {
   id: string;
