@@ -106,6 +106,10 @@ test("conditional or negative language cannot authorize a business approval",()=
  const o=s.obligations[2]!,text="I would approve, but the delivery time is not confirmed.";
  const c={executionMode:"autonomous" as const,state:s,policy:textilePolicy,policyHash:"hash",actorId:o.assignee,evidence:[{id:"r",text,sha256:"hash",origin:"external"}],knowledge:[],receipt:{id:"r",evidenceId:"r",deliveryId:"d",bindingId:"b",actorId:o.assignee,obligationId:o.id,obligationRevision:o.revision,kind:"ask",text}};
  assert.throws(()=>autonomousGate(c,{disposition:"propose",operation:{type:"decide",obligationId:o.id,expectedObligationRevision:o.revision,proposalHash:o.proposal!.sha256,choice:"approve",reason:"Yes",subjectRevision:"1",observedAt:now,validUntil:later},citations:[{ref:"r",quote:text}],reason:"Interpret",uncertainties:[]}),/ai_explicit_decision_required/);
+ const conditional="Approved only if overtime is authorized. Overtime is not approved yet.";
+ c.receipt.text=conditional;c.evidence[0]!.text=conditional;
+ for(const choice of ["approve","reject"] as const)assert.throws(()=>autonomousGate(c,{disposition:"propose",operation:{type:"decide",obligationId:o.id,expectedObligationRevision:o.revision,proposalHash:o.proposal!.sha256,choice,reason:"Interpret",subjectRevision:"1",observedAt:now,validUntil:later},citations:[{ref:"r",quote:conditional}],reason:"Interpret",uncertainties:[]}),/ai_conditional_decision_requires_clarification/);
+
 });
 
 test("granular tools bind identity and time in application code and require explicit completion evidence",()=>{

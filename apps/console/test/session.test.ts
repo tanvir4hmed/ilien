@@ -31,3 +31,9 @@ test('logout cannot be undone by a late refresh response',async()=>{
 test('a saved session for another app client cannot be restored',()=>{
  const f=fixture();const other=new WorkspaceSession(f.store,['other-client'],fetch,f.now);assert.equal(other.available,false);assert.equal(f.store.getItem(SESSION_KEY),null);
 });
+
+test('default browser fetch is called without binding it to the session object',async()=>{
+ const original=globalThis.fetch;let calls=0;
+ globalThis.fetch=async function(this:unknown){assert.equal(this,undefined);calls++;return Response.json({AuthenticationResult:{AccessToken:'restored',RefreshToken:'rotated',ExpiresIn:900}});};
+ try{const saved=storage(),initial=new WorkspaceSession(saved,['client']);initial.accept('client',tokens);const restored=new WorkspaceSession(saved,['client']);assert.equal(await restored.accessToken(),'restored');assert.equal(calls,1);}finally{globalThis.fetch=original;}
+});

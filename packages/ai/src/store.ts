@@ -371,6 +371,7 @@ export function gate(context: Context, proposal: Proposal) {
       if(op.timeBasis === "received" && (!context.state.autonomous || op.observedAt !== r.receivedAt || op.validUntil !== r.expiresAt)) fail("ai_reported_time_scope");
       if(op.type==="decide" && context.state.obligations.find(o=>o.id===r.obligationId)?.proposal?.sha256 !== op.proposalHash) fail("ai_decision_scope");
       if(op.type==="decide") {
+        if(/\b(if|unless|conditional|subject to|not approved yet|pending approval)\b|শর্তসাপেক্ষ|অনুমোদন বাকি/iu.test(r.text)) fail("ai_conditional_decision_requires_clarification");
         const yes=/\b(approved?|yes|agree|okay|ok)\b|অনুমোদন|সম্মত/iu.test(r.text);
         const caveat=/\b(not|no|reject|decline|maybe|perhaps|if|unless|subject to|could|might|would|but|however)\b|নয়|হয়নি|হয়নি|অসম্মত/iu.test(r.text);
         const no=/\b(no|not approved|reject(?:ed)?|declin(?:e|ed))\b|অসম্মত/iu.test(r.text);

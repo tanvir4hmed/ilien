@@ -13,7 +13,7 @@ export class WorkspaceSession {
   private saved:SavedSession|null=null;
   private pending:Promise<string>|null=null;
   private generation=0;
-  constructor(private storage:Pick<Storage,"getItem"|"setItem"|"removeItem">, private clients:string[], private request:typeof fetch=fetch, private now=()=>Date.now()) {}
+  constructor(private storage:Pick<Storage,"getItem"|"setItem"|"removeItem">, private clients:string[], private request:typeof fetch=(input,init)=>fetch(input,init), private now=()=>Date.now()) {}
   private load() {
     try {
       const value=this.storage.getItem(SESSION_KEY);

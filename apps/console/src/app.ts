@@ -593,17 +593,11 @@ async function casePage(id: string) {
   ]);
   const state = journey.state;
   const heading = card(`${words(state.subject.type)} · ${state.subject.id}`);
-  heading.append(
-    el("span", words(state.status), "badge"),
-    el("p", state.goal),
-    el(
-      "p",
-      `Due ${date(state.deadline)} · Source: ${state.origin === "simulated" ? "Simulated event" : "Recorded request"}`,
-      "muted",
-    ),
-    button("Back to cases", () => show("Cases")),
-  );
   heading.classList.add("case-heading");
+  heading.append(el("span",words(state.status),"badge"));
+  const brief=fold(`Case brief · Due ${date(state.deadline)} · ${state.origin === "simulated" ? "Simulated source" : "Recorded source"}`,heading);
+  brief.append(el("p",state.goal));
+  const back=button("Back to cases",()=>show("Cases"));
   const sections=panelTabs(content,["Flow","Messages","Outcome","History"],preferredCaseTab,name=>{
     preferredCaseTab=name;
     if(name==="Flow")requestAnimationFrame(()=>sections.panels.get("Flow")!.querySelector<HTMLButtonElement>("[data-fit-map]")?.click());
@@ -686,6 +680,7 @@ async function casePage(id: string) {
     renderJourney(messagesHost,current,evidence,{mode:"Communication flow",compact:true});
     renderJourney(historyHost,current,evidence,{mode:"Activity",compact:true});
   };
+  map.classList.add("case-map");
   mapHost.dataset.view=preferredJourneyView;
   async function refresh() {
     if (refreshing || disposed || document.hidden) return;
@@ -733,6 +728,7 @@ async function casePage(id: string) {
     if (timer) clearTimeout(timer);
   };
   controls.append(
+    back,
     field("Live", live),
     status,
     button("Refresh", refresh),

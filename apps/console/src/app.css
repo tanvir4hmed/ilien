@@ -760,3 +760,15 @@ blockquote {
 .connection-state::after { content:''; display:block; height:4px; background:linear-gradient(90deg,#15665b,#dcebc4,#15665b); background-size:200% 100%; animation:connection-progress 1.5s linear infinite; border-radius:4px; margin-top:24px; }
 @keyframes connection-progress { to {background-position:-200% 0;} }
 @media (prefers-reduced-motion:reduce) {.connection-state::after {animation:none;}}
+
+.case-heading { padding:16px 20px; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px 16px; }
+.case-heading > h2 { margin:0; align-self:center; }
+.case-heading > .badge { align-self:center; }
+.case-heading > details, .case-heading > .case-controls, .case-heading > .notice { grid-column:1/-1; }
+.case-heading > details { margin:0; }
+.case-heading .case-controls { margin:0; padding-top:10px; }
+.case-map { padding:18px 20px; margin-top:0; }
+.case-map > h2 { margin:0 0 10px; }
+.case-map .journey-scroll { margin:12px 0; max-height:min(560px,55vh); }
+.case-map .journey-scroll + p { margin-bottom:0; font-size:.8rem; }
+@media (min-width:900px) {.main:has(.case-heading) .top {margin-bottom:16px;} }
