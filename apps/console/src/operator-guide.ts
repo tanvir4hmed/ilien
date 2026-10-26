@@ -4,9 +4,25 @@ export function scenarioFields(
   event: Row,
   host: HTMLElement,
 ): (() => Row) | null {
+  if(event.eventType === "communication.request_raised") {
+    host.replaceChildren();
+    const draft=structuredClone(event), payload=draft.payload as Row, subject=draft.subject as Row;
+    const wrap=node("section","","scenario-fields");host.append(wrap);
+    const ref=node("input");ref.value=String(subject.id ?? "REQ-001");
+    const request=node("textarea");request.value=String(payload.summary ?? "");request.rows=4;
+    const group=node("select"),kind=node("select"),proposal=node("textarea");
+    for(const [value,label] of [["stores","Stores"],["quality","Quality"],["planning","Planning"],["production","Production"],["procurement","Procurement"],["supplier","Supplier"]]) {const o=node("option",label);o.value=value!;group.append(o);}
+    for(const [value,label] of [["fact","Information"],["evidence","Evidence or validation"],["decision","Business approval"],["acknowledgement","Acknowledgement"],["commitment","Commitment or timeline"],["completion","Completion tracking"]]) {const o=node("option",label);o.value=value!;kind.append(o);}
+    group.value=String(payload.group);kind.value=String(payload.kind);proposal.value=String(payload.proposal ?? "");
+    const field=(title:string,input:HTMLElement)=>{const l=node("label",title);l.append(input);wrap.append(l);};
+    wrap.append(node("h3","Describe a communication request"),node("p","The team is an initial routing hint. ILIEN analyses the request and may clarify or correct the route within configured permissions.","muted"));
+    field("Request reference",ref);field("What should ILIEN coordinate?",request);field("Initial responsible team",group);field("Response needed",kind);field("Exact proposal, when requesting approval",proposal);
+    return ()=>{if(!ref.value.trim() || !request.value.trim())throw new Error("Enter a reference and a request.");if(kind.value==="decision" && !proposal.value.trim())throw new Error("Enter the exact proposal to approve.");subject.id=ref.value.trim();draft.correlationId=ref.value.trim();payload.summary=request.value.trim();payload.group=group.value;payload.kind=kind.value;if(kind.value==="decision")payload.proposal=proposal.value.trim();else delete payload.proposal;return draft;};
+  }
   const subject = event.subject as Row,
     payload = event.payload as Row;
-  const material =
+  const production=event.eventType === "manufacturing.production_coordination_requested";
+  const material = production ||
     event.eventType === "manufacturing.material_readiness_requested" ||
     event.eventType === "planning.upstream_supply_shifted";
   const revision = event.eventType === "plm.techpack_approved";
@@ -27,7 +43,7 @@ export function scenarioFields(
     readers: (() => void)[] = [];
   const group = node("section", "", "scenario-fields");
   host.append(group);
-  const heading = material
+  const heading = production ? "Coordinate quantity, timeline and production readiness" : material
     ? "Check material availability"
     : revision
       ? "Confirm a specification change"
@@ -36,7 +52,7 @@ export function scenarioFields(
     node("h3", heading),
     node(
       "p",
-      material
+      production ? "ILIEN will contact stores, clarify the production timeline, obtain planning approval and track production-ready status. Observe the map; no operator approval is needed." : material
         ? "Enter an order and the material you need. ILIEN will ask stores, quality, planning and procurement for information."
         : revision
           ? "Identify the specification and version that people need to acknowledge."

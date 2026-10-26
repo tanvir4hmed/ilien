@@ -1,6 +1,6 @@
 # WhatsApp and email coordination
 
-The channel layer uses AWS End User Messaging Social / `SendWhatsAppMessage` and SES / `SendEmail`. Transport receipts, case replies and verified business outcomes are distinct. Correlated natural-language replies can queue the bounded AI coordinator in autonomous or explicit review mode. See [current autonomous scope](AUTONOMOUS_COORDINATION.md); automatic clarification and generalized participant payload profiles remain unfinished.
+The channel layer uses AWS End User Messaging Social / `SendWhatsAppMessage` and SES / `SendEmail`. Transport receipts, accepted reports and independently verified outcomes are distinct. Correlated replies queue the bounded coordinator in autonomous or review mode. Autonomous missions support same-person clarification, eligible rerouting, decision relay, source questions and versioned human/machine recipient profiles. See [autonomous scope and limits](AUTONOMOUS_COORDINATION.md).
 
 ## Recognising incoming conversations
 

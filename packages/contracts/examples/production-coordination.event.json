@@ -1,0 +1,7 @@
+{
+  "contractVersion":"1.0","eventId":"sample-production-coordination-001",
+  "eventType":"manufacturing.production_coordination_requested","payloadVersion":"1.0",
+  "occurredAt":"2026-10-26T09:00:00+06:00","correlationId":"sample-order-coordination-001",
+  "subject":{"type":"production_order","id":"PO-COORD-001","revision":"1"},
+  "payload":{"siteId":"sample-site-001","materialLotId":"LOT-TX-204","requiredQuantity":{"value":"1200","unit":"unit"},"neededBy":"2026-10-29T16:00:00+06:00","requestedInformation":["usable_stock","allocation"]}
+}

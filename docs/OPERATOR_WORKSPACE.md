@@ -101,3 +101,7 @@ The received-event API includes its actual `case_id` and `case_status`, preservi
 **User guide** in navigation explains start → map → conversation → response/verification → source outcome, status meanings and real-channel prerequisites. A printable source version is [USER_GUIDE.md](USER_GUIDE.md).
 
 The shared local form uses a dedicated secretless native-auth app client. Hosted PKCE continues on the original client. API authorizer and handler admit only the explicitly configured hosted/native client IDs from the same issuer, and still resolve server membership per request.
+
+## Autonomous observer experience
+
+Production coordination and generic communication missions run without normal internal operator approval. Their case view defaults to live updates and hides role-play, manual sending, manual AI invocation and simulated source acknowledgement controls. The observer still sees tasks, clarification/source questions, current evidence, machine decisions, channel activity and source outcomes. Legacy workflows retain their practice/review controls. Accepted participant reports have a distinct map state from independently verified evidence.

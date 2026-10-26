@@ -66,8 +66,8 @@ export async function handler(
   if (event.rawPath === "/health")
     return response(200, {
       service: "ilien",
-      phase: "autonomous-coordination-foundation",
-      version: "0.9.0",
+      phase: "autonomous-communication",
+      version: "1.0.0",
     });
   const consoleRequest = event.rawPath.startsWith("/console/");
   if (consoleRequest && event.requestContext.http.method === "OPTIONS")

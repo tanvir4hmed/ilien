@@ -737,3 +737,9 @@ blockquote {
     grid-template-columns: 1fr;
   }
 }
+.node[data-status="accepted"],
+.journey-node[data-status="accepted"] {
+  border-color: #377fa6;
+  background: #eef8ff;
+}
+.journey-canvas.focus-pending .journey-node[data-status="accepted"] { opacity: .45; }

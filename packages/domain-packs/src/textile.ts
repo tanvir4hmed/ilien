@@ -2,6 +2,7 @@ import type { Policy, CaseState } from "../../coordination/src/types.js";
 import type { SourceEvent } from "../../contracts/src/index.js";
 import type { ProductConfiguration } from "../../product/src/configuration.js";
 import { z } from "zod";
+import { createHash } from "node:crypto";
 export const textilePolicy: Policy = {
   version: "textile-v1",
   groups: [
@@ -77,9 +78,24 @@ const materialPayload = z.object({
 export function template(event: SourceEvent): {
   workflow: string;
   goal: string;
-  branches: { group: string; kind: string; question: string }[];
+  autonomous?: boolean;
+  branches: { id?: string; dependencies?: string[]; requiredFacts?:string[]; acceptance?: "responsible_reply"|"independent"; proposalStatement?: string; group: string; kind: string; question: string }[];
 } | null {
   if (event.payloadVersion !== "1.0" || !event.subject.revision) return null;
+  if (event.eventType === "manufacturing.production_coordination_requested") {
+    if(!materialPayload.safeParse(event.payload).success) return null;
+    return {workflow:"production-coordination-v1",autonomous:true,goal:"Coordinate available quantity, schedule impact and an authorized plan; track production-ready evidence and return structured progress to the source.",branches:[
+      {id:"stock",requiredFacts:["usable_quantity"],group:"stores",kind:"fact",question:"Report currently usable quantity and unit for this material lot. Distinguish unavailable or quarantined material."},
+      {id:"impact",dependencies:["stock"],requiredFacts:["completion_time"],group:"production",kind:"commitment",question:"Using the reported available quantity, explain production impact and confirm a specific completion time. Request clarification if timing is unknown."},
+      {id:"approval",dependencies:["impact"],group:"planning",kind:"decision",question:"Approve or reject the exact proposed quantity and completion schedule. No approval is inferred from silence."},
+      {id:"ready",dependencies:["approval"],requiredFacts:["completion_reference"],group:"production",kind:"completion",question:"Acknowledge the authorized plan, report progress, and explicitly confirm production-ready status with a completion reference when ready. Starting work does not complete this request."},
+    ]};
+  }
+  if(event.eventType === "communication.request_raised") {
+    const parsed=z.strictObject({summary:z.string().min(1).max(1000),group:z.string().min(1).max(80),kind:z.enum(["fact","decision","acknowledgement","evidence","commitment","completion"]),proposal:z.string().min(1).max(1000).optional(),requiredFacts:z.array(z.string().min(1).max(80).regex(/^[A-Za-z0-9_-]+$/)).max(12).optional(),context:z.record(z.string(),z.unknown()).optional()}).safeParse(event.payload);
+    if(!parsed.success || (parsed.data.kind==="decision" && !parsed.data.proposal)) return null;
+    return {workflow:"generic-communication-v1",autonomous:true,goal:parsed.data.summary,branches:[{id:"request",group:parsed.data.group,kind:parsed.data.kind,question:parsed.data.summary,proposalStatement:parsed.data.proposal,requiredFacts:parsed.data.requiredFacts}]};
+  }
   if (
     [
       "manufacturing.material_readiness_requested",
@@ -163,7 +179,7 @@ export function seedCase(
         !policy.actors.some(
           (a) => a.enabled && a.group === b.group && a.role === "respondent",
         ) ||
-        !policy.actors.some(
+        (!definition.autonomous || b.acceptance === "independent") && !policy.actors.some(
           (a) => a.enabled && a.group === b.group && a.role === "verifier",
         ),
     )
@@ -174,6 +190,8 @@ export function seedCase(
     revision: 1,
     subject: { ...event.subject, revision: event.subject.revision! },
     workflow: definition.workflow,
+    autonomous: definition.autonomous ?? false,
+    awaitingPlan: definition.autonomous ?? false,
     configurationVersion: policy.version,
     origin: "simulated",
     status: "active",
@@ -185,9 +203,10 @@ export function seedCase(
     contacts: 0,
     obligations: definition.branches.map((branch, i) => ({
       ...branch,
-      id: `root_${i + 1}`,
+      id: branch.id ?? `root_${i + 1}`,
       required: true,
-      dependencies: [],
+      dependencies: branch.dependencies ?? [],
+      acceptance: branch.acceptance ?? (definition.autonomous ? "responsible_reply" : "independent"),
       assignee: policy.actors.find(
         (a) => a.enabled && a.group === branch.group && a.role === "respondent",
       )!.id,
@@ -196,6 +215,10 @@ export function seedCase(
       reminders: 0,
       escalated: false,
       nextContactAt: now,
+      ...(branch.proposalStatement ? {proposal:(()=>{
+        const proposal={id:`proposal_${branch.id ?? `root_${i+1}`}`,revision:1,statement:branch.proposalStatement,subjectRevision:event.subject.revision!};
+        return {...proposal,sha256:createHash("sha256").update(JSON.stringify(proposal)).digest("hex"),evidenceId:input.sourceEvidenceId};
+      })()} : {}),
     })),
   };
 }

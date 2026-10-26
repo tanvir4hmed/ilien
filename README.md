@@ -10,7 +10,7 @@ The demonstration uses synthetic manufacturing events. Channel adapters call AWS
 
 ## Build
 
-Use Node.js 24 and Terraform 1.15.8. Run `npm ci --ignore-scripts` and `npm run build`. See the runbook for deployment and authenticated simulation. The browser operator workspace includes Cognito sign-in, case/evidence views, simulator, agent review and configuration controls. See [operator workspace](docs/OPERATOR_WORKSPACE.md) for scope and verification limits.
+Use Node.js 24 and Terraform 1.15.8. Run `npm ci --ignore-scripts` and `npm run build`. See the runbook for deployment and authenticated simulation. The browser operator workspace includes Cognito sign-in, case/evidence views, simulator, autonomous observer maps, legacy agent review and configuration controls. See [operator workspace](docs/OPERATOR_WORKSPACE.md) for scope and verification limits.
 
 ## Documentation
 

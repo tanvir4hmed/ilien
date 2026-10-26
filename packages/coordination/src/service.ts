@@ -9,7 +9,7 @@ import {
 import { sourceEventSchema } from "../../contracts/src/validation.js";
 import { configurationFor } from "../../product/src/configuration.js";
 import { seedCase } from "../../domain-packs/src/textile.js";
-import { initialize, nextWake, resolveActor, transition } from "./engine.js";
+import { initialize, nextWake, resolveActor, transition, satisfied } from "./engine.js";
 import {
   commandSchema,
   acknowledgementSchema,
@@ -228,7 +228,7 @@ async function persist(
             requirements: state.obligations.map((o) => ({
               requirementId: o.id,
               status:
-                o.status === "verified"
+                satisfied(o)
                   ? "satisfied"
                   : o.status === "disputed"
                     ? "conflicting"
@@ -245,7 +245,7 @@ async function persist(
                   o.decision &&
                   o.proposal &&
                   o.reply &&
-                  o.status === "verified",
+                  satisfied(o),
               )
               .map((o) => ({
                 decisionId: o.decision!.evidenceId,
@@ -258,6 +258,9 @@ async function persist(
               })),
             origin: "simulated",
             scope: "communication_only",
+            status: state.status === "completed" ? "done" : state.status === "active" ? "in_progress" : state.status,
+            data: state.obligations.filter(o=>o.reply).map(o=>({requirementId:o.id,department:o.group,status:o.status,acceptance:o.acceptance ?? "independent",progress:o.reply!.progress,timeBasis:o.reply!.timeBasis ?? "observed",reportedAt:o.reply!.observedAt,validUntil:o.reply!.validUntil,facts:(o.reply!.facts ?? []).map(({key,value,unit})=>({key,value,unit})),evidenceId:o.reply!.evidenceId})),
+            sourceQuestions: (state.sourceQuestions ?? []).filter(q=>!q.answer).map(q=>({questionId:q.id,question:q.question})),
           }),
         ),
       ],
@@ -278,7 +281,7 @@ async function persist(
   if (wake) await enqueue(tenant, state, wake, tx);
   const operation = JSON.parse(raw) as { type?: string; operation?: { type?: string } };
   const type = operation.operation?.type ?? operation.type;
-  if (type && ["activate", "reply", "verify", "decide", "add_child", "link_dependency", "reassign", "reopen"].includes(type))
+  if (type && ["activate", "reply", "verify", "decide", "add_child", "link_dependency", "reassign", "reopen","route_initial","clarify","reroute","attach_proposal","relay_decision","source_response"].includes(type))
     await enqueueAutonomousCase({ tenant_id: tenant, id: state.sourceId, origin: state.origin }, state.id, tx);
 }
 async function enqueue(
@@ -495,7 +498,7 @@ export async function listTasks(source: Source) {
   return transaction(source.tenant_id, async (tx) =>
     rows(
       await query(
-        "SELECT c.id AS case_id,c.snapshot->>'goal' AS goal,c.snapshot->'subject'->>'id' AS subject,o.value->>'id' AS obligation_id,o.value->>'group' AS department,o.value->>'assignee' AS owner,o.value->>'question' AS question,o.value->>'status' AS status,c.updated_at FROM coordination_cases c CROSS JOIN LATERAL jsonb_array_elements(c.snapshot->'obligations') o(value) WHERE c.connection_id=CAST(:source AS uuid) AND c.status IN ('active','blocked','paused') AND o.value->>'status'<>'verified' ORDER BY c.updated_at DESC,c.id,o.value->>'id' LIMIT 100",
+        "SELECT c.id AS case_id,c.snapshot->>'goal' AS goal,c.snapshot->'subject'->>'id' AS subject,o.value->>'id' AS obligation_id,o.value->>'group' AS department,o.value->>'assignee' AS owner,o.value->>'question' AS question,o.value->>'status' AS status,c.updated_at FROM coordination_cases c CROSS JOIN LATERAL jsonb_array_elements(c.snapshot->'obligations') o(value) WHERE c.connection_id=CAST(:source AS uuid) AND c.status IN ('active','blocked','paused') AND o.value->>'status' NOT IN ('verified','accepted') ORDER BY c.updated_at DESC,c.id,o.value->>'id' LIMIT 100",
         [param("source", source.id)],
         tx,
       ),

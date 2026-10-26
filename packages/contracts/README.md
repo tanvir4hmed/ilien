@@ -23,3 +23,11 @@ Deduplicate by `(tenantId, sourceConnectionId, eventId)`. Identical retries retu
 ## Example event
 
 The fixture in `examples/material-readiness.event.json` is independently authored synthetic data. It is not a verified payload from an external application. Additional context, actor directories, authority rules and mission mappings are server configuration, not permissions embedded in this event.
+
+## Autonomous mission additions
+
+`manufacturing.production_coordination_requested` activates quantity → schedule → approval → production-ready tracking. `communication.request_raised` activates a generic scoped mission with `summary`, eligible `group`, and `kind`. Optional `requiredFacts` declares exact fact keys that must be reported before acceptance; kind `decision` requires `proposal`. Neither message content nor a client group value grants authority: the published directory and bindings remain authoritative.
+
+Source results add `status`, structured `data[]`, current `decisionRefs[]` and unresolved `sourceQuestions[]`. Facts preserve string values, units and evidence references. `timeBasis=received` marks message receipt time rather than a claimed inspection timestamp. `accepted` responsible replies and independently `verified` evidence are distinct. A source question is answered through an authenticated case command (`source_response`) with the normal request ID, expected revision and actor envelope; it is not available to the model.
+
+Versioned recipient profiles and their restricted field mappings are defined in `src/communication.ts`. Machine JSON mapping validates required fields and exact types before sending. See [autonomous coordination](../../docs/AUTONOMOUS_COORDINATION.md).

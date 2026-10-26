@@ -21,6 +21,7 @@ import {
 import { plan } from "./planner.js";
 import { caseHeld } from "../../operations/src/supervision.js";
 import { pausedFor } from "../../operations/src/controls.js";
+import { clarificationFallback } from "./autonomy.js";
 export async function processRun(tenant: string, id: string) {
   const lease = randomUUID();
   const claimed = await transaction(tenant, async (tx) => {
@@ -142,6 +143,7 @@ export async function processRun(tenant: string, id: string) {
           );
         }),
     });
+    if(context.executionMode === "autonomous") result.proposal=clarificationFallback(context,result.proposal);
     await transaction(tenant, async (tx) => {
       if (await pausedFor(source, "agent", tx))
         throw new CoordinationError("agent_processing_paused");

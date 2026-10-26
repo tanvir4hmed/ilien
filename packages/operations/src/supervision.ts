@@ -2,6 +2,7 @@ import { query, param, rows } from "../../persistence/src/database.js";
 import type { Source } from "../../coordination/src/service.js";
 import type { CaseState } from "../../coordination/src/types.js";
 import { decode } from "../../channels/src/intents.js";
+import { satisfied } from "../../coordination/src/engine.js";
 interface Projection {
   id: string;
   connection_id: string;
@@ -46,7 +47,7 @@ function inspect(row: Projection) {
     if (
       typeof o.id !== "string" ||
       !o.id ||
-      !["waiting", "answered", "verified", "disputed", "blocked"].includes(
+      !["waiting", "answered", "accepted", "verified", "disputed", "blocked"].includes(
         o.status,
       )
     )
@@ -68,9 +69,10 @@ function inspect(row: Projection) {
         o.verification.actorId === o.reply.actorId ||
         o.verification.replyRevision !== o.reply.revision ||
         o.reply.subjectRevision !== state.subject?.revision ||
-        o.dependencies.some((id) => byId.get(id)?.status !== "verified"))
+        o.dependencies.some((id) => !byId.get(id) || !satisfied(byId.get(id)!)))
     )
       issues.push("unverified_or_stale_requirement");
+    if(o.status === "accepted" && (!state.autonomous || o.acceptance!=="responsible_reply" || !o.reply || o.reply.subjectRevision!==state.subject.revision || o.dependencies.some(id=>!byId.get(id) || !satisfied(byId.get(id)!)) || (o.kind==="completion" && (o.reply.progress!=="ready" || o.requiredFacts?.some(key=>!o.reply!.facts?.some(f=>f.key===key)))))) issues.push("invalid_accepted_requirement");
   }
   const visited = new Set<string>(),
     path = new Set<string>();
@@ -89,7 +91,7 @@ function inspect(row: Projection) {
   for (const id of byId.keys()) visit(id);
   if (
     state.status === "completed" &&
-    state.obligations.some((o) => o.required && o.status !== "verified")
+    (state.obligations.some((o) => o.required && !satisfied(o)) || state.sourceQuestions?.some(q=>!q.answer))
   )
     issues.push("false_completion_projection");
   return {

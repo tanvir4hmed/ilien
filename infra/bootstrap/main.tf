@@ -49,7 +49,7 @@ resource "aws_iam_policy" "runtime_boundary" {
   policy = jsonencode({ Version = "2012-10-17", Statement = [
     { Effect = "Allow", Action = ["kms:GenerateDataKey", "kms:Decrypt"], Resource = "arn:aws:kms:us-east-1:${local.account}:key/*", Condition = { StringEquals = { "kms:ViaService" = "sns.us-east-1.amazonaws.com", "aws:ResourceTag/Project" = "ilien" } } },
     { Effect = "Allow", Action = ["sns:Publish"], Resource = "arn:aws:sns:us-east-1:${local.account}:ilien-source-results" },
-    { Effect = "Allow", Action = ["bedrock:InvokeModel"], Resource = "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0" },
+    { Effect = "Allow", Action = ["bedrock:InvokeModel"], Resource = "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-pro-v1:0" },
     { Effect = "Allow", Action = ["logs:CreateLogStream", "logs:PutLogEvents"], Resource = "arn:aws:logs:us-east-1:${local.account}:log-group:/aws/lambda/ilien-*" },
     { Effect = "Allow", Action = ["rds-data:*"], Resource = "arn:aws:rds:us-east-1:${local.account}:cluster:ilien" },
     { Effect = "Allow", Action = ["secretsmanager:GetSecretValue", "secretsmanager:PutSecretValue"], Resource = ["arn:aws:secretsmanager:us-east-1:${local.account}:secret:ilien-*", "arn:aws:secretsmanager:us-east-1:${local.account}:secret:rds!cluster-*"] },

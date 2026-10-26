@@ -1,6 +1,6 @@
 # Architecture overview
 
-ILIEN implements intake, deterministic coordination and real AWS WhatsApp/SES adapters. The bounded Bedrock planner supports autonomous policy-gated execution and explicit review mode; [current scope and unfinished autonomous capabilities](AUTONOMOUS_COORDINATION.md) are documented. The workspace uses Cognito identity and server-side membership. Latest CI determines deployed status; [acceptance evidence](ACCEPTANCE.md) distinguishes targeted checks from remaining assurance.
+ILIEN implements intake, deterministic coordination and AWS WhatsApp/SES adapters. The bounded Bedrock planner supports autonomous communication missions and explicit review mode; [mission lifecycle, recipient profiles and limits](AUTONOMOUS_COORDINATION.md) are documented. The workspace uses Cognito identity and server-side membership. Latest CI determines deployed status; [acceptance evidence](ACCEPTANCE.md) distinguishes targeted checks from remaining assurance.
 
 ```mermaid
 flowchart LR

@@ -6,9 +6,9 @@ This release adds autonomous execution and retains an explicit review mode for t
 
 The agent observes a canonical case and original evidence, chooses whether to retrieve approved knowledge, observes the search result and proposes one next step. Its choices can introduce a prerequisite question, link existing dependencies, request a fresh answer, suggest an eligible reassignment or request a source report. It can instead wait or request review. This is a bounded tool-selection loop, not a model that owns the workflow database or a fixed classifier that always sends the same next message.
 
-Autonomous mode applies eligible grounded proposals through deterministic authorization without an internal operator click; declared uncertainty blocks execution. Explicit review mode still requires exact-proposal operator review. Neither schema validation nor a model can guarantee meaning. Graph, role, version, consent and outcome checks apply in both modes. The review diagram and review endpoint below describe review mode; autonomous execution uses a separate machine audit rather than inventing a human review record.
+Autonomous mode applies grounded proposals through deterministic authorization without an internal operator click; uncertainty blocks business effects but permits scoped questions. Explicit review mode still requires exact-proposal operator review. Neither schema validation nor a model can guarantee meaning. Graph, role, version, consent and outcome checks apply in both modes. The review diagram and review endpoint below describe review mode; autonomous execution uses a separate machine audit rather than inventing a human review record.
 
-The worker has Bedrock invocation permission and may wake only the outbox relay Lambda; it has no SES or Social Messaging send permission. The model has only two tools: scoped knowledge retrieval and proposal submission. It cannot browse URLs, run code/SQL, fetch attachments, edit policies, choose credentials, approve itself, contact a participant or execute a factory action. The application runtime database role is shared by application modules; separate per-component database roles remain additional hardening work. Model text is never executed as SQL or code.
+The worker has Bedrock invocation permission and may wake only the outbox relay Lambda; it has no SES or Social Messaging send permission. Autonomous missions use scoped knowledge retrieval and granular action tools; application code binds identity, versions, timing and decision hashes. Legacy review workflows retain proposal submission. The model cannot browse URLs, run code/SQL, fetch attachments, edit policies, choose credentials, approve itself or execute a factory action. The application runtime database role is shared by application modules; separate per-component database roles remain additional hardening work. Model text is never executed as SQL or code.
 
 ## Flow
 
@@ -23,8 +23,8 @@ sequenceDiagram
   R->>D: Durable run intent + revision + budget reservation
   D->>A: Relay dispatches SQS run ID
   A->>D: Claim run; capture current case, policy, evidence
-  A->>B: Scoped context and two tool schemas
-  B-->>A: Search approved knowledge, or submit proposal
+  A->>B: Scoped context and eligible tool schemas
+  B-->>A: Search approved knowledge, or select an action
   A->>D: Scoped search and immutable step observations
   A->>B: Search result when requested (bounded loop)
   B-->>A: Typed proposal, exact citations, uncertainty
@@ -43,8 +43,8 @@ Correlated, enabled-actor receipts marked `needs_review / unstructured_reply` ca
 
 ## Model and execution limits
 
-- Pinned model: `amazon.nova-lite-v1:0`, regional Bedrock Converse in us-east-1. Prompt/tool contract version: `coordination-autonomy-6`. Tool schemas use Nova's supported top-level fields; each call must select an allowed tool, and the last call must submit a proposal/wait/review. The operation schema exposes only actions eligible for the current kind of run. Schema/grounding failures receive bounded tool-error feedback within the existing three-call budget. Runtime validation is mandatory; internal operator approval is specific to review mode.
-- At most three serial model calls per run, one requested tool per call, 1,024 output tokens per call, 22-second provider timeout and no SDK retry. An unsupported/invalid result stops for review; no hidden stronger-model fallback.
+- Pinned model: `amazon.nova-pro-v1:0`, regional Bedrock Converse in us-east-1. Prompt/tool contract version: `coordination-autonomy-9`. Nova Lite failed targeted natural-language evaluations; Pro completed the production scenario with the same gates. Tools expose only actions eligible for the current run. Schema/grounding failures receive bounded feedback within the three-call budget. Runtime validation is mandatory; internal operator approval is specific to review mode.
+- At most three serial model calls per run, one requested tool per call, 1,024 output tokens per call, 22-second provider timeout and no SDK retry. An invalid receipt interpretation asks a bounded clarification where possible; unavailable models and unsupported case planning remain unresolved. No hidden model fallback.
 - Serialized model request maximum 30,000 UTF-8 bytes; original base context maximum 19,000 bytes. Overlarge originals are not silently summarized or truncated. They require operator review. Context contains bounded case-linked evidence, not all historic conversations.
 - Tenant admission limits: 128 runs per rolling 24 hours; 48 per case per rolling 24 hours; 160 lifetime per case; at most two attempts for an identical case revision/receipt. Receipt interpretation and event-driven case follow-up share these limits. Failed, rejected and interrupted runs still consume admission capacity. Repeated identical searches stop the loop.
 - Each run reserves a conservative 100,000-token accounting allowance; actual provider usage is recorded per completed call and cumulatively. An over-budget usage response prevents subsequent calls. The byte/call/output limits and admission counts bound requested work; the reservation is not an AWS billing cap. Unknown provider outcomes retain the allowance rather than being assumed free. No release refunds reservations within the admission window.

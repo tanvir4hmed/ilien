@@ -37,6 +37,8 @@ import { pausedFor } from "../../operations/src/controls.js";
 import { authoredReplyText } from "../../channels/src/text.js";
 import { autonomousGate } from "./autonomy.js";
 import { caseHeld } from "../../operations/src/supervision.js";
+import type { Operation } from "../../coordination/src/types.js";
+import { configurationFor } from "../../product/src/configuration.js";
 function fail(s: string): never {
   throw new CoordinationError(s);
 }
@@ -67,7 +69,7 @@ export async function enqueueAgent(
   if (!config?.enabled || (automatic && !config.auto_receipts))
     return { state: "disabled" };
   if (
-    state.status !== "active" ||
+    (state.status !== "active" && !(state.autonomous && state.status === "blocked")) ||
     state.takeoverBy ||
     Date.parse(state.deadline) <= Date.now()
   )
@@ -158,7 +160,7 @@ export async function buildContext(
     fail("ai_policy_changed");
   if (
     state.revision !== run.expected_revision ||
-    state.status !== "active" ||
+    (state.status !== "active" && !(state.autonomous && state.status === "blocked")) ||
     state.takeoverBy ||
     Date.parse(state.deadline) <= Date.now()
   )
@@ -175,9 +177,11 @@ export async function buildContext(
     actorId: actor.id,
     evidence: [],
     knowledge: [],
+    participantProfiles: ((await configurationFor(source.id,tx)).configuration.messageProfiles ?? []).map(({group,channel,language,style,format,factKeys})=>({group,channel,language,style,format,factKeys})),
   };
   const ids = new Set([
     state.sourceEvidenceId,
+    ...(state.sourceQuestions ?? []).flatMap(q=>q.evidenceId ? [q.evidenceId] : []),
     ...state.obligations.flatMap((o) =>
       [o.reply?.evidenceId, o.verification?.evidenceId].filter(
         (v): v is string => !!v,
@@ -226,9 +230,10 @@ export async function buildContext(
       binding_id: string;
       delivery_id: string;
       normalized: { text: string } | string;
+      created_at: string;
     }>(
       await query(
-        "SELECT id,evidence_id,binding_id,delivery_id,normalized FROM channel_receipts WHERE id=CAST(:id AS uuid) AND case_id=CAST(:case AS uuid) AND connection_id=CAST(:source AS uuid) AND status='needs_review' AND reason='unstructured_reply'",
+        "SELECT id,evidence_id,binding_id,delivery_id,normalized,created_at FROM channel_receipts WHERE id=CAST(:id AS uuid) AND case_id=CAST(:case AS uuid) AND connection_id=CAST(:source AS uuid) AND status='needs_review' AND reason='unstructured_reply'",
         [
           ...args(source),
           param("id", run.receipt_id),
@@ -261,7 +266,11 @@ export async function buildContext(
     )
       fail("ai_contact_changed");
     context.actorId = b.actor_id;
+    const stamp=r.created_at.replace(" ","T");
+    const receivedAt=new Date(/[Zz]|[+-]\d\d(?::?\d\d)?$/.test(stamp)?stamp:stamp+"Z").toISOString();
     context.receipt = {
+      receivedAt,
+      expiresAt:new Date(Date.parse(receivedAt)+policy.evidenceAgeSeconds*1000).toISOString(),
       id: r.id,
       evidenceId: r.evidence_id,
       deliveryId: d.id,
@@ -317,6 +326,14 @@ export async function retrieve(
     ),
   );
 }
+export function executionActor(context: Context, op: Operation) {
+  if(context.receipt && context.state.autonomous && ["clarify","reroute","source_query"].includes(op.type)) {
+    const actor=context.policy.actors.find(a=>a.enabled && a.role==="coordinator");
+    if(!actor) fail("ai_coordinator_unavailable");
+    return actor.id;
+  }
+  return context.actorId;
+}
 export function gate(context: Context, proposal: Proposal) {
   if (proposal.disposition !== "propose") {
     if (proposal.operation) fail("ai_nonproposal_operation");
@@ -343,13 +360,29 @@ export function gate(context: Context, proposal: Proposal) {
   if (r) {
     if (!proposal.citations.some((c) => c.ref === r.evidenceId))
       fail("ai_receipt_citation_required");
-    if (op.type === "reply") {
+    if (op.type === "reply" || op.type === "decide") {
       if (
         op.obligationId !== r.obligationId ||
         op.expectedObligationRevision !== r.obligationRevision ||
         op.subjectRevision !== context.state.subject.revision
       )
         fail("ai_reply_scope");
+      if(op.timeBasis === "received" && (!context.state.autonomous || op.observedAt !== r.receivedAt || op.validUntil !== r.expiresAt)) fail("ai_reported_time_scope");
+      if(op.type==="decide" && context.state.obligations.find(o=>o.id===r.obligationId)?.proposal?.sha256 !== op.proposalHash) fail("ai_decision_scope");
+      if(op.type==="decide") {
+        const yes=/\b(approved?|yes|agree|okay|ok)\b|অনুমোদন|সম্মত/iu.test(r.text);
+        const caveat=/\b(not|no|reject|decline|maybe|perhaps|if|unless|subject to|could|might|would|but|however)\b|নয়|হয়নি|হয়নি|অসম্মত/iu.test(r.text);
+        const no=/\b(no|not approved|reject(?:ed)?|declin(?:e|ed))\b|অসম্মত/iu.test(r.text);
+        if((op.choice==="approve" && (!yes || caveat)) || (op.choice==="reject" && !no)) fail("ai_explicit_decision_required");
+      }
+      if(op.type==="reply") {
+        for(const fact of op.facts ?? []) {
+          if(!groundedQuote(r.text,fact.quote) || !groundedQuote(fact.quote,fact.value) || (fact.unit && !groundedQuote(fact.quote,fact.unit))) fail("ai_fact_not_grounded");
+          if(/\b(not|maybe|possibly|might|unsure|unconfirmed)\b|সম্ভবত|নিশ্চিত নই/iu.test(fact.quote)) fail("ai_uncertain_fact_requires_clarification");
+        }
+        if(op.progress && (!op.statusQuote || !groundedQuote(r.text,op.statusQuote))) fail("ai_progress_not_grounded");
+        if(op.progress === "ready" && (!/ready|complete|finished|প্রস্তুত|সম্পন্ন|শেষ/iu.test(op.statusQuote!) || /\b(not|will|would|could|expect|expected|tomorrow)\b|pending|in progress|হয়নি|হয়নি|অসম্পূর্ণ|হবে/iu.test(op.statusQuote!))) fail("ai_completion_not_explicit");
+      }
     } else if (op.type === "verify") {
       if (
         op.obligationId !== r.obligationId ||
@@ -359,18 +392,28 @@ export function gate(context: Context, proposal: Proposal) {
         fail("ai_verify_scope");
     } else if (op.type === "add_child") {
       if (op.parentId !== r.obligationId) fail("ai_child_scope");
+    } else if(context.state.autonomous && (op.type==="clarify" || op.type==="reroute")) {
+      if(op.obligationId!==r.obligationId) fail("ai_reply_scope");
+    } else if(context.state.autonomous && op.type==="source_query") {
+      // Routed back only to the authenticated original source, not an arbitrary address.
     } else fail("ai_receipt_operation_forbidden");
   } else if (
-    !["add_child", "link_dependency", "reopen", "reassign", "report"].includes(
+    !["add_child", "link_dependency", "reopen", "reassign", "report", ...(context.state.autonomous ? ["route_initial","clarify","reroute","attach_proposal","relay_decision","source_query"] : [])].includes(
       op.type,
     )
   )
     fail("ai_operation_forbidden");
+  const statement=op.type==="attach_proposal" ? op.statement : op.type==="add_child" ? op.proposalStatement : undefined;
+  if(statement) {
+    const quoted=proposal.citations.map(c=>c.quote).join(" ");
+    const numbers=statement.match(/\b\d+(?:[.:]\d+)*\b/g) ?? [];
+    if(numbers.some(number=>!quoted.includes(number))) fail("ai_proposal_number_not_grounded");
+  }
   // Preview is pure: no channels, SQL, credentials or external effects.
   transition(
     context.state,
     context.policy,
-    resolveActor(context.policy, context.actorId),
+    resolveActor(context.policy, executionActor(context,op)),
     op,
     r?.evidenceId ?? context.state.sourceEvidenceId,
     new Date().toISOString(),
@@ -455,11 +498,11 @@ export async function executeAutonomousRun(source: Source, id: string) {
     if (hash(JSON.stringify(proposal)) !== run.proposal_hash) fail("ai_proposal_hash_mismatch");
     const operation = autonomousGate(fresh, proposal);
     const applied = await applyCommand(source, run.case_id, JSON.stringify({
-      commandId: run.id, expectedRevision: run.expected_revision, actorId: fresh.actorId, operation,
+      commandId: run.id, expectedRevision: run.expected_revision, actorId: executionActor(fresh,operation), operation,
     }), tx, fresh.receipt?.evidenceId ?? fresh.state.sourceEvidenceId);
     await query(
       "INSERT INTO ai_executions(tenant_id,run_id,actor_id,proposal_hash,policy_hash,settings_revision,case_revision,operation) VALUES(CAST(:tenant AS uuid),CAST(:id AS uuid),:actor,:hash,:policy,CAST(:settings AS int),CAST(:revision AS int),CAST(:operation AS jsonb))",
-      [...args(source), param("id", id), param("actor", fresh.actorId), param("hash", run.proposal_hash!), param("policy", fresh.policyHash), param("settings", String(run.settings_revision)), param("revision", String(applied.revision)), param("operation", JSON.stringify(operation))], tx,
+      [...args(source), param("id", id), param("actor", executionActor(fresh,operation)), param("hash", run.proposal_hash!), param("policy", fresh.policyHash), param("settings", String(run.settings_revision)), param("revision", String(applied.revision)), param("operation", JSON.stringify(operation))], tx,
     );
     if (fresh.receipt) await query("UPDATE channel_receipts SET status='applied',reason='autonomous_grounded_interpretation' WHERE id=CAST(:id AS uuid)", [param("id", fresh.receipt.id)], tx);
     await query("UPDATE ai_runs SET state='executed',reason='autonomous_policy_gated_execution',updated_at=now() WHERE id=CAST(:id AS uuid)", [param("id", id)], tx);

@@ -12,6 +12,8 @@ import {
   type Policy,
 } from "../../coordination/src/types.js";
 import { communicationContext } from "../../domain-packs/src/communication.js";
+import { configurationFor } from "../../product/src/configuration.js";
+import type { MessageProfile, Fact } from "../../contracts/src/communication.js";
 
 export interface Binding {
   id: string;
@@ -43,6 +45,9 @@ export interface Delivery {
     claim?: unknown;
     proposal?: unknown;
     sourceContext?: Record<string, unknown>;
+    profile?: MessageProfile;
+    facts?: (Fact & {evidenceId:string; actorId:string})[];
+    autonomous?:boolean;
   };
 }
 export const decode = <T>(v: T | string): T =>
@@ -86,10 +91,20 @@ export async function createDelivery(
     ),
   )[0];
   if (!original) throw new CoordinationError("source_evidence_required");
-  const sourceContext = communicationContext(
+  const sourceContext = contact.kind === "decision_update" ? {} : communicationContext(
     JSON.parse(original.original_text),
     obligation.group,
   );
+  const configuration=(await configurationFor(state.sourceId,tx)).configuration;
+  const profile=configuration.messageProfiles?.find(p=>p.group===obligation.group && p.channel===binding.channel);
+  if(profile && contact.kind !== "decision_update") {
+    const event=JSON.parse(original.original_text) as {payload:Record<string,unknown>};
+    for(const field of profile.sourceFields) if(Object.hasOwn(event.payload,field)) sourceContext[field]=event.payload[field];
+  }
+  const needed=new Set<string>();
+  const collect=(id:string)=>{if(needed.has(id))return;needed.add(id);for(const dep of state.obligations.find(o=>o.id===id)?.dependencies ?? []) collect(dep);};
+  for(const dep of obligation.dependencies) collect(dep);
+  const facts=contact.kind === "decision_update" ? [] : state.obligations.filter(o=>needed.has(o.id) && ["accepted","verified"].includes(o.status)).flatMap(o=>(o.reply?.facts ?? []).map(f=>({...f,evidenceId:o.reply!.evidenceId,actorId:o.reply!.actorId})));
   const id = randomUUID();
   const result = rows<{ id: string }>(
     await query(
@@ -117,6 +132,9 @@ export async function createDelivery(
             obligationRevision: obligation.revision,
             deadline: state.deadline,
             sourceContext,
+            ...(profile ? {profile} : {}),
+            facts,
+            autonomous:state.autonomous ?? false,
             ...(obligation.proposal ? { proposal: obligation.proposal } : {}),
             ...(contact.kind === "verify_request"
               ? { claim: obligation.reply }
@@ -138,6 +156,9 @@ export async function createDelivery(
 
 export function contactCurrent(state: CaseState, d: Delivery) {
   const o = state.obligations.find((o) => o.id === d.obligation_id);
+  if(d.request.contact.kind === "decision_update") return ["active","blocked"].includes(state.status) && !state.takeoverBy && !!state.decisionNotices?.some(n=>n.withdrawn && n.obligationId===d.obligation_id && n.actorId===d.actor_id && n.decisionId===d.request.contact.decisionId && n.decisionHash===d.request.contact.decisionHash);
+  const decision=d.request.contact.decisionId ? state.obligations.find(n=>n.id===d.request.contact.decisionId) : undefined;
+  if(d.request.contact.kind==="decision_notice" && (!decision?.proposal || decision.decision?.choice!=="approve" || !["accepted","verified"].includes(decision.status) || decision.proposal.sha256!==d.request.contact.decisionHash || !decision.reply || Date.parse(decision.reply.validUntil)<=Date.now())) return false;
   return (
     !!o &&
     state.status === "active" &&
@@ -147,7 +168,7 @@ export function contactCurrent(state: CaseState, d: Delivery) {
     (d.request.contact.kind === "verify_request"
       ? o.status === "answered" &&
         o.reply?.revision === d.request.contact.replyRevision
-      : o.assignee === d.actor_id && o.status === "waiting")
+      : o.assignee === d.actor_id && (o.status === "waiting" || d.request.contact.kind==="decision_notice"))
   );
 }
 

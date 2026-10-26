@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { factSchema, type Fact } from "../../contracts/src/communication.js";
 const id = z
   .string()
   .min(1)
@@ -6,6 +7,12 @@ const id = z
   .regex(/^[A-Za-z0-9_-]+$/);
 const text = z.string().min(1).max(1000);
 export const operationSchema = z.discriminatedUnion("type", [
+  z.strictObject({type:z.literal("source_query"), questionId:id, question:text}),
+  z.strictObject({type:z.literal("source_response"), questionId:id, answer:text}),
+  z.strictObject({type:z.literal("route_initial"), obligationId:id, group:id, question:text}),
+  z.strictObject({type:z.literal("clarify"), obligationId:id, question:text, reason:text}),
+  z.strictObject({type:z.literal("reroute"), obligationId:id, group:id, reason:text}),
+  z.strictObject({type:z.literal("relay_decision"), obligationId:id, decisionId:id}),
   z.strictObject({
     type: z.literal("attach_proposal"),
     obligationId: id,
@@ -24,6 +31,7 @@ export const operationSchema = z.discriminatedUnion("type", [
     subjectRevision: z.string().min(1).max(160),
     observedAt: z.iso.datetime({ offset: true }),
     validUntil: z.iso.datetime({ offset: true }),
+    timeBasis: z.enum(["observed", "received"]).optional(),
   }),
   z.strictObject({
     type: z.literal("adopt_configuration"),
@@ -43,6 +51,10 @@ export const operationSchema = z.discriminatedUnion("type", [
     statement: text,
     observedAt: z.iso.datetime({ offset: true }),
     validUntil: z.iso.datetime({ offset: true }),
+    timeBasis: z.enum(["observed", "received"]).optional(),
+    facts: z.array(factSchema).max(12).optional(),
+    progress: z.enum(["in_progress", "ready"]).optional(),
+    statusQuote: z.string().min(1).max(500).optional(),
     subjectRevision: z.string().min(1).max(160),
   }),
   z.strictObject({
@@ -64,7 +76,9 @@ export const operationSchema = z.discriminatedUnion("type", [
       "acknowledgement",
       "evidence",
       "commitment",
+      "completion",
     ]),
+    proposalStatement: text.optional(),
   }),
   z.strictObject({
     type: z.literal("link_dependency"),
@@ -125,6 +139,10 @@ export interface Reply {
   observedAt: string;
   validUntil: string;
   subjectRevision: string;
+  timeBasis?: "observed" | "received";
+  facts?: Fact[];
+  progress?: "in_progress" | "ready";
+  statusQuote?: string;
 }
 export interface Obligation {
   id: string;
@@ -135,7 +153,11 @@ export interface Obligation {
   dependencies: string[];
   assignee: string;
   revision: number;
-  status: "waiting" | "answered" | "verified" | "disputed" | "blocked";
+  status: "waiting" | "answered" | "accepted" | "verified" | "disputed" | "blocked";
+  acceptance?: "responsible_reply" | "independent";
+  requiredFacts?: string[];
+  clarificationCount?: number;
+  relayKeys?: string[];
   proposal?: {
     id: string;
     revision: number;
@@ -164,6 +186,10 @@ export interface Obligation {
   nextContactAt: string;
 }
 export interface CaseState {
+  autonomous?: boolean;
+  awaitingPlan?: boolean;
+  sourceQuestions?: {id:string;question:string;answer?:string;evidenceId?:string}[];
+  decisionNotices?: {decisionId:string;decisionHash:string;obligationId:string;actorId:string;withdrawn?:boolean}[];
   id: string;
   revision: number;
   inboxId: string;
@@ -192,7 +218,9 @@ export interface CaseState {
 export interface Contact {
   obligationId: string;
   actorId: string;
-  kind: "ask" | "reminder" | "escalation" | "verify_request";
+  kind: "ask" | "reminder" | "escalation" | "verify_request" | "decision_notice" | "decision_update";
+  decisionId?: string;
+  decisionHash?: string;
   replyEvidenceId?: string;
   replyRevision?: number;
   question: string;
@@ -201,7 +229,7 @@ export interface Contact {
   origin: "simulated";
 }
 export interface Outcome {
-  outcome: "completed" | "partial" | "blocked" | "cancelled" | "handed_off";
+  outcome: "completed" | "in_progress" | "partial" | "blocked" | "cancelled" | "handed_off";
   terminal: boolean;
   requirements: { id: string; status: string; evidenceIds: string[] }[];
   unresolvedObligationIds: string[];

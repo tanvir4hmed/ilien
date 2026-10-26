@@ -260,10 +260,12 @@ export async function receive(
             ? "greeting_received"
             : "quoted_message_without_new_reply";
         }
+        if(d?.request.contact.kind==="decision_update") {status="received";reason="decision_update_acknowledged";}
         if (
           authored &&
           !isGreeting(authored) &&
           d &&
+          d.request.contact.kind!=="decision_update" &&
           d.actor_id === binding!.actor_id &&
           caseRow
         ) {

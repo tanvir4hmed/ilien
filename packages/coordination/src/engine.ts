@@ -14,6 +14,7 @@ const fail = (code: string, status = 409): never => {
 };
 const at = (now: string, seconds: number) =>
   new Date(Date.parse(now) + seconds * 1000).toISOString();
+export const satisfied = (o: Obligation) => o.status === "verified" || o.status === "accepted";
 export function resolveActor(policy: Policy, id: string): Actor {
   return (
     policy.actors.find((a) => a.id === id && a.enabled) ??
@@ -49,6 +50,9 @@ function invalidate(
   o.status = "waiting";
   delete o.reply;
   delete o.decision;
+  // A changed prerequisite invalidates the proposed business terms as well.
+  // They must be assembled again from the current dependency evidence.
+  if(o.kind === "decision") delete o.proposal;
   delete o.verification;
   delete o.verificationRequested;
   o.revision++;
@@ -94,9 +98,15 @@ function fresh(o: Obligation, now: string, policy: Policy) {
       Date.parse(now) - policy.evidenceAgeSeconds * 1000
   );
 }
+function rememberDecisionNotices(state:CaseState,contacts:Contact[]) {
+  for(const c of contacts.filter(c=>c.kind==="decision_notice" && c.decisionId && c.decisionHash)) {
+    if(state.decisionNotices?.some(n=>n.decisionId===c.decisionId && n.decisionHash===c.decisionHash && n.actorId===c.actorId))continue;
+    state.decisionNotices=[...(state.decisionNotices ?? []),{decisionId:c.decisionId!,decisionHash:c.decisionHash!,obligationId:c.obligationId,actorId:c.actorId}];
+  }
+}
 export function outcome(state: CaseState, terminal: boolean): Outcome {
   const unresolved = state.obligations.filter(
-    (o) => o.required && o.status !== "verified",
+    (o) => o.required && !satisfied(o),
   );
   const type =
     state.status === "completed"
@@ -105,7 +115,8 @@ export function outcome(state: CaseState, terminal: boolean): Outcome {
         ? "cancelled"
         : state.status === "handed_off"
           ? "handed_off"
-          : state.obligations.some((o) => o.status === "verified")
+          : state.autonomous && state.status === "active" ? "in_progress"
+          : state.obligations.some(satisfied)
             ? "partial"
             : "blocked";
   return {
@@ -132,6 +143,7 @@ function advance(
   const wasBlocked = state.status === "blocked";
   if (["completed", "cancelled", "handed_off"].includes(state.status))
     return { contacts };
+  if (state.awaitingPlan) return { contacts };
   for (const o of state.obligations) {
     const reporterAllowed =
       !o.reply ||
@@ -156,11 +168,16 @@ function advance(
       (!fresh(o, now, policy) || !reporterAllowed || !verifierAllowed)
     )
       invalidate(state, o.id, now);
+    if (o.status === "answered" && o.acceptance === "responsible_reply" &&
+        o.dependencies.every(id => satisfied(node(state,id))) &&
+        (o.kind !== "completion" || o.reply?.progress === "ready")) {
+      o.status = o.decision?.choice === "reject" ? "disputed" : "accepted";
+    }
   }
   if (
-    state.obligations
+    !state.sourceQuestions?.some(q=>!q.answer) && state.obligations.some(o => o.required) && state.obligations
       .filter((o) => o.required)
-      .every((o) => o.status === "verified")
+      .every(satisfied)
   ) {
     state.status = "completed";
     return { contacts, result: outcome(state, true) };
@@ -173,8 +190,9 @@ function advance(
   for (const o of state.obligations) {
     if (
       o.status === "answered" &&
+      o.acceptance !== "responsible_reply" &&
       !o.verificationRequested &&
-      o.dependencies.every((id) => node(state, id).status === "verified")
+      o.dependencies.every((id) => satisfied(node(state, id)))
     ) {
       const verifier = policy.actors.find(
         (a) =>
@@ -203,7 +221,8 @@ function advance(
     }
     if (
       o.status !== "waiting" ||
-      o.dependencies.some((id) => node(state, id).status !== "verified") ||
+      o.dependencies.some((id) => !satisfied(node(state, id))) ||
+      (o.kind === "decision" && !o.proposal) ||
       Date.parse(o.nextContactAt) > Date.parse(now)
     )
       continue;
@@ -248,6 +267,15 @@ function advance(
       sourceEvidenceId: state.sourceEvidenceId,
       origin: "simulated",
     });
+    const approval = state.autonomous && o.kind === "completion"
+      ? o.dependencies.map(id=>node(state,id)).find(d=>d.kind === "decision" && d.decision?.choice === "approve" && satisfied(d)) : undefined;
+    if (approval?.proposal && fresh(approval,now,policy)) {
+      const contact = contacts[contacts.length-1]!;
+      contact.kind = "decision_notice";
+      contact.decisionId = approval.id;
+      contact.decisionHash = approval.proposal.sha256;
+      contact.question = `Authorized decision: ${approval.proposal.statement}. ${o.question}`;
+    }
     state.contacts++;
     o.reminders++;
     o.nextContactAt = at(now, policy.reminderSeconds);
@@ -304,6 +332,7 @@ export function transition(
     fail("case_revision_limit_handoff_required");
   if (operation.type !== "tick" && !actor) fail("actor_required", 403);
   const op = operation;
+  const extraContacts: Contact[] = [];
   if (op.type === "tick") {
     if (
       ["completed", "cancelled", "handed_off"].includes(state.status) ||
@@ -327,6 +356,66 @@ export function transition(
     )
       fail("case_deadline_elapsed");
     switch (op.type) {
+      case "source_query": {
+        coordinator(actor!); if(!state.autonomous) fail("autonomous_mission_required");
+        if((state.sourceQuestions?.length ?? 0)>=8) fail("source_question_limit");
+        if(state.sourceQuestions?.some(q=>q.id===op.questionId || q.question.trim().toLowerCase()===op.question.trim().toLowerCase())) fail("duplicate_source_question");
+        state.sourceQuestions=[...(state.sourceQuestions ?? []),{id:op.questionId,question:op.question}];
+        break;
+      }
+      case "source_response": {
+        coordinator(actor!);
+        const q=state.sourceQuestions?.find(q=>q.id===op.questionId && !q.answer);
+        if(!q) fail("source_question_not_open");
+        q!.answer=op.answer; q!.evidenceId=evidenceId;
+        break;
+      }
+      case "route_initial": {
+        coordinator(actor!);
+        if (!state.autonomous || !state.awaitingPlan) fail("initial_routing_already_complete");
+        if (!policy.groups.includes(op.group)) fail("group_outside_service_scope",403);
+        const owner=policy.actors.find(a=>a.enabled && a.group===op.group && a.role==="respondent");
+        if(!owner) fail("no_responsible_actor");
+        const o=node(state,op.obligationId);
+        if(o.dependencies.length) fail("initial_prerequisite_required");
+        o.group=op.group; o.assignee=owner!.id; o.question=op.question;
+        state.awaitingPlan=false;
+        break;
+      }
+      case "clarify": {
+        coordinator(actor!);
+        if (!state.autonomous) fail("autonomous_mission_required");
+        const o = node(state,op.obligationId);
+        if ((o.clarificationCount ?? 0) >= 4) fail("clarification_limit_source_attention");
+        if (o.question.trim().toLowerCase() === op.question.trim().toLowerCase()) fail("duplicate_clarification");
+        invalidate(state,o.id,now);
+        o.question = op.question;
+        o.clarificationCount = (o.clarificationCount ?? 0)+1;
+        break;
+      }
+      case "reroute": {
+        coordinator(actor!);
+        if (!state.autonomous || !policy.groups.includes(op.group)) fail("group_outside_service_scope",403);
+        const o=node(state,op.obligationId);
+        if (o.group === op.group) fail("routing_unchanged");
+        const owner=policy.actors.find(a=>a.enabled && a.group===op.group && a.role==="respondent");
+        if (!owner) fail("no_responsible_actor");
+        invalidate(state,o.id,now); o.group=op.group; o.assignee=owner!.id;
+        break;
+      }
+      case "relay_decision": {
+        coordinator(actor!);
+        if (!state.autonomous) fail("autonomous_mission_required");
+        const o=node(state,op.obligationId), d=node(state,op.decisionId);
+        if (!d.proposal || d.decision?.choice!=="approve" || !satisfied(d) || !fresh(d,now,policy)) fail("current_approved_decision_required");
+        const key=`${d.id}/${d.proposal!.sha256}/${d.reply!.revision}`;
+        if (o.relayKeys?.includes(key)) fail("decision_already_relayed");
+        if (state.contacts>=policy.maxContacts) fail("contact_budget_exhausted");
+        o.relayKeys=[...(o.relayKeys ?? []),key];
+        extraContacts.push({obligationId:o.id,actorId:o.assignee,kind:"decision_notice",decisionId:d.id,decisionHash:d.proposal!.sha256,question:`Authorized decision: ${d.proposal!.statement}. Decision by ${d.decision!.actorId}. This notice concerns your assigned responsibility only.`,subject:state.subject,sourceEvidenceId:state.sourceEvidenceId,origin:"simulated"});
+        state.contacts++;
+        break;
+      }
       case "adopt_configuration": {
         coordinator(actor!);
         if (op.version !== policy.version)
@@ -380,6 +469,7 @@ export function transition(
         coordinator(actor!);
         const o = node(state, op.obligationId);
         if (o.kind !== "decision") fail("decision_obligation_required");
+        if(o.dependencies.some(id=>!satisfied(node(state,id)))) fail("unresolved_dependency");
         if (
           o.proposal &&
           (o.proposal.id !== op.proposalId ||
@@ -414,6 +504,7 @@ export function transition(
         canRespond(actor!, o);
         if (op.type === "reply" && o.kind === "decision")
           fail("bound_decision_required");
+        if(op.type === "decide" && o.dependencies.some(id=>!satisfied(node(state,id)))) fail("unresolved_dependency");
         if (
           op.type === "decide" &&
           (o.kind !== "decision" ||
@@ -446,6 +537,8 @@ export function transition(
           observedAt: op.observedAt,
           validUntil: op.validUntil,
           subjectRevision: op.subjectRevision,
+          timeBasis: op.timeBasis ?? "observed",
+          ...(op.type === "reply" ? {facts:op.facts,progress:op.progress,statusQuote:op.statusQuote} : {}),
         };
         if (op.type === "decide")
           o.decision = {
@@ -458,6 +551,14 @@ export function transition(
         delete o.verification;
         delete o.verificationRequested;
         o.status = "answered";
+        if (o.kind === "completion" && op.type === "reply" && op.progress !== "ready") {
+          o.status="waiting"; o.nextContactAt=now; o.reminders=0;
+        }
+        const missing=op.type === "reply" ? (o.requiredFacts ?? []).filter(key=>!op.facts?.some(f=>f.key===key)) : [];
+        if(state.autonomous && missing.length && (o.kind!=="completion" || (op.type==="reply" && op.progress==="ready"))) {
+          o.status="waiting";o.nextContactAt=now;o.reminders=0;
+          o.question=`Please confirm ${missing.map(k=>k.replaceAll("_"," ")).join(", ")} for ${state.subject.id}. Preserve quantities, units, timing and uncertainty; no completion is inferred from missing information.`;
+        }
         break;
       }
       case "verify": {
@@ -474,7 +575,7 @@ export function transition(
           !fresh(o, now, policy)
         )
           fail("stale_or_missing_reply");
-        if (o.dependencies.some((id) => node(state, id).status !== "verified"))
+        if (o.dependencies.some((id) => !satisfied(node(state, id))))
           fail("unresolved_dependency");
         invalidateParents(state, o.id, now);
         o.revision++;
@@ -523,7 +624,14 @@ export function transition(
           reminders: 0,
           escalated: false,
           nextContactAt: now,
+          acceptance: state.autonomous ? "responsible_reply" : "independent",
         });
+        if (op.proposalStatement) {
+          if (op.kind !== "decision" || !state.autonomous) fail("decision_obligation_required");
+          const child=state.obligations[state.obligations.length-1]!;
+          const proposal={id:`proposal_${child.id}`, revision:1,statement:op.proposalStatement,subjectRevision:state.subject.revision};
+          child.proposal={...proposal,sha256:createHash("sha256").update(JSON.stringify(proposal)).digest("hex"),evidenceId};
+        }
         graphGuard(state, policy);
         break;
       }
@@ -580,8 +688,20 @@ export function transition(
   }
   state.revision++;
   const effect = advance(state, policy, now);
+  effect.contacts.unshift(...extraContacts);
+  rememberDecisionNotices(state,effect.contacts);
+  for(const notice of state.decisionNotices ?? []) {
+    const decision=state.obligations.find(o=>o.id===notice.decisionId);
+    if(notice.withdrawn || (decision?.proposal?.sha256===notice.decisionHash && decision.decision?.choice==="approve" && satisfied(decision)))continue;
+    if(state.contacts>=policy.maxContacts) {state.status="blocked";effect.result=outcome(state,false);continue;}
+    notice.withdrawn=true;
+    effect.contacts.push({obligationId:notice.obligationId,actorId:notice.actorId,kind:"decision_update",decisionId:notice.decisionId,decisionHash:notice.decisionHash,question:"Correction: the previously communicated approval is no longer current because its supporting information changed. No replacement approval is implied. A revised authorized decision is required before relying on that earlier approval.",subject:state.subject,sourceEvidenceId:state.sourceEvidenceId,origin:"simulated"});
+    state.contacts++;
+  }
   if (op.type === "report" || op.type === "cancel" || op.type === "handoff")
     effect.result = outcome(state, op.type !== "report");
+  else if (state.autonomous && op.type !== "tick" && !effect.result)
+    effect.result=outcome(state,false);
   return { state, ...effect };
 }
 export function nextWake(
@@ -608,7 +728,7 @@ export function nextWake(
       state.status !== "paused" &&
       !state.takeoverBy &&
       o.status === "waiting" &&
-      o.dependencies.every((id) => node(state, id).status === "verified")
+      o.dependencies.every((id) => satisfied(node(state, id)))
     )
       times.push(Date.parse(o.nextContactAt));
   }

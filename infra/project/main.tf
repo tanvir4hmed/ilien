@@ -250,7 +250,7 @@ module "agent" {
   policy = jsonencode({ Version = "2012-10-17", Statement = concat(local.base_statements, [
     { Effect = "Allow", Action = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], Resource = module.agent_queue.arn },
     { Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = module.relay.arn },
-    { Effect = "Allow", Action = ["bedrock:InvokeModel"], Resource = "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0" }
+    { Effect = "Allow", Action = ["bedrock:InvokeModel"], Resource = "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-pro-v1:0" }
   ]) })
 }
 resource "aws_lambda_event_source_mapping" "agent" {

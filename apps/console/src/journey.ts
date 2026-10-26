@@ -294,6 +294,8 @@ export function renderJourney(
               decision: o.decision,
               verification: o.verification,
               proposal: o.proposal,
+              acceptance: o.acceptance,
+              structuredFacts: o.reply?.facts,
             },
             o.reply?.evidenceId,
           ),
@@ -351,7 +353,7 @@ export function renderJourney(
     view.append(
       node(
         "p",
-        "Arrows show prerequisites → dependent work. Select a task to inspect its owner and evidence. A reply is not a verified answer; provider acceptance is not confirmed delivery.",
+        "Arrows show prerequisites → dependent work. Accepted means the configured responsible-person rule was met; verified means an independent check. Provider acceptance is not confirmed delivery.",
         "muted",
       ),
     );
@@ -506,7 +508,7 @@ export function renderJourney(
     for (const r of data.aiRuns ?? [])
       entries.push({
         time: String(r.created_at),
-        title: `AI review · ${words(r.state)}`,
+        title: `AI coordination · ${words(r.state)}`,
         body: {
           status: r.state,
           reason: r.reason,

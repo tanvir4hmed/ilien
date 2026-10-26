@@ -1,0 +1,7 @@
+{
+  "contractVersion":"1.0","eventId":"sample-communication-001",
+  "eventType":"communication.request_raised","payloadVersion":"1.0",
+  "occurredAt":"2026-10-26T09:00:00+06:00","correlationId":"sample-communication-001",
+  "subject":{"type":"coordination_request","id":"REQ-001","revision":"1"},
+  "payload":{"summary":"Confirm the current inspection disposition and any missing supporting information for the referenced request.","group":"quality","kind":"evidence"}
+}

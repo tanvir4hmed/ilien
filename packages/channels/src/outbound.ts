@@ -22,10 +22,13 @@ import { approvedTemplate } from "./templates.js";
 import { pausedFor } from "../../operations/src/controls.js";
 import { caseHeld } from "../../operations/src/supervision.js";
 import { projectProviderEvents } from "./events.js";
+import { renderProfile } from "./profiles.js";
 const social = new SocialMessagingClient({ maxAttempts: 1 });
 const email = new SESv2Client({ maxAttempts: 1 });
 
 export function render(d: Delivery) {
+  if(d.request.profile) return renderProfile(d,d.request.profile);
+  if(d.request.autonomous || d.request.facts?.length || d.request.contact.kind==="decision_notice") return renderProfile(d,{group:"configured",channel:d.channel,format:"human",version:"default-v1",language:"en",style:"concise",sourceFields:Object.keys(d.request.sourceContext ?? {}),factKeys:["available_quantity","usable_quantity","completion_time","completion_reference","delay_days","quantity","unit","status"],fields:[]});
   const r = d.request;
   const labels: Record<string, string> = {
     siteId: "Factory",
@@ -154,7 +157,9 @@ export async function sendDelivery(tenant: string, id: string) {
       return { retryAfter: 2 as const };
     if (usage.count >= 100) reason = "daily_contact_budget";
     if (integrityHold) reason = "case_integrity_review_required";
-    const body = template?.body ?? render(d);
+    let body="";
+    try { body = template?.body ?? render(d); }
+    catch(error) {reason=error instanceof Error && "code" in error ? String(error.code) : "message_rendering_failed";}
     if (Buffer.byteLength(body) > 4000) reason = "message_size_limit";
     if (reason) {
       await query(

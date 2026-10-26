@@ -30,6 +30,7 @@ let config: Config,
   page = "Overview";
 let content: HTMLElement;
 let stopLive: (() => void) | undefined;
+let preferredJourneyView = "Workflow map";
 const pageLabels: Record<string, string> = {
   Overview: "Home",
   Cases: "Requests",
@@ -199,7 +200,7 @@ async function api<T = unknown>(path: string, body?: unknown): Promise<T> {
     loginScreen();
     throw new Error("Session expired. Sign in again.");
   }
-  const response = await fetch(`${config.apiUrl}/console/v1${path}`, {
+  const request = () => fetch(`${config.apiUrl}/console/v1${path}`, {
     method: body === undefined ? "GET" : "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -209,9 +210,16 @@ async function api<T = unknown>(path: string, body?: unknown): Promise<T> {
     cache: "no-store",
     credentials: "omit",
   });
+  let response = await request();
+  // Aurora can resume after inactivity. Retry reads only; never replay a mutation.
+  for(let attempt=0;body===undefined && response.status===503 && attempt<3;attempt++) {
+    await new Promise(resolve=>setTimeout(resolve,2000*(attempt+1)));
+    response=await request();
+  }
   const data = await response.json();
   if (!response.ok) {
     const messages: Record<string, string> = {
+      temporarily_unavailable: "The workspace is waking up. Please try again shortly.",
       stale_case_revision:
         "This request changed. Refresh it before trying again.",
       stale_revision: "This request changed. Refresh it before trying again.",
@@ -280,7 +288,7 @@ function loginScreen(message?: string) {
     el("h1", "Every conversation. One context."),
     el(
       "p",
-      "Coordinate requests, collect evidence and bring verified outcomes back to their source.",
+      "Coordinate requests, collect evidence and bring traceable outcomes back to their source.",
       "muted",
     ),
   );
@@ -592,6 +600,12 @@ async function casePage(id: string) {
       ),
     );
   heading.append(button("How to use this map", () => show("Help")));
+  const questions=(state.sourceQuestions ?? []).filter(q=>!q.answer);
+  if(questions.length) {
+    const pending=card("Waiting for source clarification");
+    pending.append(el("p","ILIEN has returned these questions to the requesting source. Source responses resume the same case automatically.","muted"));
+    for(const q of questions)pending.append(el("p",q.question));
+  }
   const deliveryIssues = journey.deliveries.filter((d) =>
     ["blocked", "uncertain"].includes(String(d.status)),
   );
@@ -628,6 +642,7 @@ async function casePage(id: string) {
     refreshing = false;
   let current = journey;
   const draw = () => renderJourney(mapHost, current, evidence);
+  mapHost.dataset.view=preferredJourneyView;
   async function refresh() {
     if (refreshing || disposed || document.hidden) return;
     refreshing = true;
@@ -635,6 +650,7 @@ async function casePage(id: string) {
       const next = await api<Journey>(`/cases/${id}/journey`);
       if (disposed) return;
       const changed = next.state.revision !== state.revision;
+      if(changed && state.autonomous) { preferredJourneyView=mapHost.dataset.view ?? "Workflow map"; await casePage(id); return; }
       const changedHistory =
         JSON.stringify({ ...current, observedAt: "" }) !==
         JSON.stringify({ ...next, observedAt: "" });
@@ -665,6 +681,7 @@ async function casePage(id: string) {
       : "Updates are off";
     schedule();
   };
+  if(state.autonomous) {live.checked=true;status.textContent="Watching autonomous coordination";schedule();}
   stopLive = () => {
     disposed = true;
     if (timer) clearTimeout(timer);
@@ -678,17 +695,17 @@ async function casePage(id: string) {
   draw();
   content.append(evidenceHost);
   const requiredWork = state.obligations.filter(
-    (o) => o.required && o.status !== "verified",
+    (o) => o.required && !["verified","accepted"].includes(o.status),
   );
   const next = card("What needs to happen next");
   next.append(
     el(
       "p",
       requiredWork.length
-        ? `${requiredWork.length} required answers still need verification. ${state.status === "paused" ? "Processing is paused." : ""}`
+        ? state.autonomous ? `${requiredWork.length} required outcomes remain. ILIEN manages the next questions and follow-ups automatically.` : `${requiredWork.length} required answers still need verification. ${state.status === "paused" ? "Processing is paused." : ""}`
         : state.status === "completed"
           ? "The request has a completed outcome. Check the source acknowledgement below."
-          : "Required answers are verified. Review the outcome before reporting back.",
+          : "Required outcomes are accepted. Source reporting continues automatically.",
     ),
   );
   const grid = el("div", "", "grid");
@@ -706,7 +723,7 @@ async function casePage(id: string) {
       c.append(
         el(
           "p",
-          `${o.dependencies.every((d) => state.obligations.find((n) => n.id === d)?.status === "verified") ? "Prerequisites verified" : "Waiting for"}: ${o.dependencies.map((d) => state.obligations.find((n) => n.id === d)?.question ?? d).join("; ")}`,
+          `${o.dependencies.every((d) => ["verified","accepted"].includes(state.obligations.find((n) => n.id === d)?.status ?? "")) ? "Prerequisites satisfied" : "Waiting for"}: ${o.dependencies.map((d) => state.obligations.find((n) => n.id === d)?.question ?? d).join("; ")}`,
         ),
       );
     if (o.reply)
@@ -719,10 +736,10 @@ async function casePage(id: string) {
     if (o.proposal) details("Proposal to decide", o.proposal, c);
     if (o.decision) details("Decision", o.decision, c);
   }
-  if (role !== "viewer") {
+  if (role !== "viewer" && !state.autonomous) {
     caseActions(state, policy, id);
   }
-  if (role !== "viewer" && state.status === "active") {
+  if (role !== "viewer" && state.status === "active" && !state.autonomous) {
     const send = card("Send through a connected channel");
     send.append(
       el(
@@ -824,7 +841,7 @@ async function casePage(id: string) {
       item,
     );
     if (role === "admin") details("Advanced result references", result, item);
-    if (r.current && !r.acknowledgement && role !== "viewer") {
+    if (r.current && !r.acknowledgement && role !== "viewer" && !state.autonomous) {
       const reason = input();
       item.append(
         field("Why is the source accepting this outcome?", reason),
@@ -845,11 +862,11 @@ async function casePage(id: string) {
   ai.append(
     el(
       "p",
-      "Ask the assistant to review the evidence and suggest a next step. Suggestions require review; requesting a review uses model tokens.",
+      state.autonomous ? "ILIEN reacts to replies and case changes automatically. This page observes its decisions; normal coordination needs no internal operator approval." : "Ask the assistant to review the evidence and suggest a next step. Suggestions require review; requesting a review uses model tokens.",
       "muted",
     ),
   );
-  if (role !== "viewer")
+  if (role !== "viewer" && !state.autonomous)
     ai.append(
       button("Ask AI to review this request", async () => {
         await api(`/cases/${id}/agent`, { requestId: crypto.randomUUID() });
@@ -1565,6 +1582,8 @@ async function simulator() {
     workflowSupported: boolean;
   }[];
   const choice = options([
+    {value:"production-coordination",label:"Autonomous coordination · quantity, schedule, approval and production readiness"},
+    {value:"generic-communication",label:"Custom communication · information, approval or completion"},
     {
       value: "material-readiness",
       label: "Material readiness · stock, quality and supplier information",

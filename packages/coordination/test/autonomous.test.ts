@@ -1,0 +1,135 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { seedCase, textilePolicy } from "../../domain-packs/src/textile.js";
+import { sourceEventSchema } from "../../contracts/src/validation.js";
+import { initialize, transition, resolveActor } from "../src/engine.js";
+import type { CaseState, Operation } from "../src/types.js";
+import { renderProfile } from "../../channels/src/profiles.js";
+import type { Delivery } from "../../channels/src/intents.js";
+import { contactCurrent } from "../../channels/src/intents.js";
+import { gate } from "../../ai/src/store.js";
+import { autonomousGate, clarificationFallback } from "../../ai/src/autonomy.js";
+import { autonomousTools, autonomousToolProposal } from "../../ai/src/tools.js";
+import { messageProfileSchema } from "../../contracts/src/communication.js";
+const now=new Date().toISOString(), later=new Date(Date.now()+1800000).toISOString();
+function fresh() {
+ const event=sourceEventSchema.parse(JSON.parse(readFileSync("packages/contracts/examples/production-coordination.event.json","utf8")));
+ return seedCase(event,{id:"case-test",inboxId:"inbox-test",sourceId:"source-test",sourceEvidenceId:"source-evidence"},textilePolicy,now)!;
+}
+function apply(state:CaseState,actor:string,op:Operation) {return transition(state,textilePolicy,resolveActor(textilePolicy,actor),op,`evidence-${state.revision}`,now);}
+function answer(state:CaseState,id:string,statement:string,facts:{key:string;value:string;quote:string;unit?:string}[]=[],progress?:"in_progress"|"ready") {
+ const o=state.obligations.find(o=>o.id===id)!;
+ return apply(state,o.assignee,{type:"reply",obligationId:id,expectedObligationRevision:o.revision,statement,observedAt:now,validUntil:later,subjectRevision:"1",facts,progress,statusQuote:progress?statement:undefined});
+}
+function approved() {
+ let s=fresh();
+ assert.equal(initialize(s,textilePolicy,now).contacts.length,0);
+ s=apply(s,"coordinator",{type:"route_initial",obligationId:"stock",group:"stores",question:s.obligations[0]!.question}).state;
+ const stock=answer(s,"stock","800 units usable",[{key:"usable_quantity",value:"800",unit:"units",quote:"800 units usable"}]);
+ assert.equal(stock.state.obligations[0]!.status,"accepted");
+ assert.ok(stock.contacts.some(c=>c.obligationId==="impact"));
+ assert.ok(!stock.contacts.some(c=>c.kind==="verify_request"));
+ s=stock.state;
+ const missing=answer(s,"impact","Delivery will be delayed");
+ assert.equal(missing.state.obligations[1]!.status,"waiting");
+ assert.match(missing.contacts[0]!.question,/completion time/);
+ s=answer(missing.state,"impact","Ready at 16:00",[{key:"completion_time",value:"16:00",quote:"Ready at 16:00"}]).state;
+ s=apply(s,"coordinator",{type:"attach_proposal",obligationId:"approval",proposalId:"plan-1",proposalRevision:1,statement:"800 units; production ready at 16:00",reason:"Reported quantity and schedule"}).state;
+ const o=s.obligations.find(o=>o.id==="approval")!;
+ const decision=apply(s,"planning_owner",{type:"decide",obligationId:o.id,expectedObligationRevision:o.revision,proposalHash:o.proposal!.sha256,choice:"approve",reason:"Schedule accepted",subjectRevision:"1",observedAt:now,validUntil:later});
+ assert.ok(decision.contacts.some(c=>c.kind==="decision_notice" && c.question.includes("800 units")));
+ return decision.state;
+}
+test("quantity → missing time → approval → in progress → production ready completes without an internal verifier",()=>{
+ let s=approved();
+ const relay=apply(s,"coordinator",{type:"relay_decision",obligationId:"stock",decisionId:"approval"});
+ assert.match(relay.contacts[0]!.question,/800 units/);
+ assert.throws(()=>apply(relay.state,"coordinator",{type:"relay_decision",obligationId:"stock",decisionId:"approval"}),/decision_already_relayed/);
+ s=answer(relay.state,"ready","Production started",[],"in_progress").state;
+ assert.equal(s.status,"active");
+ s=answer(s,"ready","Production is ready",[],"ready").state;
+ assert.equal(s.status,"active","Missing completion reference cannot finish production");
+ const done=answer(s,"ready","Production ready, completion PR-001",[{key:"completion_reference",value:"PR-001",quote:"completion PR-001"}],"ready");
+ assert.equal(done.state.status,"completed");assert.equal(done.result?.outcome,"completed");
+});
+test("a quantity correction invalidates the previous approval and queued decision notice",()=>{
+ const s=approved();
+ const notice:Delivery={case_id:s.id,obligation_id:"ready",obligation_revision:s.obligations[3]!.revision,actor_id:"production_owner",request:{contact:{kind:"decision_notice",decisionId:"approval",decisionHash:s.obligations[2]!.proposal!.sha256},subject:s.subject}} as Delivery;
+ assert.ok(contactCurrent(s,notice));
+ const corrected=answer(s,"stock","700 units usable",[{key:"usable_quantity",value:"700",unit:"units",quote:"700 units usable"}]).state;
+ assert.equal(corrected.obligations[2]!.status,"waiting");
+ assert.equal(corrected.obligations[2]!.proposal,undefined,"Old proposed terms must not survive a changed prerequisite");
+ assert.ok(!contactCurrent(corrected,notice));
+ assert.throws(()=>apply(corrected,"coordinator",{type:"relay_decision",obligationId:"stock",decisionId:"approval"}),/current_approved_decision_required/);
+ const correction=answer(s,"stock","700 units usable",[{key:"usable_quantity",value:"700",unit:"units",quote:"700 units usable"}]);
+ assert.ok(correction.contacts.some(c=>c.kind==="decision_update" && c.actorId==="production_owner"));
+});
+test("clarification keeps the same task; rerouting stays inside the published service scope",()=>{
+ let s=fresh();s=apply(s,"coordinator",{type:"route_initial",obligationId:"stock",group:"stores",question:"Confirm available quantity"}).state;
+ const clarified=apply(s,"coordinator",{type:"clarify",obligationId:"stock",question:"How much is usable rather than total stock?",reason:"Clarify usable amount"});
+ assert.equal(clarified.state.obligations.length,4);assert.equal(clarified.contacts[0]!.actorId,"stores_owner");
+ assert.throws(()=>apply(s,"coordinator",{type:"reroute",obligationId:"stock",group:"unauthorized",reason:"Guess"}),/group_outside_service_scope/);
+ const routed=apply(s,"coordinator",{type:"reroute",obligationId:"stock",group:"procurement",reason:"Source identified procurement as the owner"});
+ assert.equal(routed.contacts[0]!.actorId,"procurement_owner");
+});
+test("source clarification is a typed source request and cannot be answered by the model",()=>{
+ let s=approved();s=apply(s,"coordinator",{type:"source_query",questionId:"destination",question:"Confirm the destination for this order"}).state;
+ s=answer(s,"ready","Production ready, PR-001",[{key:"completion_reference",value:"PR-001",quote:"PR-001"}],"ready").state;
+ assert.notEqual(s.status,"completed");
+ const c={state:s,policy:textilePolicy,policyHash:"hash",actorId:"coordinator",evidence:[{id:"source-evidence",text:"Confirm destination",origin:"simulated",sha256:"hash"}],knowledge:[]};
+ assert.throws(()=>gate(c,{disposition:"propose",operation:{type:"source_response",questionId:"destination",answer:"Invented destination"},reason:"Guess",citations:[{ref:"source-evidence",quote:"Confirm destination"}],uncertainties:[]}),/ai_operation_forbidden/);
+ assert.equal(apply(s,"coordinator",{type:"source_response",questionId:"destination",answer:"Authorized source confirms destination A"}).state.status,"completed");
+});
+test("machine email renders only the exact typed field mapping; absent required fields block",()=>{
+ const p=messageProfileSchema.parse({group:"production",channel:"email",format:"json",version:"v1",sourceFields:["quantity"],factKeys:[],fields:[{name:"order",path:"subject.id",type:"string",required:true},{name:"amount",path:"source.quantity",type:"number",required:true}]});
+ const d={case_id:"case-1",token:"route-token",request:{subject:{id:"ORDER-1",type:"order",revision:"1"},contact:{question:"Coordinate"},deadline:later,sourceContext:{quantity:800,confidentialPrice:1234}}} as unknown as Delivery;
+ assert.deepEqual(JSON.parse(renderProfile(d,p)),{order:"ORDER-1",amount:800});
+ d.request.sourceContext={};assert.throws(()=>renderProfile(d,p),/machine_payload_required_field_missing/);
+});
+test("autonomous fact extraction cannot invent quantity and future estimates cannot mean ready",()=>{
+ const s=approved(),o=s.obligations[3]!;
+ const c={executionMode:"autonomous" as const,state:s,policy:textilePolicy,policyHash:"hash",actorId:o.assignee,evidence:[{id:"reply",text:"Not ready; 800 units in progress",origin:"external",sha256:"hash"}],knowledge:[],receipt:{id:"receipt",evidenceId:"reply",deliveryId:"send",bindingId:"binding",actorId:o.assignee,obligationId:o.id,obligationRevision:o.revision,kind:"decision_notice",text:"Not ready; 800 units in progress",receivedAt:now,expiresAt:later}};
+ const op:Operation={type:"reply",obligationId:o.id,expectedObligationRevision:o.revision,statement:"800 units",observedAt:now,validUntil:later,timeBasis:"received",subjectRevision:"1",facts:[{key:"quantity",value:"8000",quote:"800 units"}]};
+ const p={disposition:"propose" as const,operation:op,reason:"Interpret",citations:[{ref:"reply",quote:"800 units"}],uncertainties:[]};
+ assert.throws(()=>autonomousGate(c,p),/ai_fact_not_grounded/);
+ op.facts=[];op.progress="ready";op.statusQuote="Not ready";
+ assert.throws(()=>autonomousGate(c,p),/ai_completion_not_explicit/);
+});
+test("conditional or negative language cannot authorize a business approval",()=>{
+ let s=fresh();s=apply(s,"coordinator",{type:"route_initial",obligationId:"stock",group:"stores",question:"Confirm usable quantity"}).state;
+ s=answer(s,"stock","800 units",[{key:"usable_quantity",value:"800",unit:"units",quote:"800 units"}]).state;
+ s=answer(s,"impact","16:00",[{key:"completion_time",value:"16:00",quote:"16:00"}]).state;
+ s=apply(s,"coordinator",{type:"attach_proposal",obligationId:"approval",proposalId:"p",proposalRevision:1,statement:"800 units at 16:00",reason:"Report"}).state;
+ const o=s.obligations[2]!,text="I would approve, but the delivery time is not confirmed.";
+ const c={executionMode:"autonomous" as const,state:s,policy:textilePolicy,policyHash:"hash",actorId:o.assignee,evidence:[{id:"r",text,sha256:"hash",origin:"external"}],knowledge:[],receipt:{id:"r",evidenceId:"r",deliveryId:"d",bindingId:"b",actorId:o.assignee,obligationId:o.id,obligationRevision:o.revision,kind:"ask",text}};
+ assert.throws(()=>autonomousGate(c,{disposition:"propose",operation:{type:"decide",obligationId:o.id,expectedObligationRevision:o.revision,proposalHash:o.proposal!.sha256,choice:"approve",reason:"Yes",subjectRevision:"1",observedAt:now,validUntil:later},citations:[{ref:"r",quote:text}],reason:"Interpret",uncertainties:[]}),/ai_explicit_decision_required/);
+});
+
+test("granular tools bind identity and time in application code and require explicit completion evidence",()=>{
+ const s=approved(),o=s.obligations[3]!,text="Production will be ready tomorrow.";
+ const c={executionMode:"autonomous" as const,state:s,policy:textilePolicy,policyHash:"hash",actorId:o.assignee,evidence:[{id:"r",text,sha256:"hash",origin:"external"}],knowledge:[],receipt:{id:"r",evidenceId:"r",deliveryId:"d",bindingId:"b",actorId:o.assignee,obligationId:o.id,obligationRevision:o.revision,kind:"ask",text,receivedAt:now,expiresAt:later}};
+ const p=autonomousToolProposal("coordinate_record_answer",{reason:"Reported future schedule",statement:text,facts:[],progress:"in_progress",statusQuote:text},c);
+ assert.equal(p.operation?.type,"reply");
+ if(p.operation?.type!=="reply")throw new Error("reply required");
+ assert.equal(p.operation.observedAt,now);assert.equal(p.operation.timeBasis,"received");
+ assert.equal(p.operation.obligationId,o.id);assert.equal(p.citations[0]!.ref,"r");
+ assert.throws(()=>autonomousToolProposal("coordinate_record_answer",{reason:"Invalid",statement:text,facts:[],progress:"ready"},c));
+ p.operation.progress="ready";
+ assert.throws(()=>autonomousGate(c,p),/ai_completion_not_explicit/);
+ const names=autonomousTools(c).map(t=>t.toolSpec?.name);
+ assert.ok(!names.includes("coordinate_propose_decision"));
+ assert.throws(()=>autonomousToolProposal("coordinate_source_response",{},c),/ai_unknown_action_tool/);
+});
+
+test("an uncertain proposed reply becomes a bounded clarification, never accepted business data",()=>{
+ let s=fresh();s=apply(s,"coordinator",{type:"route_initial",obligationId:"stock",group:"stores",question:"Confirm usable quantity"}).state;
+ const o=s.obligations[0]!,text="Maybe 800 units; I have to check.";
+ const c={executionMode:"autonomous" as const,state:s,policy:textilePolicy,policyHash:"hash",actorId:o.assignee,evidence:[{id:"r",text,sha256:"hash",origin:"external"}],knowledge:[],receipt:{id:"r",evidenceId:"r",deliveryId:"d",bindingId:"b",actorId:o.assignee,obligationId:o.id,obligationRevision:o.revision,kind:"ask",text,receivedAt:now,expiresAt:later}};
+ const p=clarificationFallback(c,{disposition:"propose",operation:{type:"reply",obligationId:o.id,expectedObligationRevision:o.revision,statement:text,subjectRevision:"1",observedAt:now,validUntil:later},reason:"Uncertain",citations:[{ref:"r",quote:text}],uncertainties:["Usable amount unknown"]});
+ assert.equal(autonomousGate(c,p).type,"clarify");
+ if(p.operation?.type!=="clarify")throw new Error("clarify required");
+ c.state=apply(s,"coordinator",p.operation).state;
+ const escalated=clarificationFallback(c,{disposition:"review",operation:null,reason:"Still uncertain",citations:[],uncertainties:["Unknown"]});
+ assert.equal(autonomousGate(c,escalated).type,"source_query");
+});

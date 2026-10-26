@@ -9,6 +9,7 @@ import {
 import { policySchema, type Source } from "../../coordination/src/service.js";
 import { CoordinationError } from "../../coordination/src/types.js";
 import { decode } from "../../channels/src/intents.js";
+import { messageProfileSchema } from "../../contracts/src/communication.js";
 const identifier = z
   .string()
   .min(1)
@@ -19,9 +20,14 @@ export const workflowSchema = z.strictObject({
   workflow: identifier,
   goal: z.string().min(1).max(1000),
   requiredPayloadKeys: z.array(identifier).max(16),
+  autonomous: z.boolean().optional(),
   branches: z
     .array(
       z.strictObject({
+        id: identifier.optional(),
+        dependencies: z.array(identifier).max(12).optional(),
+        acceptance: z.enum(["responsible_reply","independent"]).optional(),
+        requiredFacts: z.array(identifier).max(12).optional(),
         group: identifier,
         kind: z.enum([
           "fact",
@@ -29,15 +35,18 @@ export const workflowSchema = z.strictObject({
           "acknowledgement",
           "evidence",
           "commitment",
+          "completion",
         ]),
         question: z.string().min(1).max(1000),
+        proposalStatement: z.string().min(1).max(1000).optional(),
       }),
     )
     .min(1)
     .max(12),
 });
 export const configurationSchema = z.strictObject({
-  workflows: z.array(workflowSchema).max(32),
+  workflows: z.array(workflowSchema).max(256),
+  messageProfiles: z.array(messageProfileSchema).max(64).optional(),
   automaticFallback: z.boolean(),
   whatsappTemplate: z
     .strictObject({
@@ -51,6 +60,10 @@ export const configurationSchema = z.strictObject({
 export type ProductConfiguration = z.infer<typeof configurationSchema>;
 export const defaultConfiguration: ProductConfiguration = {
   workflows: [],
+  messageProfiles:[
+    {group:"stores",channel:"whatsapp",format:"human",version:"stores-v1",language:"en",style:"concise",sourceFields:["siteId","materialLotId","requiredQuantity","neededBy"],factKeys:["usable_quantity","available_quantity","completion_time"],fields:[]},
+    ...["production","planning","quality","procurement"].map(group=>({group,channel:"email" as const,format:"human" as const,version:"department-v1",language:"en" as const,style:"formal" as const,sourceFields:["siteId","materialLotId","requiredQuantity","neededBy"],factKeys:["usable_quantity","available_quantity","completion_time","completion_reference","delay_days"],fields:[]})),
+  ],
   automaticFallback: false,
   whatsappTemplate: null,
 };
@@ -68,7 +81,7 @@ export async function configurationFor(sourceId: string, tx: string) {
   return row
     ? {
         revision: row.revision,
-        configuration: configurationSchema.parse(decode(row.configuration)),
+        configuration: configurationSchema.parse({...defaultConfiguration,...decode(row.configuration)}),
       }
     : { revision: 1, configuration: defaultConfiguration };
 }
@@ -144,17 +157,35 @@ export async function publishConfiguration(
   )
     throw new CoordinationError("duplicate_event_mapping");
   for (const w of input.configuration.workflows)
+  {
+    const ids=w.branches.map((b,i)=>b.id ?? `root_${i+1}`);
+    if(new Set(ids).size!==ids.length || w.branches.some(b=>b.dependencies?.some(d=>!ids.includes(d)))) throw new CoordinationError("invalid_workflow_dependencies");
+    const visiting=new Set<string>(),visited=new Set<string>();
+    const visit=(id:string)=>{if(visiting.has(id)) throw new CoordinationError("dependency_cycle");if(visited.has(id))return; visiting.add(id); for(const d of w.branches[ids.indexOf(id)]!.dependencies ?? [])visit(d);visiting.delete(id);visited.add(id);};
+    ids.forEach(visit);
     for (const b of w.branches)
       if (
         !input.policy.groups.includes(b.group) ||
         !input.policy.actors.some(
           (a) => a.enabled && a.group === b.group && a.role === "respondent",
         ) ||
-        !input.policy.actors.some(
+        (!w.autonomous || b.acceptance === "independent") && !input.policy.actors.some(
           (a) => a.enabled && a.group === b.group && a.role === "verifier",
         )
       )
         throw new CoordinationError("workflow_authority_missing");
+  }
+  const profileKeys=new Set<string>();
+  for (const profile of input.configuration.messageProfiles ?? []) {
+    const key=`${profile.group}:${profile.channel}`;
+    if(profileKeys.has(key)) throw new CoordinationError("duplicate_message_profile");
+    profileKeys.add(key);
+    if(!input.policy.groups.includes(profile.group)) throw new CoordinationError("profile_group_outside_scope");
+    for(const f of profile.fields) {
+      if(f.path.startsWith("source.") && !profile.sourceFields.includes(f.path.slice(7))) throw new CoordinationError("profile_field_not_disclosed");
+      if(f.path.startsWith("facts.") && !profile.factKeys.includes(f.path.slice(6))) throw new CoordinationError("profile_fact_not_disclosed");
+    }
+  }
   return transaction(source.tenant_id, async (tx) => {
     const current = rows<{ revision: number }>(
       await query(
