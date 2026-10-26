@@ -2,7 +2,7 @@
 
 ## Latest checked release —26 October2026
 
-Code719889c deployed successfully in GitHub Actions40289739578. All59 deterministic checks passed: AI12,channels16,simulation3,autonomy19,console9. Chrome confirmed guest sign-in, clean case tabs/settings, full map visibility and reload restoration without entering credentials again. The24-hour boundary is covered by a controlled-clock test, not a24-hour soak.
+Codea9a8c86 deployed successfully in GitHub Actions40290747851. All59 deterministic checks passed: AI12,channels16,simulation3,autonomy19,console9. Chrome confirmed guest sign-in, clean case tabs/settings, full map visibility and reload restoration without entering credentials again. The24-hour boundary is covered by a controlled-clock test, not a24-hour soak. Final Chrome inspection showed Completed, Published, source acknowledgement Accepted, and Live off automatically.
 
 A fresh partial-dispatch rehearsal completed with **four real SES/Gmail reply turns**, including a deadline-only continuation and conditional approval clarification. Original quantity evidence/expiry remained separate from the later deadline. The same exact proposal hash survived clarification and was explicitly approved; current communication result was published through SNS. A simulated source validated quantities and decision hash, acknowledged the exact result and replayed the receipt idempotently.
 
