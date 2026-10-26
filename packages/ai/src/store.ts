@@ -377,6 +377,7 @@ export function gate(context: Context, proposal: Proposal) {
         if((op.choice==="approve" && (!yes || caveat)) || (op.choice==="reject" && !no)) fail("ai_explicit_decision_required");
       }
       if(op.type==="reply") {
+        if(context.state.autonomous && /\b(wrong department|do not own|don't own|not our department)\b/iu.test(r.text)) fail("ai_wrong_department_requires_routing");
         for(const fact of op.facts ?? []) {
           if(!groundedQuote(r.text,fact.quote) || !groundedQuote(fact.quote,fact.value) || (fact.unit && !groundedQuote(fact.quote,fact.unit))) fail("ai_fact_not_grounded");
           if(/\b(maybe|possibly|might|unsure|unconfirmed)\b|সম্ভবত|নিশ্চিত নই/iu.test(fact.quote)) fail("ai_uncertain_fact_requires_clarification");
@@ -397,6 +398,7 @@ export function gate(context: Context, proposal: Proposal) {
       if (op.parentId !== r.obligationId) fail("ai_child_scope");
     } else if(context.state.autonomous && (op.type==="clarify" || op.type==="reroute")) {
       if(op.obligationId!==r.obligationId) fail("ai_reply_scope");
+      if(op.type==="reroute" && !r.text.toLowerCase().replaceAll("_"," ").includes(op.group.toLowerCase().replaceAll("_"," "))) fail("ai_route_owner_not_identified");
     } else if(context.state.autonomous && op.type==="source_query") {
       // Routed back only to the authenticated original source, not an arbitrary address.
     } else fail("ai_receipt_operation_forbidden");

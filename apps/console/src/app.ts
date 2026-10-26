@@ -876,7 +876,7 @@ async function casePage(id: string) {
       }),
     );
   ai.append(
-    button("View suggestions", async () => {
+    button(state.autonomous ? "View AI decisions" : "View suggestions", async () => {
       const runs = await api<{ items: Row[] }>(`/cases/${id}/agent`);
       table(runs.items, ["state", "created_at"], ai, (r) =>
         runPage(String(r.id)),

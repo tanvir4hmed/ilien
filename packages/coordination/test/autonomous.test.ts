@@ -164,3 +164,12 @@ test("an explicit negative report is preserved rather than converted to positive
  p.operation.facts![0]!.value="authorized";
  assert.throws(()=>autonomousGate(c,p),/ai_fact_negation_lost/);
 });
+
+test("a wrong-department refusal cannot satisfy the task or invent a replacement owner",()=>{
+ let s=fresh();s=apply(s,"coordinator",{type:"route_initial",obligationId:"stock",group:"stores",question:"Confirm usable stock"}).state;
+ const o=s.obligations[0]!,text="We do not own this inspection. Quality owns the inspection result.";
+ const c={executionMode:"autonomous" as const,state:s,policy:textilePolicy,policyHash:"hash",actorId:o.assignee,evidence:[{id:"r",text,sha256:"hash",origin:"external"}],knowledge:[],receipt:{id:"r",evidenceId:"r",deliveryId:"d",bindingId:"b",actorId:o.assignee,obligationId:o.id,obligationRevision:o.revision,kind:"ask",text,receivedAt:now,expiresAt:later}};
+ assert.throws(()=>autonomousGate(c,autonomousToolProposal("coordinate_record_answer",{reason:"Refusal",statement:text,facts:[]},c)),/ai_wrong_department_requires_routing/);
+ assert.equal(autonomousGate(c,autonomousToolProposal("coordinate_reroute",{reason:"Quality explicitly identified",group:"quality"},c)).type,"reroute");
+ assert.throws(()=>autonomousGate(c,autonomousToolProposal("coordinate_reroute",{reason:"Guess",group:"procurement"},c)),/ai_route_owner_not_identified/);
+});
