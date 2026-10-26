@@ -153,3 +153,14 @@ test("persisted proposal hashing survives JSONB key reordering but detects chang
  const changed=structuredClone(p);changed.operation.question="Confirm 8000 units";
  assert.notEqual(hash(serializeProposal(p)),hash(serializeProposal(changed)));
 });
+
+test("an explicit negative report is preserved rather than converted to positive authority",()=>{
+ let s=fresh();s=apply(s,"coordinator",{type:"route_initial",obligationId:"stock",group:"stores",question:"Confirm usable quantity"}).state;
+ const o=s.obligations[0]!,text="Stock release is not authorized.";
+ const c={executionMode:"autonomous" as const,state:s,policy:textilePolicy,policyHash:"hash",actorId:o.assignee,evidence:[{id:"r",text,sha256:"hash",origin:"external"}],knowledge:[],receipt:{id:"r",evidenceId:"r",deliveryId:"d",bindingId:"b",actorId:o.assignee,obligationId:o.id,obligationRevision:o.revision,kind:"ask",text,receivedAt:now,expiresAt:later}};
+ const p=autonomousToolProposal("coordinate_record_answer",{reason:"Preserve negative release status",statement:text,facts:[{key:"release_authorization",value:"not authorized",quote:text}]},c);
+ assert.equal(autonomousGate(c,p).type,"reply");
+ if(p.operation?.type!=="reply")throw new Error("reply required");
+ p.operation.facts![0]!.value="authorized";
+ assert.throws(()=>autonomousGate(c,p),/ai_fact_negation_lost/);
+});

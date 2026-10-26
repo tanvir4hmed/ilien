@@ -379,7 +379,9 @@ export function gate(context: Context, proposal: Proposal) {
       if(op.type==="reply") {
         for(const fact of op.facts ?? []) {
           if(!groundedQuote(r.text,fact.quote) || !groundedQuote(fact.quote,fact.value) || (fact.unit && !groundedQuote(fact.quote,fact.unit))) fail("ai_fact_not_grounded");
-          if(/\b(not|maybe|possibly|might|unsure|unconfirmed)\b|সম্ভবত|নিশ্চিত নই/iu.test(fact.quote)) fail("ai_uncertain_fact_requires_clarification");
+          if(/\b(maybe|possibly|might|unsure|unconfirmed)\b|সম্ভবত|নিশ্চিত নই/iu.test(fact.quote)) fail("ai_uncertain_fact_requires_clarification");
+          const negation=/\b(not|no|never|without)\b|নয়|নয়|হয়নি|হয়নি|অনুমতি নেই/iu;
+          if(negation.test(fact.quote) && !negation.test(fact.value)) fail("ai_fact_negation_lost");
         }
         if(op.progress && (!op.statusQuote || !groundedQuote(r.text,op.statusQuote))) fail("ai_progress_not_grounded");
         if(op.progress === "ready" && (!/ready|complete|finished|প্রস্তুত|সম্পন্ন|শেষ/iu.test(op.statusQuote!) || /\b(not|will|would|could|expect|expected|tomorrow)\b|pending|in progress|হয়নি|হয়নি|অসম্পূর্ণ|হবে/iu.test(op.statusQuote!))) fail("ai_completion_not_explicit");
