@@ -31,7 +31,7 @@ The graph is derived from the current case, not a hardcoded scenario:
 - **Activity** combines the recorded case actions, AI reviews, sends, replies, provider events and results by time. Simulated response evidence is labelled separately from external evidence.
 - Selecting a step opens readable details and original evidence where available. Fit-to-screen supports walkthroughs without inventing progress animations.
 - Message bodies are explicitly previews, capped at 2,000 characters; original inbound evidence remains accessible. Each history category is capped at the latest 100 records and reports truncation. This is a bounded recent history, not an unlimited audit export. Current task status can reflect older evidence outside that window.
-- Live updates default on for autonomous cases, every ten seconds, only while the tab is visible. Navigating away cancels updates. No AI runs while watching. The selected view persists; new case revisions prompt the operator to refresh before changing work.
+- Live updates default on for active cases (off otherwise), every ten seconds, only while the tab is visible. Navigating away cancels updates. No AI runs while watching. The selected view persists; new case revisions prompt the operator to refresh before changing work.
 
 Sending, provider acceptance, confirmed delivery, received reply, verified answer, published result and source acknowledgement are different states. No receipt is fabricated and provider acceptance is not labelled as delivery. Source simulation, participant role-play and real channel activity remain explicitly distinguishable.
 

@@ -20,7 +20,7 @@ Use **Cases → Case list → Open map & request**. Create and list occupy adjac
 - **Messages:** recorded requests, real channel sends, provider receipts and replies, linked by actual message/case references.
 - **History:** time-ordered case actions, AI review states, messages, evidence and outcomes.
 
-Click a box or communication to inspect details and original evidence. Use Fit map to screen. Live updates defaults on for autonomous missions and checks every ten seconds while the tab is visible. The map follows actual tasks, dependencies, sends and replies; it is not a prerecorded route.
+Click a box or communication to inspect details and original evidence. Use Fit map to screen. Live updates default on for active cases and check every ten seconds while the tab is visible. Completed, paused and blocked cases open with updates off; use Refresh or explicitly enable Live when needed. This avoids idle database polling. The map follows actual tasks, dependencies, sends and replies; it is not a prerecorded route.
 
 ## 5. Practice a response
 

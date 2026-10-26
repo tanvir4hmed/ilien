@@ -722,7 +722,7 @@ async function casePage(id: string) {
       : "Updates are off";
     schedule();
   };
-  live.checked=true;status.textContent="Live · checks every 10 seconds";schedule();
+  live.checked=state.status==="active";status.textContent=live.checked?"Live · checks every 10 seconds":"Updates are off";schedule();
   stopLive = () => {
     disposed = true;
     if (timer) clearTimeout(timer);
