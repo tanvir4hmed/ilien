@@ -123,3 +123,5 @@ Prompt `coordination-autonomy-13` asks the model to record clearly reported part
 Conditional decision language is rejected for both approval and rejection: a missing approval on a separate condition is not a rejection of the current proposal. Explicit externally owned prerequisites take priority over recording an empty answer. Non-decision child tasks cannot inherit model-supplied decision proposal metadata.
 
 Automatic case scheduling is constrained before inference: contact-producing transitions wait for new evidence; initial routing and grounded proposal assembly wake when needed. Explicit source responses and current decision relays can trigger follow-up. Participant receipt interpretation remains event-driven. This prevents idle follow-up runs from generating duplicate source questions after an ask.
+
+Exact proposals inherit prerequisite fact citations from stored provenance in application code. The model still supplies the proposed terms; missing/invented numbers are blocked against exact numeric tokens in original quoted evidence. This repairs omitted citations without trusting model memory or accepting uncited numerical substrings.

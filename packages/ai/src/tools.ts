@@ -53,5 +53,12 @@ export function autonomousToolProposal(name:string,input:unknown,context:Context
    if(operation.type==="route_initial" && original) citations=[{ref:original.id,quote:original.text.slice(0,200)}];
    else if(!citations.length) citations=context.evidence.slice(0,8).map(e=>({ref:e.id,quote:e.text.slice(0,500)}));
  }
+ if(operation?.type==="attach_proposal") {
+   const needed=new Set<string>();
+   const collect=(id:string)=>{if(needed.has(id))return;needed.add(id);for(const dep of context.state.obligations.find(o=>o.id===id)?.dependencies ?? [])collect(dep);};
+   for(const dep of context.state.obligations.find(o=>o.id===operation.obligationId)?.dependencies ?? [])collect(dep);
+   const inherited=context.state.obligations.filter(o=>needed.has(o.id)&&satisfied(o)).flatMap(o=>(o.reply?.facts ?? []).map(f=>({ref:f.evidenceId ?? o.reply!.evidenceId,quote:f.quote})));
+   citations=[...new Map([...citations,...inherited].map(c=>[`${c.ref}/${c.quote}`,c])).values()].slice(0,8);
+ }
  return {disposition:operation?"propose":"wait",operation,reason:parsed.reason,citations,uncertainties:parsed.uncertainties};
 }

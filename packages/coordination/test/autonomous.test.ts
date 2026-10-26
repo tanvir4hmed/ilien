@@ -236,3 +236,14 @@ test("automatic questions wait without a second model run; grounded proposal ass
  assert.equal(needsCasePlanning(s,'clarify'),false);
  assert.equal(needsCasePlanning(s,'source_response'),false);
 });
+
+test("proposal citations inherit immutable prerequisite fact references, not model recollection",()=>{
+ let s=fresh();s=apply(s,'coordinator',{type:'route_initial',obligationId:'stock',group:'stores',question:'Confirm usable quantity'}).state;
+ s=answer(s,'stock','800 units',[{key:'usable_quantity',value:'800',unit:'units',quote:'800 units'}]).state;
+ s=answer(s,'impact','16:00',[{key:'completion_time',value:'16:00',quote:'16:00'}]).state;
+ const c={executionMode:'autonomous' as const,state:s,policy:textilePolicy,policyHash:'hash',actorId:'coordinator',evidence:s.obligations.filter(o=>o.reply).map(o=>({id:o.reply!.evidenceId,text:o.reply!.statement,origin:'simulated',sha256:'hash'})),knowledge:[]};
+ const p=autonomousToolProposal('coordinate_propose_decision',{obligationId:'approval',statement:'800 units at 16:00',reason:'Grounded terms',citations:[]},c);
+ assert.ok(p.citations.some(c=>c.quote==='800 units'));assert.ok(p.citations.some(c=>c.quote==='16:00'));
+ assert.doesNotThrow(()=>autonomousGate(c,p));
+ const invented=structuredClone(p);if(invented.operation?.type!=='attach_proposal')throw Error('proposal expected');invented.operation.statement='1800 units at 16:00';assert.throws(()=>autonomousGate(c,invented),/ai_proposal_number_not_grounded|ai_unknown_citation/);
+});

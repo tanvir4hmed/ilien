@@ -280,7 +280,7 @@ export function renderJourney(
         ...new Set(
           data.deliveries
             .filter((d) => d.obligation_id === o.id)
-            .map((d) => words(d.channel)),
+            .map((d) => `${words(d.channel)}${["blocked","uncertain"].includes(String(d.status)) ? ` · ${words(d.status)}` : ""}`),
         ),
       ];
       box(

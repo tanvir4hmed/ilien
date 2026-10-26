@@ -414,7 +414,8 @@ export function gate(context: Context, proposal: Proposal) {
   if(statement) {
     const quoted=proposal.citations.map(c=>c.quote).join(" ");
     const numbers=statement.match(/\b\d+(?:[.:]\d+)*\b/g) ?? [];
-    if(numbers.some(number=>!quoted.includes(number))) fail("ai_proposal_number_not_grounded");
+    const citedNumbers=new Set(quoted.match(/\b\d+(?:[.:]\d+)*\b/g) ?? []);
+    if(numbers.some(number=>!citedNumbers.has(number))) fail("ai_proposal_number_not_grounded");
   }
   // Preview is pure: no channels, SQL, credentials or external effects.
   transition(
