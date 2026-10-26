@@ -28,17 +28,22 @@ sequenceDiagram
   A->>D: Scoped search and immutable step observations
   A->>B: Search result when requested (bounded loop)
   B-->>A: Typed proposal, exact citations, uncertainty
-  A->>D: Gate preview; save proposal hash for review
-  O->>D: Approve exact proposal hash or reject with reason
-  D->>C: Recheck versions, knowledge, authority and consent
-  C->>D: Atomic command + journal + existing contact outbox
+  A->>D: Gate preview; persist exact proposal and hash
+  alt Autonomous mode
+    A->>C: Recheck versions, knowledge, authority and consent
+    C->>D: Atomic command + machine audit + contact outbox
+  else Explicit review mode
+    O->>D: Approve exact proposal hash or reject with reason
+    D->>C: Recheck versions, knowledge, authority and consent
+    C->>D: Atomic command + human review + contact outbox
+  end
 ```
 
-Only a correlated, enabled-actor receipt marked `needs_review / unstructured_reply` automatically queues a run. Unmatched, quarantined, blocked or unauthorized receipts are not interpreted into actions. Structured replies retain the deterministic path. Case investigation can also be explicitly requested through the operator API. There is no periodic model polling; waiting consumes persisted state, not inference calls. Subsequent eligible replies create fresh runs with current evidence. No automatic recursive run follows a proposed action.
+Correlated, enabled-actor receipts marked `needs_review / unstructured_reply` can automatically queue receipt interpretation. Autonomous mode also queues bounded investigations after activation and meaningful accepted transitions. Unmatched, quarantined, blocked or unauthorized receipts are not interpreted into actions. Structured replies retain the deterministic path. Case investigation can also be explicitly requested through the source API. There is no periodic model polling; waiting consumes persisted state, not inference calls. Follow-up runs use durable events and admission limits, not recursive model calls inside the same worker. Report actions do not enqueue themselves.
 
 ## Model and execution limits
 
-- Pinned model: `amazon.nova-lite-v1:0`, regional Bedrock Converse in us-east-1. Prompt/tool contract version: `coordination-review-5`. Tool schemas use Nova's supported top-level fields; each call must select an allowed tool, and the last call must submit a proposal/wait/review. The operation schema exposes only actions eligible for the current kind of run. Schema/grounding failures receive bounded tool-error feedback within the existing three-call budget. Runtime validation and operator review remain mandatory.
+- Pinned model: `amazon.nova-lite-v1:0`, regional Bedrock Converse in us-east-1. Prompt/tool contract version: `coordination-autonomy-6`. Tool schemas use Nova's supported top-level fields; each call must select an allowed tool, and the last call must submit a proposal/wait/review. The operation schema exposes only actions eligible for the current kind of run. Schema/grounding failures receive bounded tool-error feedback within the existing three-call budget. Runtime validation is mandatory; internal operator approval is specific to review mode.
 - At most three serial model calls per run, one requested tool per call, 1,024 output tokens per call, 22-second provider timeout and no SDK retry. An unsupported/invalid result stops for review; no hidden stronger-model fallback.
 - Serialized model request maximum 30,000 UTF-8 bytes; original base context maximum 19,000 bytes. Overlarge originals are not silently summarized or truncated. They require operator review. Context contains bounded case-linked evidence, not all historic conversations.
 - Tenant admission limits: 128 runs per rolling 24 hours; 48 per case per rolling 24 hours; 160 lifetime per case; at most two attempts for an identical case revision/receipt. Receipt interpretation and event-driven case follow-up share these limits. Failed, rejected and interrupted runs still consume admission capacity. Repeated identical searches stop the loop.
@@ -57,7 +62,7 @@ Stored run context and retrieval observations preserve document versions/hashes;
 
 ## Proposal integrity and authorization
 
-The model emits a strict schema: `disposition`, `reason`, nullable `operation`, exact-quote `citations` and `uncertainties`. Proposed effects require a citation to supplied original evidence. Receipt interpretation additionally requires a citation to that receipt's normalized text. Citation matching proves that quoted text was supplied, not that its interpretation is correct. All effect proposals remain held for semantic review, including those with an empty uncertainty list.
+The model emits a strict schema: `disposition`, `reason`, nullable `operation`, exact-quote `citations` and `uncertainties`. Proposed effects require a citation to supplied original evidence. Receipt interpretation additionally requires a citation to that receipt's normalized text. Citation matching proves that quoted text was supplied, not that its interpretation is correct. Review mode holds effect proposals for semantic review; autonomous mode rejects declared uncertainty and applies only currently authorized grounded operations. Broad autonomous semantic quality remains unmeasured.
 
 Receipt runs act only as the original bound participant and can propose `reply`, `verify` or `add_child` within the correlated obligation. Case investigation runs use the configured coordinator and can propose `add_child`, `link_dependency`, `reopen`, `reassign` or `report`. The model cannot choose the acting identity. Existing transition rules select eligible responsibility and enforce dependencies, node/depth/contact limits, verifier independence, evidence freshness and outcome coverage. `report` does not certify completion merely because the model requests it.
 
@@ -93,7 +98,7 @@ Publishing an approved synthetic procedure, with timestamps chosen for the inten
 }
 ```
 
-Revoke with `{ "action": "revoke", "id": "<document UUID>", "reason": "<reason>" }`. Publishing/revocation and settings changes are audited with the authenticated principal. Initial settings enable review-only runs and automatic eligible-receipt interpretation; they do not permit automatic effects. An approval may create an existing channel delivery intent, so review the resulting recipient/question before approving.
+Revoke with `{ "action": "revoke", "id": "<document UUID>", "reason": "<reason>" }`. Publishing/revocation and settings changes are audited with the authenticated principal. Schema 9 selects autonomous execution and increments existing settings revisions so earlier proposals become stale. Review mode can be explicitly configured. A permitted effect may create a channel delivery intent; consent and current send-time checks still apply. See [autonomous runtime](AUTONOMOUS_COORDINATION.md).
 
 ## Recovery, privacy and evaluation limits
 
