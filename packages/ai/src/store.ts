@@ -185,7 +185,7 @@ export async function buildContext(
     state.sourceEvidenceId,
     ...(state.sourceQuestions ?? []).flatMap(q=>q.evidenceId ? [q.evidenceId] : []),
     ...state.obligations.flatMap((o) =>
-      [o.reply?.evidenceId, o.verification?.evidenceId].filter(
+      [o.reply?.evidenceId, o.verification?.evidenceId,...(o.reply?.facts ?? []).map(f=>f.evidenceId),...(o.retainedFacts ?? []).map(f=>f.evidenceId)].filter(
         (v): v is string => !!v,
       ),
     ),
@@ -306,7 +306,7 @@ export async function buildContext(
     });
   }
   // Do not silently truncate originals or remove negation. Oversized contexts require review.
-  if (Buffer.byteLength(JSON.stringify(context)) > 19000)
+  if (Buffer.byteLength(JSON.stringify(context)) > 24000)
     fail("ai_context_limit_requires_review");
   return context;
 }

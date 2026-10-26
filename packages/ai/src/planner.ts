@@ -139,7 +139,7 @@ export async function plan(
       },
       inferenceConfig: { maxTokens: 1024, temperature: 0 },
     };
-    if (Buffer.byteLength(JSON.stringify(request)) > 30000)
+    if (Buffer.byteLength(JSON.stringify(request)) > 48000)
       throw new Error("ai_input_budget_exhausted");
     const start = Date.now();
     const response = await client.send(new ConverseCommand(request), {

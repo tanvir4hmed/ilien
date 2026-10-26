@@ -58,7 +58,14 @@ export function autonomousToolProposal(name:string,input:unknown,context:Context
    const collect=(id:string)=>{if(needed.has(id))return;needed.add(id);for(const dep of context.state.obligations.find(o=>o.id===id)?.dependencies ?? [])collect(dep);};
    for(const dep of context.state.obligations.find(o=>o.id===operation.obligationId)?.dependencies ?? [])collect(dep);
    const inherited=context.state.obligations.filter(o=>needed.has(o.id)&&satisfied(o)).flatMap(o=>(o.reply?.facts ?? []).map(f=>({ref:f.evidenceId ?? o.reply!.evidenceId,quote:f.quote})));
-   citations=[...new Map([...citations,...inherited].map(c=>[`${c.ref}/${c.quote}`,c])).values()].slice(0,8);
+   const source=context.evidence.find(e=>e.id===context.state.sourceEvidenceId);
+   const references:{ref:string;quote:string}[]=[];
+   if(source) {
+     const identifiers=[context.state.subject.id];
+     try{const event=JSON.parse(source.text);for(const [key,value] of Object.entries(event.payload ?? {}))if(key.endsWith("Id")&&typeof value==="string")identifiers.push(value);}catch{}
+     for(const value of identifiers)if(operation.statement.includes(value)&&source.text.includes(value))references.push({ref:source.id,quote:value});
+   }
+   citations=[...new Map([...citations,...inherited,...references].map(c=>[`${c.ref}/${c.quote}`,c])).values()].slice(0,8);
  }
  return {disposition:operation?"propose":"wait",operation,reason:parsed.reason,citations,uncertainties:parsed.uncertainties};
 }
