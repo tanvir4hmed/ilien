@@ -5,6 +5,7 @@ import {
 import { createHash } from "node:crypto";
 import type { Delivery } from "./intents.js";
 import type { ProductConfiguration } from "../../product/src/configuration.js";
+import { meaningText } from "./meaning.js";
 const client = new SocialMessagingClient({ maxAttempts: 1 });
 export const TEMPLATE_BODY =
   "ILIEN {{1}}. Request: {{2}}. Subject: {{3}} / {{4}} / revision {{5}}. Deadline: {{6}}. Reported information (unverified): {{7}}. Source context is synthetic. Reply to this message with your response. This request authorizes no operational action.";
@@ -41,9 +42,7 @@ export async function approvedTemplate(
     d.request.subject.id,
     d.request.subject.revision,
     d.request.deadline,
-    d.request.claim || d.request.proposal
-      ? JSON.stringify({ claim: d.request.claim, proposal: d.request.proposal })
-      : JSON.stringify((d.request.facts ?? []).filter(f=>d.request.profile?.factKeys.includes(f.key)).map(({key,value,unit})=>({key,value,unit}))),
+    meaningText(d,d.request.profile) || "No additional source facts supplied; do not infer operational permission.",
   ];
   const parameters = values.map((text) => ({
     type: "text",

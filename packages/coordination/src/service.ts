@@ -45,6 +45,13 @@ export const policySchema = z.strictObject({
         group: policyId,
         role: z.enum(["respondent", "verifier", "coordinator"]),
         enabled: z.boolean(),
+        name:z.string().max(160).optional(),
+        capabilities:z.array(z.string().min(1).max(160)).max(24).optional(),
+        scope:z.array(z.string().min(1).max(160)).max(24).optional(),
+        approvalScopes:z.array(z.string().min(1).max(160)).max(24).optional(),
+        preferredChannel:z.enum(["email","whatsapp"]).optional(),
+        workingHours:z.string().max(160).optional(),
+        backupActorId:policyId.optional(),
       }),
     )
     .max(128),
@@ -55,6 +62,9 @@ export const policySchema = z.strictObject({
   maxNodes: z.number().int().min(1).max(32),
   maxDepth: z.number().int().min(1).max(8),
   evidenceAgeSeconds: z.number().int().min(60).max(604800),
+  autoExtendSeconds:z.number().int().min(0).max(604800).optional(),
+  maxExtensions:z.number().int().min(0).max(10).optional(),
+  supervisorActorId:policyId.optional(),
 });
 export async function policyFor(
   source: Source,
@@ -236,7 +246,8 @@ async function persist(
               evidence: [o.reply?.evidenceId, o.verification?.evidenceId]
                 .filter(Boolean)
                 .map((evidenceId) => ({ evidenceId, revision: 1 })),
-              reasonCode: o.status,
+              reasonCode: o.skipped ? "not_applicable" : o.satisfiedFrom ? "satisfied_from_existing_evidence" : o.status,
+              skipped:o.skipped,satisfiedFrom:o.satisfiedFrom,conflicts:o.conflicts,
             })),
             unresolvedObligationIds: result.unresolvedObligationIds,
             decisionRefs: state.obligations
@@ -259,7 +270,7 @@ async function persist(
             origin: "simulated",
             scope: "communication_only",
             status: state.status === "completed" ? "done" : state.status === "active" ? "in_progress" : state.status,
-            data: state.obligations.filter(o=>o.reply).map(o=>({requirementId:o.id,department:o.group,status:o.status,acceptance:o.acceptance ?? "independent",progress:o.reply!.progress,timeBasis:o.reply!.timeBasis ?? "observed",reportedAt:o.reply!.observedAt,validUntil:o.reply!.validUntil,facts:(o.reply!.facts ?? []).map(({key,value,unit,evidenceId,reportedAt,validUntil})=>({key,value,unit,evidenceId,reportedAt,validUntil})),evidenceId:o.reply!.evidenceId})),
+            data: state.obligations.filter(o=>o.reply).map(o=>({requirementId:o.id,department:o.group,status:o.status,acceptance:o.acceptance ?? "independent",progress:o.reply!.progress,timeBasis:o.reply!.timeBasis ?? "observed",reportedAt:o.reply!.observedAt,validUntil:o.reply!.validUntil,facts:o.reply!.facts ?? [],restrictions:o.reply!.restrictions ?? [],conflicts:o.conflicts ?? [],evidenceId:o.reply!.evidenceId})),
             sourceQuestions: (state.sourceQuestions ?? []).filter(q=>!q.answer).map(q=>({questionId:q.id,question:q.question})),
           }),
         ),
@@ -505,13 +516,16 @@ export async function listTasks(source: Source) {
     ),
   );
 }
-export async function caseView(source: Source, id: string, section: string) {
+export async function caseView(source: Source, id: string, section: string, historyPage=0, asOf?:string,messageId?:string) {
+  historyPage=z.number().int().min(0).max(10000).parse(historyPage);
+  const snapshotAt=asOf?z.iso.datetime({offset:true}).parse(asOf):new Date().toISOString();
   return transaction(
     source.tenant_id,
     async (tx) => {
       const state = await getCase(source, id, tx);
       if (section === "state") return state;
       if (section === "journey") {
+        if(messageId){const message=rows(await query("SELECT id,channel,status,reason,rendered_text,rendered_sha256,request->>'routingReason' AS routing_reason,request->>'demo' AS demo,created_at FROM channel_deliveries WHERE id=CAST(:message AS uuid) AND case_id=CAST(:case AS uuid) AND connection_id=CAST(:source AS uuid)",[param("message",z.uuid().parse(messageId)),param("case",id),param("source",source.id)],tx))[0];if(!message)throw new CoordinationError("message_not_found",404);return message;}
         const sourceEvent = rows(
           await query(
             "SELECT event_type,occurred_at,received_at FROM inbox_events WHERE id=CAST(:inbox AS uuid) AND connection_id=CAST(:source AS uuid)",
@@ -538,13 +552,16 @@ export async function caseView(source: Source, id: string, section: string) {
         const records: Record<string, unknown[]> = {};
         const truncated: string[] = [];
         for (const [name, sql] of Object.entries(definitions)) {
+          const alias=name==="deliveryEvents"?"e.":name==="journal"?"j.":name==="results"?"r.":"";
+          const paged=sql.replace(" ORDER BY ",` AND ${alias}created_at<=CAST(:asof AS timestamptz) ORDER BY `).replace("LIMIT 101","LIMIT 101 OFFSET CAST(:offset AS integer)");
           const data = rows(
             await query(
-              sql,
+              paged,
               [
                 param("case", id),
                 param("source", source.id),
                 param("revision", String(state.revision)),
+                param("asof",snapshotAt),param("offset",String(historyPage*100)),
               ],
               tx,
             ),
@@ -557,6 +574,7 @@ export async function caseView(source: Source, id: string, section: string) {
           sourceEvent,
           ...records,
           truncated,
+          asOf:snapshotAt,nextPage:truncated.length?historyPage+1:null,
           observedAt: new Date().toISOString(),
         };
       }

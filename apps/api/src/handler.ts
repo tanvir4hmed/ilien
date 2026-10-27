@@ -357,7 +357,7 @@ export async function handler(
         method === "GET" &&
         !["commands", "acknowledgements"].includes(section)
       )
-        return response(200, await caseView(source, id, section));
+        return response(200, await caseView(source, id, section,Number(event.queryStringParameters?.page??0),event.queryStringParameters?.asOf,event.queryStringParameters?.messageId));
       if (
         method === "POST" &&
         ["commands", "acknowledgements"].includes(section)

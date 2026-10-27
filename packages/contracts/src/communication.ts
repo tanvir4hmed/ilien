@@ -3,6 +3,8 @@ const identifier = z.string().min(1).max(80).regex(/^[A-Za-z0-9_-]+$/);
 export const factSchema = z.strictObject({
   key: identifier, value: z.string().min(1).max(300),
   unit: z.string().min(1).max(32).optional(), quote: z.string().min(1).max(500),
+  scope: z.string().min(1).max(160).optional(),
+  category: z.enum(["fact", "restriction", "instruction", "uncertainty"]).optional(),
 });
 export type Fact = z.infer<typeof factSchema>;
 export const messageProfileSchema = z.strictObject({
@@ -10,8 +12,8 @@ export const messageProfileSchema = z.strictObject({
   format: z.enum(["human", "json"]), version: identifier,
   language: z.enum(["en", "bn"]).default("en"),
   style: z.enum(["concise", "formal"]).default("concise"),
-  sourceFields: z.array(identifier).max(24),
-  factKeys: z.array(identifier).max(24),
+  sourceFields: z.array(z.union([identifier,z.literal("*")])).max(24),
+  factKeys: z.array(z.union([identifier,z.literal("*")])).max(24),
   fields: z.array(z.strictObject({
     name: identifier, path: z.string().regex(/^(caseId|token|question|deadline|subject\.(id|type|revision)|source\.[A-Za-z0-9_-]+|facts\.[A-Za-z0-9_-]+)$/),
     type: z.enum(["string", "number", "boolean", "object"]), required: z.boolean(),

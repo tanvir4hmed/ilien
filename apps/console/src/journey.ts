@@ -12,6 +12,8 @@ export type Journey = {
   results: RecordRow[];
   truncated: string[];
   observedAt: string;
+  asOf?:string;
+  nextPage?:number|null;
 };
 export const words = (value: unknown): string =>
   String(value ?? "")
@@ -89,7 +91,7 @@ export function renderJourney(
   host: HTMLElement,
   data: Journey,
   evidence: (id: string) => Promise<void>,
-  options: {mode?:"Workflow map"|"Communication flow"|"Activity";compact?:boolean} = {},
+  options: {mode?:"Workflow map"|"Communication flow"|"Activity";compact?:boolean;message?:(id:string)=>Promise<unknown>} = {},
 ) {
   host.replaceChildren();
   const selected = host.dataset.view || "Workflow map";
@@ -112,7 +114,7 @@ export function renderJourney(
     host.append(
       node(
         "p",
-        `Recent 100 records per history shown. Older ${data.truncated.map(words).join(", ")} are not included; this is not the complete history.`,
+        `More ${data.truncated.map(words).join(", ")} are available using Load older history.`,
         "notice",
       ),
     );
@@ -124,6 +126,16 @@ export function renderJourney(
       b.onclick = () => void evidence(evidenceId);
       inspector.append(b);
     }
+  };
+  const inspectTask=(id:string)=>{
+    const o=data.state.obligations.find(o=>o.id===id)!;
+    show(o.question,{owner:o.assignee,status:o.skipped?"not applicable":o.status,skipReason:o.skipped?.reason,satisfiedFrom:o.satisfiedFrom,waitingFor:o.dependencies.filter(id=>!data.state.obligations.some(d=>d.id===id&&(d.skipped||["accepted","verified"].includes(d.status)))),conflicts:o.conflicts,requiredFacts:o.requiredFacts,reply:o.reply,proposal:o.proposal,decision:o.decision,nextContactAt:o.nextContactAt,responseDeadline:data.state.deadline,businessDeadline:data.state.businessDeadline},o.reply?.evidenceId);
+    for(const d of data.deliveries.filter(d=>d.obligation_id===id)){
+      const b=node("button",`${words(d.channel)} · ${words(d.status)} · ${date(d.created_at)}${d.reason?` · ${words(d.reason)}`:""}`);
+      b.onclick=async()=>{show("Outgoing message",d);if(options.message){try{show("Full outgoing message",await options.message(String(d.id)));}catch(e){show("Message unavailable",String(e));}}};inspector.append(b);
+      for(const r of data.receipts.filter(r=>r.delivery_id===d.id)){const reply=node("button",`Reply · ${words(r.status)} · ${date(r.created_at)}`);reply.onclick=()=>show("Participant reply",r,String(r.evidence_id));inspector.append(reply);}
+    }
+    inspector.scrollIntoView({block:"nearest",behavior:"smooth"});
   };
   function tab(label: string, action: () => void) {
     const b = node("button", label);
@@ -289,26 +301,8 @@ export function renderJourney(
         channels.join(" / ") || "No channel send recorded",
         o.question,
         pos,
-        o.status,
-        () =>
-          show(
-            o.question,
-            {
-              assignedTo: words(o.assignee),
-              status: o.status,
-              dependencies: o.dependencies.map(
-                (id) =>
-                  state.obligations.find((n) => n.id === id)?.question ?? id,
-              ),
-              reply: o.reply,
-              decision: o.decision,
-              verification: o.verification,
-              proposal: o.proposal,
-              acceptance: o.acceptance,
-              structuredFacts: o.reply?.facts,
-            },
-            o.reply?.evidenceId,
-          ),
+        o.skipped ? "not applicable" : o.satisfiedFrom ? "evidence reused" : o.status,
+        () => inspectTask(o.id),
       );
     }
     const current = data.results.find((r) => r.current === true);

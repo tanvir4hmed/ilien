@@ -8,6 +8,14 @@ export function communicationContext(
     eventType?: string;
     payload?: Record<string, unknown>;
   };
+  // The source explicitly declares which context is intended for each recipient.
+  // Unlabelled arbitrary fields remain private until a disclosure profile maps them.
+  const context=event.payload?.communicationContext;
+  if(context && typeof context==="object" && !Array.isArray(context)) {
+    const scoped=(context as Record<string,unknown>)[group];
+    if(scoped && typeof scoped==="object" && !Array.isArray(scoped))return {...scoped as Record<string,unknown>};
+  }
+  if(event.eventType==="communication.request_raised" && event.payload?.context && typeof event.payload.context==="object")return {context:event.payload.context};
   const fields =
     event.eventType &&
     [

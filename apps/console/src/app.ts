@@ -1,5 +1,8 @@
 import { scenarioFields, userGuide } from "./operator-guide.js";
 import { guestLogin, type GuestConfig } from "./guest-login.js";
+import { renderRecovery } from "./recovery.js";
+import { companySettings } from "./company-settings.js";
+import type {ProductConfiguration} from "../../../packages/product/src/configuration.js";
 import { WorkspaceSession, SessionError, SESSION_KEY } from "./session.js";
 import { authoredReplyText } from "../../../packages/channels/src/text.js";
 import {
@@ -676,10 +679,18 @@ async function casePage(id: string) {
   let current = journey;
   const messagesHost=el("div"),historyHost=el("div");messagesPanel.append(messagesHost);historyPanel.append(historyHost);
   const draw = () => {
-    renderJourney(mapHost,current,evidence,{mode:"Workflow map",compact:true});
-    renderJourney(messagesHost,current,evidence,{mode:"Communication flow",compact:true});
-    renderJourney(historyHost,current,evidence,{mode:"Activity",compact:true});
+    const message=(messageId:string)=>api(`/cases/${id}/journey?messageId=${encodeURIComponent(messageId)}`);
+    renderJourney(mapHost,current,evidence,{mode:"Workflow map",compact:true,message});
+    renderJourney(messagesHost,current,evidence,{mode:"Communication flow",compact:true,message});
+    renderJourney(historyHost,current,evidence,{mode:"Activity",compact:true,message});
   };
+  historyPanel.append(button("Load older history",async()=>{
+    if(current.nextPage===null||current.nextPage===undefined){toast("All available history is loaded.");return;}
+    live.checked=false;if(timer)clearTimeout(timer);
+    const older=await api<Journey>(`/cases/${id}/journey?page=${current.nextPage}&asOf=${encodeURIComponent(current.asOf??current.observedAt)}`);
+    for(const key of ["contacts","deliveries","receipts","deliveryEvents","journal","aiRuns","results"] as const)current[key]=[...new Map([...current[key],...older[key]].map(r=>[String(r.id),r])).values()];
+    current.nextPage=older.nextPage;current.truncated=older.truncated;draw();status.textContent="History expanded; live refresh paused.";
+  }));
   map.classList.add("case-map");
   mapHost.dataset.view=preferredJourneyView;
   async function refresh() {
@@ -781,6 +792,10 @@ async function casePage(id: string) {
   if (role !== "viewer" && !state.autonomous) {
     caseActions(state, policy, id,fold("Advanced case controls",historyPanel));
   }
+  if(role!=="viewer" && state.autonomous)renderRecovery(historyPanel,state,policy,async(operation,actorId)=>{
+    await api(`/cases/${id}/commands`,{commandId:crypto.randomUUID(),expectedRevision:state.revision,actorId,operation});
+    await casePage(id);
+  });
   if (role !== "viewer" && state.status === "active" && !state.autonomous) {
     const send = card("Send through a connected channel",fold("Advanced delivery controls",historyPanel));
     send.append(
@@ -1857,6 +1872,7 @@ async function channels() {
   const list=card("People & channels",tabs.panels.get("Connected people")!);
   list.append(el("p","Recipients are scoped to a responsibility and require recorded consent. Conversation history belongs inside each case.","muted"));
   table(bindings.items,["actor_id","channel","address","enabled","priority"],list);
+  if(role==="admin")for(const b of bindings.items.filter(b=>b.enabled))list.append(button(`Remove ${String(b.channel)} contact: ${String(b.actor_id)}`,async()=>{await api("/channels/bindings",{action:"archive",bindingId:b.id,reason:"Administrator removed endpoint from active directory; history retained."});await show("Channels");}));
   list.append(button("Refresh people",()=>show("Channels")));
   if(role==="admin"){
     const create=card("Connect a consented recipient",tabs.panels.get("Add or update")!);
@@ -2082,6 +2098,7 @@ async function settings() {
     ),
   );
   const tabs=panelTabs(content,["Workflows","AI controls","Access"]);
+  if(role==="admin")companySettings(tabs.panels.get("Workflows")!,configuration as unknown as {revision:number;policy:Policy;configuration:ProductConfiguration},api);
   const c = card("Workflow rules",tabs.panels.get("Workflows")!);
   const configSummary = configuration.configuration as { workflows?: Row[] };
   for (const rule of configSummary.workflows ?? [])

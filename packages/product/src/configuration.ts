@@ -28,6 +28,7 @@ export const workflowSchema = z.strictObject({
         dependencies: z.array(identifier).max(12).optional(),
         acceptance: z.enum(["responsible_reply","independent"]).optional(),
         requiredFacts: z.array(identifier).max(12).optional(),
+        optional:z.boolean().optional(),
         group: identifier,
         kind: z.enum([
           "fact",
@@ -48,6 +49,9 @@ export const configurationSchema = z.strictObject({
   workflows: z.array(workflowSchema).max(256),
   messageProfiles: z.array(messageProfileSchema).max(64).optional(),
   automaticFallback: z.boolean(),
+  assistedIntake:z.boolean().optional(),
+  intakeGroup:identifier.optional(),
+  demoRouting:z.strictObject({enabled:z.boolean(),actorId:identifier}).optional(),
   whatsappTemplate: z
     .strictObject({
       name: z.string().regex(/^[a-z0-9_]{1,128}$/),
@@ -61,8 +65,8 @@ export type ProductConfiguration = z.infer<typeof configurationSchema>;
 export const defaultConfiguration: ProductConfiguration = {
   workflows: [],
   messageProfiles:[
-    {group:"stores",channel:"whatsapp",format:"human",version:"stores-v1",language:"en",style:"concise",sourceFields:["siteId","materialLotId","requiredQuantity","neededBy"],factKeys:["usable_quantity","available_quantity","completion_time","passing_quantity","quarantined_quantity","dispatch_deadline"],fields:[]},
-    ...["production","planning","quality","procurement"].map(group=>({group,channel:"email" as const,format:"human" as const,version:"department-v1",language:"en" as const,style:"formal" as const,sourceFields:["siteId","materialLotId","requiredQuantity","neededBy"],factKeys:["usable_quantity","available_quantity","completion_time","completion_reference","delay_days","passing_quantity","quarantined_quantity","dispatch_deadline"],fields:[]})),
+    {group:"stores",channel:"whatsapp",format:"human",version:"stores-v1",language:"en",style:"concise",sourceFields:["siteId","materialLotId","requiredQuantity","neededBy","context"],factKeys:["usable_quantity","available_quantity","completion_time","passing_quantity","quarantined_quantity","dispatch_deadline","release_authorization","hold","restriction","instruction","uncertainty"],fields:[]},
+    ...["production","planning","quality","procurement"].map(group=>({group,channel:"email" as const,format:"human" as const,version:"department-v1",language:"en" as const,style:"formal" as const,sourceFields:["siteId","materialLotId","requiredQuantity","neededBy","context"],factKeys:["usable_quantity","available_quantity","completion_time","completion_reference","delay_days","passing_quantity","quarantined_quantity","dispatch_deadline","release_authorization","hold","restriction","instruction","uncertainty"],fields:[]})),
   ],
   automaticFallback: false,
   whatsappTemplate: null,
@@ -151,6 +155,10 @@ export async function publishConfiguration(
   for (const a of input.policy.actors)
     if (a.role !== "coordinator" && !input.policy.groups.includes(a.group))
       throw new CoordinationError("actor_group_outside_scope");
+  for(const a of input.policy.actors)if(a.backupActorId&&!input.policy.actors.some(b=>b.id===a.backupActorId&&b.enabled&&b.group===a.group&&b.role===a.role))throw new CoordinationError("invalid_backup_actor");
+  if(input.policy.supervisorActorId&&!input.policy.actors.some(a=>a.id===input.policy.supervisorActorId&&a.enabled&&a.role==="coordinator"))throw new CoordinationError("supervisor_coordinator_required");
+  if(input.configuration.assistedIntake&&!input.policy.actors.some(a=>a.enabled&&a.role==="respondent"&&a.group===input.configuration.intakeGroup))throw new CoordinationError("intake_owner_required");
+  if(input.configuration.demoRouting?.enabled&&(source.origin!=="simulated"||!input.policy.actors.some(a=>a.id===input.configuration.demoRouting!.actorId&&a.enabled)))throw new CoordinationError("simulated_demo_identity_required");
   if (
     new Set(input.configuration.workflows.map((w) => w.eventType)).size !==
     input.configuration.workflows.length
@@ -196,6 +204,10 @@ export async function publishConfiguration(
     )[0];
     if (current?.revision !== input.expectedRevision)
       throw new CoordinationError("configuration_revision_conflict");
+    const referenced=rows<{snapshot:import("../../coordination/src/types.js").CaseState|string}>(await query(
+      "SELECT snapshot FROM coordination_cases WHERE connection_id=CAST(:source AS uuid) AND (EXISTS (SELECT 1 FROM jsonb_array_elements(snapshot->'obligations') o WHERE NOT ((o->>'assignee')=ANY(CAST(:actors AS text[]))) OR NOT ((o->>'group')=ANY(CAST(:groups AS text[]))))) LIMIT 1",
+      [param("source",source.id),param("actors",`{${input.policy.actors.map(a=>a.id).join(",")}}`),param("groups",`{${input.policy.groups.join(",")}}`)],tx));
+    if(referenced.length)throw new CoordinationError("referenced_directory_entry_must_be_archived");
     const affected = rows(
       await query(
         "SELECT id,workflow,revision,status FROM coordination_cases WHERE connection_id=CAST(:source AS uuid) AND status IN ('active','paused','blocked') ORDER BY updated_at DESC LIMIT 100",

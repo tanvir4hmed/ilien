@@ -13,6 +13,7 @@ import {
 import type { CaseState, Policy } from "../../coordination/src/types.js";
 import {
   contactCurrent,
+  bindingMatches,
   decode,
   type Binding,
   type Delivery,
@@ -28,7 +29,7 @@ const email = new SESv2Client({ maxAttempts: 1 });
 
 export function render(d: Delivery) {
   if(d.request.profile) return renderProfile(d,d.request.profile);
-  if(d.request.autonomous || d.request.facts?.length || d.request.contact.kind==="decision_notice") return renderProfile(d,{group:"configured",channel:d.channel,format:"human",version:"default-v1",language:"en",style:"concise",sourceFields:Object.keys(d.request.sourceContext ?? {}),factKeys:["available_quantity","usable_quantity","completion_time","completion_reference","delay_days","passing_quantity","quarantined_quantity","dispatch_deadline","quantity","unit","status"],fields:[]});
+  if(d.request.autonomous || d.request.facts?.length || d.request.contact.kind==="decision_notice") return renderProfile(d,{group:"configured",channel:d.channel,format:"human",version:"default-v1",language:"en",style:"concise",sourceFields:Object.keys(d.request.sourceContext ?? {}),factKeys:["available_quantity","usable_quantity","completion_time","completion_reference","delay_days","passing_quantity","quarantined_quantity","dispatch_deadline","quantity","unit","status","release_authorization","hold","restriction","instruction","uncertainty"],fields:[]});
   const r = d.request;
   const labels: Record<string, string> = {
     siteId: "Factory",
@@ -110,6 +111,7 @@ export async function sendDelivery(tenant: string, id: string) {
     let template: Awaited<ReturnType<typeof approvedTemplate>> = null;
     if (
       !binding?.enabled ||
+      !bindingMatches(d,binding) ||
       binding.address !== d.address ||
       !p ||
       !decode(p.policy).actors.some((a) => a.enabled && a.id === d.actor_id)
@@ -160,7 +162,7 @@ export async function sendDelivery(tenant: string, id: string) {
     let body="";
     try { body = template?.body ?? render(d); }
     catch(error) {reason=error instanceof Error && "code" in error ? String(error.code) : "message_rendering_failed";}
-    if (Buffer.byteLength(body) > 4000) reason = "message_size_limit";
+    if (Buffer.byteLength(body) > (d.channel === "email" ? 64000 : 4000)) reason = "message_size_limit";
     if (reason) {
       await query(
         "UPDATE channel_deliveries SET status='blocked',reason=:reason WHERE id=CAST(:id AS uuid)",

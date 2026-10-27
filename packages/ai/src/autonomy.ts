@@ -20,6 +20,8 @@ export function clarificationFallback(context: Context, proposal: Proposal): Pro
   if(proposal.disposition === "propose" && (!proposal.uncertainties.length || ["route_initial","clarify","source_query"].includes(proposal.operation?.type ?? ""))) return proposal;
   const receipt=context.receipt;
   if(!receipt || !receipt.text.trim()) return proposal;
+  if(receipt.kind==="operator_attention")return {disposition:"propose",operation:{type:"clarify_attention",question:"Please state the requested response deadline explicitly as an ISO timestamp with timezone, for example 2026-10-28T10:00:00+06:00. An extension does not change evidence validity or the business deadline.",reason:"An explicit scoped recovery instruction is required."},reason:"Clarify the supervisor's recovery instruction.",citations:[{ref:receipt.evidenceId,quote:receipt.text.slice(0,500)}],uncertainties:[]};
+  if(receipt.kind==="source_question")return {...proposal,disposition:"wait",operation:null};
   const task=context.state.obligations.find(o=>o.id===receipt.obligationId);
   if(!task) return proposal;
   const missing=task.requiredFacts?.map(k=>k.replaceAll("_"," ")).join(", ");
@@ -31,7 +33,7 @@ export function clarificationFallback(context: Context, proposal: Proposal): Pro
   }
   return {
     disposition:"propose",reason:"The bound response needs clarification; no business answer is inferred.",
-    operation:{type:"clarify",obligationId:task.id,question,reason:"Ambiguous participant reply",discardFacts:true},
+    operation:{type:"clarify",obligationId:task.id,question,reason:"Ambiguous participant reply",discardFacts:false},
     citations:[{ref:receipt.evidenceId,quote:receipt.text.slice(0,500)}],uncertainties:proposal.uncertainties,
   };
 }

@@ -1,5 +1,5 @@
 import {
-  contactCurrent,
+  contactCurrent, bindingMatches,
   decode,
   type Binding,
   type Delivery,
@@ -38,7 +38,7 @@ export function openDeliveries(
     d.request = decode(d.request);
     return (
       binding.enabled &&
-      d.actor_id === binding.actor_id &&
+      bindingMatches(d,binding) &&
       ["accepted", "uncertain", "sending"].includes(d.status) &&
       Number.isFinite(time) &&
       Date.parse(d.attempt_at) <= time + 1000 &&

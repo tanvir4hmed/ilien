@@ -36,7 +36,7 @@ import {
   type Run,
 } from "./contracts.js";
 import { pausedFor } from "../../operations/src/controls.js";
-import { authoredReplyText } from "../../channels/src/text.js";
+import { authoredReplyText, authoredReplyView } from "../../channels/src/text.js";
 import { autonomousGate } from "./autonomy.js";
 import { caseHeld } from "../../operations/src/supervision.js";
 import type { Operation } from "../../coordination/src/types.js";
@@ -73,7 +73,7 @@ export async function enqueueAgent(
   if (
     (state.status !== "active" && !(state.autonomous && state.status === "blocked")) ||
     state.takeoverBy ||
-    Date.parse(state.deadline) <= Date.now()
+    (Date.parse(state.deadline) <= Date.now() && !receiptId)
   )
     return { state: "ineligible" };
   // Tenant lock serializes admission across cases: rejected, failed and uncertain runs count too.
@@ -164,7 +164,7 @@ export async function buildContext(
     state.revision !== run.expected_revision ||
     (state.status !== "active" && !(state.autonomous && state.status === "blocked")) ||
     state.takeoverBy ||
-    Date.parse(state.deadline) <= Date.now()
+    (Date.parse(state.deadline) <= Date.now() && !run.receipt_id)
   )
     fail("ai_stale_context");
   const actor = policy.actors.find(
@@ -181,6 +181,7 @@ export async function buildContext(
     knowledge: [],
     participantProfiles: ((await configurationFor(source.id,tx)).configuration.messageProfiles ?? []).map(({group,channel,language,style,format,factKeys})=>({group,channel,language,style,format,factKeys})),
   };
+  context.channelOptions=rows<{actor_id:string;channel:string;priority:number;last_inbound_at?:string}>(await query("SELECT actor_id,channel,priority,last_inbound_at FROM channel_bindings WHERE connection_id=CAST(:source AS uuid) AND enabled",[param("source",source.id)],tx)).map(b=>({actorId:b.actor_id,channel:b.channel,priority:b.priority,available:true,requiresTemplate:b.channel==="whatsapp"&&(!b.last_inbound_at||Date.parse(b.last_inbound_at)<Date.now()-23.9*3600000)}));
   const ids = new Set([
     state.sourceEvidenceId,
     ...(state.sourceQuestions ?? []).flatMap(q=>q.evidenceId ? [q.evidenceId] : []),
@@ -259,7 +260,7 @@ export async function buildContext(
         tx,
       ),
     )[0];
-    if (!b?.enabled || !d || b.actor_id !== d.actor_id)
+    if (!b?.enabled || !d || !(b.actor_id === d.actor_id || (decode(d.request).demo && decode(d.request).demoActorId === b.actor_id)))
       fail("ai_receipt_identity_changed");
     d.request = decode(d.request);
     if (
@@ -267,20 +268,22 @@ export async function buildContext(
       !["accepted", "uncertain", "sending"].includes(d.status)
     )
       fail("ai_contact_changed");
-    context.actorId = b.actor_id;
+    context.actorId = d.actor_id;
     const stamp=r.created_at.replace(" ","T");
     const receivedAt=new Date(/[Zz]|[+-]\d\d(?::?\d\d)?$/.test(stamp)?stamp:stamp+"Z").toISOString();
     context.receipt = {
+      authorshipUncertain: authoredReplyView(decode(r.normalized).text).uncertain,
       receivedAt,
       expiresAt:new Date(Date.parse(receivedAt)+policy.evidenceAgeSeconds*1000).toISOString(),
       id: r.id,
       evidenceId: r.evidence_id,
       deliveryId: d.id,
       bindingId: b.id,
-      actorId: b.actor_id,
+      actorId: d.actor_id,
       obligationId: d.obligation_id,
       obligationRevision: d.obligation_revision,
       kind: d.request.contact.kind,
+      sourceQuestionId:d.request.contact.sourceQuestionId,
       replyRevision: d.request.contact.replyRevision,
       text: authoredReplyText(decode(r.normalized).text),
     };
@@ -363,6 +366,7 @@ export function gate(context: Context, proposal: Proposal) {
     if (!proposal.citations.some((c) => c.ref === r.evidenceId))
       fail("ai_receipt_citation_required");
     if (op.type === "reply" || op.type === "decide") {
+      if(r.authorshipUncertain)fail("forwarded_evidence_requires_author_confirmation");
       if (
         op.obligationId !== r.obligationId ||
         op.expectedObligationRevision !== r.obligationRevision ||
@@ -379,6 +383,13 @@ export function gate(context: Context, proposal: Proposal) {
         if((op.choice==="approve" && (!yes || caveat)) || (op.choice==="reject" && !no)) fail("ai_explicit_decision_required");
       }
       if(op.type==="reply") {
+        for(const restriction of op.restrictions ?? [])if(!groundedQuote(r.text,restriction))fail("restriction_not_grounded");
+        if(op.withdrawRestrictions?.length && !/\b(release|withdraw|lift|retract|remove|supersede)\b|প্রত্যাহার|মুক্ত/iu.test(r.text))fail("explicit_restriction_withdrawal_required");
+        const previousRestrictions=context.state.obligations.find(o=>o.id===r.obligationId)?.reply?.restrictions ?? context.state.obligations.find(o=>o.id===r.obligationId)?.retainedRestrictions ?? [];
+        if(op.withdrawRestrictions?.some(text=>!previousRestrictions.some(p=>p.text===text&&p.actorId===r.actorId)||!groundedQuote(r.text,text)))fail("exact_restriction_withdrawal_required");
+        if(op.corrects?.length && !/\b(correct(?:ion|ed)?|replace|supersede|withdraw|retract|previous.{0,30}(wrong|incorrect))\b|সংশোধন|আগের.{0,20}ভুল/iu.test(r.text))fail("explicit_correction_required");
+        const critical=r.text.split(/(?<=[.!?।])\s+|\n+/u).filter(s=>/\b(hold|quarantin\w*|do not|must not|not authori[sz]ed|only if|unless|subject to|prohibit\w*|reserved|restriction)\b|আটকে|নিষেধ|অনুমতি নেই|শর্ত/iu.test(s));
+        if(critical.some(s=>!(op.restrictions ?? []).some(q=>groundedQuote(q,s.trim()))))fail("critical_instruction_omitted");
         if(context.state.autonomous && /\b(wrong department|do not own|don't own|not our department)\b/iu.test(r.text)) fail("ai_wrong_department_requires_routing");
         for(const fact of op.facts ?? []) {
           if(!groundedQuote(r.text,fact.quote) || !groundedQuote(fact.quote,fact.value) || (fact.unit && !groundedQuote(fact.quote,fact.unit))) fail("ai_fact_not_grounded");
@@ -401,11 +412,17 @@ export function gate(context: Context, proposal: Proposal) {
     } else if(context.state.autonomous && (op.type==="clarify" || op.type==="reroute")) {
       if(op.obligationId!==r.obligationId) fail("ai_reply_scope");
       if(op.type==="reroute" && !r.text.toLowerCase().replaceAll("_"," ").includes(op.group.toLowerCase().replaceAll("_"," "))) fail("ai_route_owner_not_identified");
+    } else if(["source_response","extend_deadline","clarify_attention"].includes(op.type)) {
+      if(context.actorId!==context.policy.supervisorActorId || !context.policy.actors.some(a=>a.id===context.actorId&&a.enabled&&a.role==="coordinator"))fail("supervisor_authority_required");
+      if(op.type==="source_response"&&(r.kind!=="source_question"||op.questionId!==r.sourceQuestionId||!groundedQuote(r.text,op.answer)))fail("source_answer_scope");
+      if(op.type==="clarify_attention"&&r.kind!=="operator_attention")fail("supervisor_clarification_scope");
+      if(op.type==="extend_deadline"&&!groundedQuote(r.text,op.deadline))fail("exact_extension_time_required");
+      if(op.type==="extend_deadline"&&(r.kind!=="operator_attention"||!/\b(extend|until|deadline)\b|বাড়ান|বাড়ান|সময়সীমা|পর্যন্ত/iu.test(r.text)))fail("explicit_extension_required");
     } else if(context.state.autonomous && op.type==="source_query") {
       // Routed back only to the authenticated original source, not an arbitrary address.
     } else fail("ai_receipt_operation_forbidden");
   } else if (
-    !["add_child", "link_dependency", "reopen", "reassign", "report", ...(context.state.autonomous ? ["route_initial","clarify","reroute","attach_proposal","relay_decision","source_query"] : [])].includes(
+    !["add_child", "link_dependency", "reopen", "reassign", "report", ...(context.state.autonomous ? ["route_initial","clarify","reroute","attach_proposal","relay_decision","source_query","skip_optional","satisfy_from","select_channel","continue_plan"] : [])].includes(
       op.type,
     )
   )

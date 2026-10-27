@@ -13,7 +13,7 @@ import {
   type CaseState,
 } from "../../coordination/src/types.js";
 import {
-  contactCurrent,
+  contactCurrent, bindingMatches,
   decode,
   type Binding,
   type Delivery,
@@ -172,7 +172,7 @@ export async function receive(
     ) {
       const open = rows<OpenDelivery>(
         await query(
-          "SELECT d.*,c.snapshot FROM channel_deliveries d JOIN coordination_cases c ON c.tenant_id=d.tenant_id AND c.id=d.case_id WHERE d.connection_id=CAST(:source AS uuid) AND d.actor_id=:actor AND d.status IN ('accepted','uncertain','sending') AND c.status='active' ORDER BY d.attempt_at DESC,d.id LIMIT 101",
+          "SELECT d.*,c.snapshot FROM channel_deliveries d JOIN coordination_cases c ON c.tenant_id=d.tenant_id AND c.id=d.case_id WHERE d.connection_id=CAST(:source AS uuid) AND (d.actor_id=:actor OR (d.request->>'demo'='true' AND d.request->>'demoActorId'=:actor)) AND d.status IN ('accepted','uncertain','sending') AND c.status='active' ORDER BY d.attempt_at DESC,d.id LIMIT 101",
           [param("source", sourceId), param("actor", binding.actor_id)],
           tx,
         ),
@@ -266,7 +266,7 @@ export async function receive(
           !isGreeting(authored) &&
           d &&
           d.request.contact.kind!=="decision_update" &&
-          d.actor_id === binding!.actor_id &&
+          bindingMatches(d,binding!) &&
           caseRow
         ) {
           const state = decode(caseRow.snapshot);
@@ -306,7 +306,7 @@ export async function receive(
               d.case_id,
               JSON.stringify({
                 commandId: receiptId,
-                actorId: binding!.actor_id,
+                actorId: d.actor_id,
                 expectedRevision: state.revision,
                 operation: op,
               }),
@@ -323,7 +323,7 @@ export async function receive(
             )
               throw error;
           }
-        } else if (d && d.actor_id !== binding!.actor_id)
+        } else if (d && !bindingMatches(d,binding!))
           reason = "sender_not_authorized_for_request";
       }
     } else if (item.blockedReason) {

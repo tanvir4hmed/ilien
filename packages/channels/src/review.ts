@@ -14,6 +14,7 @@ import {
 } from "../../coordination/src/types.js";
 import {
   contactCurrent,
+  bindingMatches,
   decode,
   type Binding,
   type Delivery,
@@ -90,7 +91,7 @@ export async function reviewReceipt(
       !r ||
       !b?.enabled ||
       !d ||
-      d.actor_id !== b.actor_id ||
+      !bindingMatches(d, b) ||
       r.case_id !== found.case_id ||
       r.delivery_id !== d.id ||
       r.binding_id !== b.id
@@ -128,7 +129,7 @@ export async function reviewReceipt(
       d.case_id,
       JSON.stringify({
         commandId,
-        actorId: b.actor_id,
+        actorId: d.actor_id,
         expectedRevision: state.revision,
         operation: op,
       }),
@@ -155,6 +156,7 @@ export async function reviewReceipt(
             commandId,
             operation: op,
             boundActor: b.actor_id,
+            logicalActor: d.actor_id,
             evidenceId: r.evidence_id,
           }),
         ),

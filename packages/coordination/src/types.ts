@@ -7,10 +7,16 @@ const id = z
   .regex(/^[A-Za-z0-9_-]+$/);
 const text = z.string().min(1).max(1000);
 export const operationSchema = z.discriminatedUnion("type", [
+  z.strictObject({type:z.literal("continue_plan"),reason:text}),
+  z.strictObject({type:z.literal("clarify_attention"),question:text,reason:text}),
   z.strictObject({type:z.literal("source_query"), questionId:id, question:text}),
   z.strictObject({type:z.literal("source_response"), questionId:id, answer:text}),
-  z.strictObject({type:z.literal("route_initial"), obligationId:id, group:id, question:text}),
-  z.strictObject({type:z.literal("clarify"), obligationId:id, question:text, reason:text,discardFacts:z.boolean().optional()}),
+  z.strictObject({type:z.literal("route_initial"), obligationId:id, group:id, question:text,channel:z.enum(["email","whatsapp"]).optional(),channelReason:text.optional()}),
+  z.strictObject({type:z.literal("clarify"), obligationId:id, question:text, reason:text,discardFacts:z.boolean().optional(),channel:z.enum(["email","whatsapp"]).optional(),channelReason:text.optional()}),
+  z.strictObject({type:z.literal("extend_deadline"),deadline:z.iso.datetime({offset:true}),reason:text}),
+  z.strictObject({type:z.literal("satisfy_from"),obligationId:id,evidenceTaskId:id,reason:text}),
+  z.strictObject({type:z.literal("skip_optional"),obligationId:id,reason:text}),
+  z.strictObject({type:z.literal("select_channel"),obligationId:id,channel:z.enum(["email","whatsapp"]),reason:text}),
   z.strictObject({type:z.literal("reroute"), obligationId:id, group:id, reason:text}),
   z.strictObject({type:z.literal("relay_decision"), obligationId:id, decisionId:id}),
   z.strictObject({
@@ -53,6 +59,9 @@ export const operationSchema = z.discriminatedUnion("type", [
     validUntil: z.iso.datetime({ offset: true }),
     timeBasis: z.enum(["observed", "received"]).optional(),
     facts: z.array(factSchema).max(12).optional(),
+    restrictions: z.array(z.string().min(1).max(1000)).max(12).optional(),
+    withdrawRestrictions:z.array(z.string().min(1).max(1000)).max(12).optional(),
+    corrects: z.array(id).max(12).optional(),
     progress: z.enum(["in_progress", "ready"]).optional(),
     statusQuote: z.string().min(1).max(500).optional(),
     subjectRevision: z.string().min(1).max(160),
@@ -118,6 +127,13 @@ export interface Actor {
   group: string;
   role: "respondent" | "verifier" | "coordinator";
   enabled: boolean;
+  name?: string;
+  capabilities?: string[];
+  scope?: string[];
+  approvalScopes?: string[];
+  preferredChannel?: "email" | "whatsapp";
+  workingHours?: string;
+  backupActorId?: string;
 }
 export interface Policy {
   version: string;
@@ -130,6 +146,9 @@ export interface Policy {
   maxNodes: number;
   maxDepth: number;
   evidenceAgeSeconds: number;
+  autoExtendSeconds?: number;
+  maxExtensions?: number;
+  supervisorActorId?: string;
 }
 export interface Reply {
   revision: number;
@@ -141,10 +160,18 @@ export interface Reply {
   subjectRevision: string;
   timeBasis?: "observed" | "received";
   facts?: ReportedFact[];
+  restrictions?: {text:string;actorId:string;evidenceId:string}[];
   progress?: "in_progress" | "ready";
   statusQuote?: string;
 }
 export interface Obligation {
+  preferredChannel?: "email" | "whatsapp";
+  channelReason?: string;
+  optional?: boolean;
+  skipped?: {reason:string;evidenceId:string};
+  satisfiedFrom?: string;
+  conflicts?: {key:string;previous:ReportedFact;incoming:ReportedFact}[];
+  retainedRestrictions?: {text:string;actorId:string;evidenceId:string}[];
   retainedFacts?: ReportedFact[];
   id: string;
   group: string;
@@ -188,8 +215,14 @@ export interface Obligation {
 }
 export type ReportedFact = Fact & {evidenceId:string;actorId:string;subjectRevision:string;reportedAt:string;validUntil:string};
 export interface CaseState {
+  extensions?: number;
+  attentionReason?: string;
+  businessDeadline?: string;
+  attentionNotified?: string;
   autonomous?: boolean;
   awaitingPlan?: boolean;
+  planningPending?:boolean;
+  supervisorClarifications?:number;
   sourceQuestions?: {id:string;question:string;answer?:string;evidenceId?:string}[];
   decisionNotices?: {decisionId:string;decisionHash:string;obligationId:string;actorId:string;withdrawn?:boolean}[];
   id: string;
@@ -220,7 +253,8 @@ export interface CaseState {
 export interface Contact {
   obligationId: string;
   actorId: string;
-  kind: "ask" | "reminder" | "escalation" | "verify_request" | "decision_notice" | "decision_update";
+  kind: "ask" | "reminder" | "escalation" | "verify_request" | "decision_notice" | "decision_update" | "source_question" | "operator_attention";
+  sourceQuestionId?: string;
   decisionId?: string;
   decisionHash?: string;
   replyEvidenceId?: string;

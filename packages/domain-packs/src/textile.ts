@@ -79,7 +79,7 @@ export function template(event: SourceEvent): {
   workflow: string;
   goal: string;
   autonomous?: boolean;
-  branches: { id?: string; dependencies?: string[]; requiredFacts?:string[]; acceptance?: "responsible_reply"|"independent"; proposalStatement?: string; group: string; kind: string; question: string }[];
+  branches: { id?: string; optional?:boolean; dependencies?: string[]; requiredFacts?:string[]; acceptance?: "responsible_reply"|"independent"; proposalStatement?: string; group: string; kind: string; question: string }[];
 } | null {
   if (event.payloadVersion !== "1.0" || !event.subject.revision) return null;
   if(event.eventType === "manufacturing.dispatch_exception_requested") {
@@ -100,7 +100,7 @@ export function template(event: SourceEvent): {
     ]};
   }
   if(event.eventType === "communication.request_raised") {
-    const parsed=z.strictObject({summary:z.string().min(1).max(1000),group:z.string().min(1).max(80),kind:z.enum(["fact","decision","acknowledgement","evidence","commitment","completion"]),proposal:z.string().min(1).max(1000).optional(),requiredFacts:z.array(z.string().min(1).max(80).regex(/^[A-Za-z0-9_-]+$/)).max(12).optional(),context:z.record(z.string(),z.unknown()).optional()}).safeParse(event.payload);
+    const parsed=z.strictObject({summary:z.string().min(1).max(1000),group:z.string().min(1).max(80),kind:z.enum(["fact","decision","acknowledgement","evidence","commitment","completion"]),proposal:z.string().min(1).max(1000).optional(),requiredFacts:z.array(z.string().min(1).max(80).regex(/^[A-Za-z0-9_-]+$/)).max(12).optional(),context:z.record(z.string(),z.unknown()).optional(),communicationContext:z.record(z.string(),z.record(z.string(),z.unknown())).optional(),businessDeadline:z.iso.datetime({offset:true}).optional()}).safeParse(event.payload);
     if(!parsed.success || (parsed.data.kind==="decision" && !parsed.data.proposal)) return null;
     return {workflow:"generic-communication-v1",autonomous:true,goal:parsed.data.summary,branches:[{id:"request",group:parsed.data.group,kind:parsed.data.kind,question:parsed.data.summary,proposalStatement:parsed.data.proposal,requiredFacts:parsed.data.requiredFacts}]};
   }
@@ -178,7 +178,14 @@ export function seedCase(
       ))
   )
     return null;
-  const definition = configured ?? template(event);
+  let definition = configured ?? template(event);
+  if(!definition && configuration?.assistedIntake && event.subject.revision && event.payloadVersion==="1.0") {
+    const summary=event.payload.requestedOutcome ?? event.payload.summary ?? event.payload.description;
+    const group=configuration.intakeGroup;
+    if(typeof summary==="string" && summary.trim() && summary.length<=1000 && group && policy.groups.includes(group)) {
+      definition={workflow:"assisted-intake-v1",goal:summary,autonomous:true,branches:[{id:"request",group,kind:"evidence",question:summary}]};
+    }
+  }
   if (!definition) return null;
   if (
     definition.branches.some(
@@ -209,16 +216,18 @@ export function seedCase(
       Date.parse(now) + policy.deadlineSeconds * 1000,
     ).toISOString(),
     contacts: 0,
+    businessDeadline: typeof event.payload.businessDeadline==="string" && Number.isFinite(Date.parse(event.payload.businessDeadline)) ? event.payload.businessDeadline : undefined,
     obligations: definition.branches.map((branch, i) => ({
       ...branch,
       id: branch.id ?? `root_${i + 1}`,
-      required: true,
+      required: !branch.optional,
       dependencies: branch.dependencies ?? [],
       acceptance: branch.acceptance ?? (definition.autonomous ? "responsible_reply" : "independent"),
       assignee: policy.actors.find(
         (a) => a.enabled && a.group === branch.group && a.role === "respondent",
       )!.id,
       revision: 1,
+      preferredChannel:policy.actors.find(a=>a.enabled&&a.group===branch.group&&a.role==="respondent")?.preferredChannel,
       status: "waiting",
       reminders: 0,
       escalated: false,

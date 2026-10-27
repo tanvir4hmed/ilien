@@ -23,6 +23,16 @@ const bindingSchema = z.strictObject({
   priority: z.number().int().min(1).max(100).default(10),
 });
 export async function saveBinding(source: Source, raw: string) {
+  const action=JSON.parse(raw);
+  if(action.action==="archive") {
+    const input=z.strictObject({action:z.literal("archive"),bindingId:z.uuid(),reason:z.string().min(1).max(500)}).parse(action);
+    return transaction(source.tenant_id,async tx=>{
+      const b=rows<{id:string}>(await query("UPDATE channel_bindings SET enabled=false WHERE id=CAST(:id AS uuid) AND connection_id=CAST(:source AS uuid) RETURNING id",[param("id",input.bindingId),param("source",source.id)],tx))[0];
+      if(!b)throw new CoordinationError("binding_not_found",404);
+      await query("INSERT INTO channel_binding_audit VALUES(CAST(:tenant AS uuid),CAST(:id AS uuid),CAST(:binding AS uuid),CAST(:change AS jsonb),now())",[param("tenant",source.tenant_id),param("id",randomUUID()),param("binding",b.id),param("change",JSON.stringify(input))],tx);
+      return {bindingId:b.id,enabled:false,archived:true};
+    });
+  }
   const b = bindingSchema.parse(JSON.parse(raw));
   b.address = b.address.trim().toLowerCase();
   if (b.channel === "whatsapp") b.address = b.address.replace(/^\+/, "");
@@ -47,12 +57,11 @@ export async function saveBinding(source: Source, raw: string) {
       throw new CoordinationError("actor_not_authorized", 403);
     const existing = rows<{ id: string; actor_id: string; address: string }>(
       await query(
-        "SELECT id,actor_id,address FROM channel_bindings WHERE connection_id=CAST(:source AS uuid) AND channel=:channel AND (address=:address OR actor_id=:actor) FOR UPDATE",
+        "SELECT id,actor_id,address FROM channel_bindings WHERE connection_id=CAST(:source AS uuid) AND channel=:channel AND address=:address FOR UPDATE",
         [
           param("source", source.id),
           param("channel", b.channel),
           param("address", b.address),
-          param("actor", b.actorId),
         ],
         tx,
       ),
