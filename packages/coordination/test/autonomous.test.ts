@@ -94,14 +94,16 @@ test("source clarification is a typed source request and cannot be answered by t
  const sourceReply=apply(s,"coordinator",{type:"source_response",questionId:"destination",answer:"Authorized source confirms destination A"});
  assert.equal(continuePlanning(sourceReply).state.status,"completed");
 });
-test("machine email renders only the exact typed field mapping; absent required fields block",()=>{
+test("machine email requires explicit source disclosure before rendering the exact typed mapping",()=>{
  const p=messageProfileSchema.parse({group:"production",channel:"email",format:"json",version:"v1",sourceFields:["quantity"],factKeys:[],fields:[{name:"order",path:"subject.id",type:"string",required:true},{name:"amount",path:"source.quantity",type:"number",required:true}]});
  const d={case_id:"case-1",token:"route-token",request:{subject:{id:"ORDER-1",type:"order",revision:"1"},contact:{question:"Coordinate"},deadline:later,sourceContext:{quantity:800,confidentialPrice:1234}}} as unknown as Delivery;
- const rendered=JSON.parse(renderProfile(d,p));
+ assert.throws(()=>renderProfile(d,p),/required_context_disclosure_missing/);
+ const mapped=messageProfileSchema.parse({...p,sourceFields:["quantity","confidentialPrice"]});
+ const rendered=JSON.parse(renderProfile(d,mapped));
  assert.deepEqual({order:rendered.order,amount:rendered.amount},{order:"ORDER-1",amount:800});
  assert.equal(rendered._ilien.caseId,"case-1");assert.equal(rendered._ilien.token,"route-token");
- assert.deepEqual(rendered._ilien.meaning.source,{quantity:800});
- d.request.sourceContext={};assert.throws(()=>renderProfile(d,p),/machine_payload_required_field_missing/);
+ assert.deepEqual(rendered._ilien.meaning.source,{quantity:800,confidentialPrice:1234});
+ d.request.sourceContext={confidentialPrice:1234};assert.throws(()=>renderProfile(d,mapped),/machine_payload_required_field_missing/);
 });
 test("autonomous fact extraction cannot invent quantity and future estimates cannot mean ready",()=>{
  const s=approved(),o=s.obligations[3]!;
