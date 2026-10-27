@@ -5,8 +5,8 @@ export function channelIcon(channel:string) {
  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.classList.add('channel-icon',`channel-${channel==='email'?'email':channel==='whatsapp'?'whatsapp':'source'}`);
  const add=(d:string,fill?:string,stroke?:string)=>{const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',d);if(fill)path.setAttribute('fill',fill);if(stroke)path.setAttribute('stroke',stroke);svg.append(path);};
  if(channel==='email'){
-  // Familiar Gmail-style envelope: this is a message channel, not a generic box.
-  add('M3.5 6.5 12 13l8.5-6.5v11H3.5z','#fff','#d64545');add('M3.5 6.5 6.3 4h11.4l2.8 2.5','#fff','#d64545');add('M3.5 6.5 7.5 10V19.5H3.5z','#4285f4');add('M20.5 6.5 16.5 10v9.5h4z','#34a853');add('M3.5 6.5 12 13l8.5-6.5','#fff','#d64545');
+  // Email is deliberately a clean red envelope, not an imitation multicolour logo.
+  add('M3.5 5.5h17v13h-17z','#fff','#c83f3f');add('M4 6 12 12.5 20 6','#fff','#c83f3f');
  } else if(channel==='whatsapp'){
   add('M12 2.5a9.5 9.5 0 0 0-8.1 14.5L2.7 21.3 7.2 20A9.5 9.5 0 1 0 12 2.5z','#25d366');add('M8.2 6.9c-.4 0-.8.2-1 .6-.4.7-1 2.1-.2 3.8.9 2 3.4 4.4 6.5 5.2 1.2.3 2.2-.3 2.8-1.3l.4-.8-2.6-1.2-1 1.2c-1.7-.6-3.2-2-3.8-3.7l1.2-.9-1.2-2.7z','#fff');
  } else {
