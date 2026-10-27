@@ -1,6 +1,7 @@
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 const client = new LambdaClient({ maxAttempts: 3 });
 const maxAttempts = 10;
+const expectedSchemaVersion = 10;
 for (let attempt = 1; attempt <= maxAttempts; attempt++) {
   const response = await client.send(
     new InvokeCommand({
@@ -11,8 +12,8 @@ for (let attempt = 1; attempt <= maxAttempts; attempt++) {
   const result = JSON.parse(
     Buffer.from(response.Payload ?? []).toString("utf8"),
   );
-  if (!response.FunctionError && result.schemaVersion === 9) {
-    console.log("Database schema version 9 applied.");
+  if (!response.FunctionError && result.schemaVersion === expectedSchemaVersion) {
+    console.log(`Database schema version ${expectedSchemaVersion} applied.`);
     break;
   }
   // Never print error messages, SQL, credentials, or raw Lambda payloads.
