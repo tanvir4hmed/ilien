@@ -6,13 +6,14 @@ import { CoordinationError } from "../../coordination/src/types.js";
 /** Business content is rendered by code. Style never edits evidence or authority. */
 export function meaningEnvelope(d: Delivery, profile?: MessageProfile) {
   const facts = d.request.facts ?? [];
-  const source = Object.fromEntries(Object.entries(d.request.sourceContext ?? {}).filter(([key]) =>
-    !profile || profile.sourceFields.includes(key) || profile.sourceFields.includes("*")));
+  const source = d.request.sourceContext ?? {};
   if (profile) {
-    // Required evidence may never disappear. Source context is an explicit allowlist:
-    // unapproved fields are intentionally excluded to avoid over-disclosure.
+    // The coordinator has already selected recipient-scoped context. A profile
+    // cannot silently remove part of that selected handoff.
     if (facts.some(f => !profile.factKeys.includes(f.key) && !profile.factKeys.includes("*")))
       throw new CoordinationError("required_fact_disclosure_missing");
+    if (Object.keys(source).some(key => !profile.sourceFields.includes(key) && !profile.sourceFields.includes("*")))
+      throw new CoordinationError("required_context_disclosure_missing");
   }
   const values = new Map<string, string>();
   for (const f of facts) {

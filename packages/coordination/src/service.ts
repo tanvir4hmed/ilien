@@ -534,9 +534,13 @@ export async function caseView(source: Source, id: string, section: string, hist
           ),
         )[0];
         const policy = await policyFor(source, tx);
+        const configuration=(await configurationFor(source.id,tx)).configuration;
         const participantChannels=(policy?.actors??[])
           .filter(actor=>actor.enabled&&actor.preferredChannel&&actor.role!=="coordinator")
           .map(actor=>({actor_id:actor.id,channel:actor.preferredChannel!}));
+        const channelBindings=rows<{actor_id:string;channel:string;enabled:boolean;last_inbound_at?:string}>(await query(
+          "SELECT actor_id,channel,enabled,last_inbound_at FROM channel_bindings WHERE connection_id=CAST(:source AS uuid) ORDER BY actor_id,priority,id",
+          [param("source",source.id)],tx));
         const participants=(policy?.actors??[]).map(actor=>({id:actor.id,group:actor.group,role:actor.role,name:actor.name,capabilities:actor.capabilities,approvalScopes:actor.approvalScopes,enabled:actor.enabled}));
         const definitions: Record<string, string> = {
           contacts:
@@ -578,6 +582,8 @@ export async function caseView(source: Source, id: string, section: string, hist
           state,
           sourceEvent,
           participantChannels,
+          channelBindings,
+          whatsappTemplateEnabled:configuration.whatsappTemplate?.enabled===true,
           participants,
           ...records,
           truncated,

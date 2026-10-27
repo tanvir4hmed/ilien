@@ -13,7 +13,7 @@ import {
   applyCommand,
   type Source,
 } from "../../coordination/src/service.js";
-import { resolveActor, transition } from "../../coordination/src/engine.js";
+import { resolveActor, satisfied, transition } from "../../coordination/src/engine.js";
 import { CoordinationError } from "../../coordination/src/types.js";
 import {
   contactCurrent,
@@ -433,6 +433,16 @@ export function gate(context: Context, proposal: Proposal) {
     const numbers=statement.match(/\b\d+(?:[.:]\d+)*\b/g) ?? [];
     const citedNumbers=new Set(quoted.match(/\b\d+(?:[.:]\d+)*\b/g) ?? []);
     if(numbers.some(number=>!citedNumbers.has(number))) fail("ai_proposal_number_not_grounded");
+    if(op.type === "attach_proposal") {
+      const needed=new Set<string>();
+      const collect=(id:string)=>{if(needed.has(id))return;needed.add(id);for(const dependency of context.state.obligations.find(o=>o.id===id)?.dependencies ?? [])collect(dependency);};
+      for(const dependency of context.state.obligations.find(o=>o.id===op.obligationId)?.dependencies ?? [])collect(dependency);
+      const mandatory=context.state.obligations.filter(o=>needed.has(o.id)&&satisfied(o)).flatMap(o=>o.reply?.restrictions ?? o.retainedRestrictions ?? []);
+      for(const restriction of mandatory) {
+        if(!groundedQuote(statement,restriction.text)) fail("ai_proposal_restriction_omitted");
+        if(!proposal.citations.some(c=>c.ref===restriction.evidenceId&&groundedQuote(c.quote,restriction.text))) fail("ai_proposal_restriction_not_cited");
+      }
+    }
   }
   // Preview is pure: no channels, SQL, credentials or external effects.
   transition(

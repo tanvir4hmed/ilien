@@ -16,6 +16,8 @@ export type Journey = {
   asOf?:string;
   nextPage?:number|null;
   participantChannels?:{actor_id:string;channel:string}[];
+  channelBindings?:{actor_id:string;channel:string;enabled:boolean;last_inbound_at?:string}[];
+  whatsappTemplateEnabled?:boolean;
   participants?:{id:string;group:string;role:string;name?:string;capabilities?:string[];approvalScopes?:string[];enabled:boolean}[];
 };
 export const words = (value: unknown): string =>
