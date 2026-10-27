@@ -3,7 +3,17 @@ import {node,words,summary} from './journey.js';
 export const statusTone=(status:unknown)=>({active:'active',received:'received',pending:'waiting',waiting:'waiting',answered:'waiting',accepted:'accepted',verified:'success',completed:'success',published:'accepted',blocked:'danger',disputed:'danger',uncertain:'danger',failed:'danger',paused:'paused',cancelled:'paused'}[String(status)] ?? 'neutral');
 export function channelIcon(channel:string) {
  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.classList.add('channel-icon',`channel-${channel==='email'?'email':channel==='whatsapp'?'whatsapp':'source'}`);
- const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',channel==='email'?'M3 5h18v14H3z M3 6l9 7 9-7':channel==='whatsapp'?'M20 11a8 8 0 0 1-12 7l-5 2 1-5a8 8 0 1 1 16-4z M8 7c0 4 2 6 6 7l2-2-3-1-1 1-2-2 1-1-1-2z':'M8 3v5M16 3v5M5 8h14v3a7 7 0 0 1-14 0z M12 18v4');svg.append(path);return svg;
+ const add=(d:string,fill?:string,stroke?:string)=>{const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',d);if(fill)path.setAttribute('fill',fill);if(stroke)path.setAttribute('stroke',stroke);svg.append(path);};
+ if(channel==='email'){
+  // Familiar Gmail-style envelope: this is a message channel, not a generic box.
+  add('M3.5 6.5 12 13l8.5-6.5v11H3.5z','#fff','#d64545');add('M3.5 6.5 6.3 4h11.4l2.8 2.5','#fff','#d64545');add('M3.5 6.5 7.5 10V19.5H3.5z','#4285f4');add('M20.5 6.5 16.5 10v9.5h4z','#34a853');add('M3.5 6.5 12 13l8.5-6.5','#fff','#d64545');
+ } else if(channel==='whatsapp'){
+  add('M12 2.5a9.5 9.5 0 0 0-8.1 14.5L2.7 21.3 7.2 20A9.5 9.5 0 1 0 12 2.5z','#25d366');add('M8.2 6.9c-.4 0-.8.2-1 .6-.4.7-1 2.1-.2 3.8.9 2 3.4 4.4 6.5 5.2 1.2.3 2.2-.3 2.8-1.3l.4-.8-2.6-1.2-1 1.2c-1.7-.6-3.2-2-3.8-3.7l1.2-.9-1.2-2.7z','#fff');
+ } else {
+  // A source/intake request enters the system. It is deliberately not a third channel.
+  add('M4 10.5h16v9H4z','#7657ad');add('M4 10.5 7.2 5h9.6l3.2 5.5','#7657ad');add('M8.2 14h7.6v2.1c0 .8-.7 1.4-1.5 1.4H9.7c-.8 0-1.5-.6-1.5-1.4z','#fff');add('M12 3v8m0 0-3-3m3 3 3-3','none','#fff');
+ }
+ return svg;
 }
 export function deliveryRecoveries(data:Journey) {
  return data.deliveries.filter(d=>['blocked','uncertain'].includes(String(d.status))).map(failed=>{

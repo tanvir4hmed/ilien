@@ -816,8 +816,8 @@ blockquote {
 .channel-step[data-tone="waiting"] { background:#fffdf4; }
 .network-channels { margin:2px 0; }
 .channel-tag { display:inline-flex; gap:3px; align-items:center; font-size:.7rem; }
-.channel-icon { width:12px; height:12px; flex:0 0 12px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
-.channel-email { color:#436ba6; }.channel-whatsapp { color:#16844a; }.channel-source { color:#7657ad; }
+.channel-icon { width:16px; height:16px; flex:0 0 16px; stroke-width:1.45; stroke-linecap:round; stroke-linejoin:round; }
+.channel-email,.channel-whatsapp,.channel-source { color:inherit; }
 .network-edge { fill:none; stroke-width:2; }
 .edge-outbound { stroke:#237c70; }.edge-inbound { stroke:#397eb2; }.edge-planned { stroke:#8b9693; stroke-dasharray:7 6; }.edge-failure { stroke:#bb5749; stroke-dasharray:7 5; }
 .failure-label,.simulation-label { font-size:.75rem; color:#9a453a; }
