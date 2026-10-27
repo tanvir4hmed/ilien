@@ -102,15 +102,17 @@ export function renderJourney(
   host.replaceChildren();
   const selected = host.dataset.view || "Workflow map";
   const controls = node("div", "", "row"),
+    meta = node("div", "", "journey-meta"),
     view = node("div"),
     inspector = node("section", "", "journey-inspector");
   inspector.setAttribute("aria-live", "polite");
   controls.hidden=!!options.mode;
   host.append(
     controls,
+    meta,
     node(
       "p",
-      `Updated ${date(data.observedAt)} · Map shows recorded work, not predicted activity. Select any step for details.`,
+      `Updated ${date(data.observedAt)} · Recorded work only. Select a step for details.`,
       "muted",
     ),
     view,
@@ -332,7 +334,7 @@ export function renderJourney(
       );
       for (const o of state.obligations) edge(positions.get(o.id)!, end);
     }
-    const tools = node("div", "", "row");
+    const tools = node("div", "", "map-tools");
     const fit = node("button", "Fit map to screen"),
       full = node("button", "Actual size"),
       focus = node("button", "Focus on pending work");
@@ -361,7 +363,7 @@ export function renderJourney(
     requestAnimationFrame(() => {
       if (canvas.isConnected) fit.click();
     });
-    view.prepend(tools);
+    meta.append(tools);
     view.append(
       node(
         "p",
@@ -383,21 +385,15 @@ export function renderJourney(
         group = data.state.obligations.find(
           (o) => o.id === contact.obligationId,
         )?.group;
-      const trace = node("section", "", "communication-trace");
-      const title = node(
-        "h3",
-        `${words(contact.kind)} · ${words(group || contact.actorId)}`,
-      );
-      trace.append(
-        title,
-        node("p", String(contact.question ?? "")),
-        node("p", date(row.created_at), "muted"),
-      );
+      const trace = node("details", "", "communication-trace"),summaryRow=node("summary","","communication-summary");
+      const sends = data.deliveries.filter((d) => d.contact_id === row.id),replies=data.receipts.filter(r=>sends.some(d=>d.id===r.delivery_id));
+      summaryRow.append(node("strong",`${words(group || contact.actorId)} · ${words(contact.kind)}`),node("span",date(row.created_at),"muted"),node("span",`${sends.length} send${sends.length===1?"":"s"} · ${replies.length} repl${replies.length===1?"y":"ies"}`,"badge"));trace.append(summaryRow);
+      trace.ontoggle=()=>{if(!trace.open)return;for(const other of view.querySelectorAll<HTMLDetailsElement>(".communication-trace"))if(other!==trace)other.open=false;};
+      trace.append(node("p", String(contact.question ?? "")));
       const flow = node("div", "", "communication-chain");
       flow.append(
         node("div", `ILIEN → ${words(contact.actorId)}`, "channel-step"),
       );
-      const sends = data.deliveries.filter((d) => d.contact_id === row.id);
       if (!sends.length)
         flow.append(
           node(

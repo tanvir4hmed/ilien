@@ -83,7 +83,7 @@ function workspaceTabs(active:string) {
 }
 function tuningTabs(active:string) {
   const nav=el("div","","workspace-tabs");nav.setAttribute("role","tablist");
-  for(const [name,title] of [["Channels","People & channels"],["Settings","Rules & profiles"],["Knowledge","Knowledge"],["Operations","Recovery"],["Inbox","Unassigned messages"]]){const b=button(title!,()=>show(name!));b.setAttribute("role","tab");b.setAttribute("aria-selected",String(name===active));b.classList.toggle("active",name===active);nav.append(b);}
+  for(const [name,title] of [["Channels","People & channels"],["Settings","Organization & rules"],["Knowledge","Knowledge"]]){const b=button(title!,()=>show(name!));b.setAttribute("role","tab");b.setAttribute("aria-selected",String(name===active));b.classList.toggle("active",name===active);nav.append(b);}
   content.append(nav);
 }
 function required(n: HTMLInputElement | HTMLTextAreaElement, title: string) {
@@ -370,11 +370,11 @@ function shell() {
   );
   for (const name of [
     "Cases",
-    ...(role === "admin" ? ["Settings"] : []),
+    ...(role === "admin" ? ["Settings","Operations"] : []),
     "Help",
   ]) {
     const b = button(label(name), () => show(name));
-    if (page === name || (name==="Cases" && page==="Simulator") || (name==="Settings" && ["Channels","Inbox","Knowledge","Operations"].includes(page))) b.classList.add("active");
+    if (page === name || (name==="Cases" && page==="Simulator") || (name==="Settings" && ["Channels","Knowledge"].includes(page)) || (name==="Operations" && page==="Inbox")) b.classList.add("active");
     nav.append(b);
   }
   side.append(
@@ -425,7 +425,7 @@ async function show(name: string) {
     };
     content.replaceChildren();
     if(["Cases","Simulator"].includes(name))workspaceTabs(name);
-    if(role==="admin" && ["Settings","Channels","Inbox","Knowledge","Operations"].includes(name))tuningTabs(name);
+    if(role==="admin" && ["Settings","Channels","Knowledge"].includes(name))tuningTabs(name);
     await tasks[name]!();
   } catch (e) {
     content.append(
@@ -507,8 +507,8 @@ async function overview() {
   );
 }
 async function cases() {
-  const [data,events] = await Promise.all([api<{items:Row[]}>("/cases"),api<{items:Row[]}>("/events")]);
-  const c = card("Find a request"),
+  const data = await api<{items:Row[]}>("/cases");
+  const c = card("Requests"),
     search = input(),
     status = options(
       [
@@ -524,30 +524,41 @@ async function cases() {
         label: value === "all" ? "All statuses" : words(value),
       })),
     ),
-    list = el("div");
+    list = el("div","","case-list"),pager=el("div","","case-pager");
   search.placeholder = "Search by subject or request";
+  let pageIndex=0,openId="";
   function render() {
     list.replaceChildren();
-    requestList(
-      data.items.filter(
+    pager.replaceChildren();
+    const matches=data.items.filter(
         (r) =>
           (status.value === "all" || r.status === status.value) &&
           JSON.stringify(r).toLowerCase().includes(search.value.toLowerCase()),
-      ),
-      list,
-    );
+      ),pages=Math.max(1,Math.ceil(matches.length/10));
+    pageIndex=Math.min(pageIndex,pages-1);
+    const visible=matches.slice(pageIndex*10,pageIndex*10+10);
+    if(!visible.length){list.append(el("p","No requests match these filters.","empty"));return;}
+    for(const r of visible){
+      const subject=r.subject?decode(r.subject as Row|string):{},item=el("details","","request-item compact-request");
+      item.open=openId===String(r.id);
+      const summary=el("summary","","request-summary"),main=el("span","","request-title");
+      main.append(el("strong",String(subject.id??words(r.workflow))),el("small",`Updated ${date(r.updated_at)}${r.deadline?` · Due ${date(r.deadline)}`:""}`));
+      summary.append(main,el("span",words(r.status),"badge"));item.append(summary);
+      const detail=el("div","","request-detail");detail.append(el("p",String(r.goal??words(r.workflow))),button("Open request",()=>casePage(String(r.id))));item.append(detail);
+      item.ontoggle=()=>{if(!item.open)return;openId=String(r.id);for(const other of list.querySelectorAll<HTMLDetailsElement>("details"))if(other!==item)other.open=false;};list.append(item);
+    }
+    if(pages>1){const previous=button("Previous",()=>{pageIndex--;render()}),next=button("Next",()=>{pageIndex++;render()});previous.disabled=pageIndex===0;next.disabled=pageIndex===pages-1;pager.append(previous,el("span",`Page ${pageIndex+1} of ${pages} · ${matches.length} requests`,`muted`),next);}
   }
-  search.oninput = render;
-  status.onchange = render;
+  search.oninput = () => {pageIndex=0;render();};
+  status.onchange = () => {pageIndex=0;render();};
+  const filters=el("div","","case-filters");filters.append(field("Search",search),field("Status",status));
   c.append(
-    field("Search", search),
-    field("Status", status),
-    el("p", "Latest 50 requests", "muted"),
+    filters,
+    el("p", "Latest 50 requests · 10 shown per page", "muted"),
     list,
+    pager,
   );
   render();
-  const pending=events.items.filter(event=>!event.case_id);
-  if(pending.length){const queued=fold(`Preparing or unmapped source requests (${pending.length})`,content);for(const event of pending)queued.append(el("p",`${words(event.event_type)} · ${words(event.status)} · ${date(event.received_at)}`));queued.append(button("Check status",()=>show("Cases")));}
 }
 async function pendingTasks() {
   const data = await api<{ items: Row[] }>("/tasks");
@@ -799,10 +810,14 @@ async function casePage(id: string) {
   if (role !== "viewer" && !state.autonomous) {
     caseActions(state, policy, id,fold("Advanced case controls",historyPanel));
   }
-  if(role!=="viewer" && state.autonomous)renderRecovery(historyPanel,state,policy,async(operation,actorId)=>{
+  if(role!=="viewer" && state.autonomous && ["blocked","paused"].includes(state.status)){
+    const recoveryHost=fold("Exception recovery",flowPanel);
+    recoveryHost.append(el("p","Automatic coordination normally needs no app action. Use these controls only to resolve this case’s exception.","muted"));
+    renderRecovery(recoveryHost,state,policy,async(operation,actorId)=>{
     await api(`/cases/${id}/commands`,{commandId:crypto.randomUUID(),expectedRevision:state.revision,actorId,operation});
     await casePage(id);
-  });
+    });
+  }
   if (role !== "viewer" && state.status === "active" && !state.autonomous) {
     const send = card("Send through a connected channel",fold("Advanced delivery controls",historyPanel));
     send.append(
@@ -1875,15 +1890,19 @@ function jsonForm(
 }
 async function channels() {
   const [configuration,bindings]=await Promise.all([api<{policy:Policy}>("/configuration"),api<{items:Row[]}>("/channels/bindings")]);
-  const tabs=panelTabs(content,["Connected people",...(role==="admin"?["Add or update"]:[])]);
+  const tabs=panelTabs(content,["Connected people",...(role==="admin"?["Connect person"]:[])]);
   const list=card("People & channels",tabs.panels.get("Connected people")!);
-  list.append(el("p","Recipients are scoped to a responsibility and require recorded consent. Conversation history belongs inside each case.","muted"));
-  table(bindings.items,["actor_id","channel","address","enabled","priority"],list);
-  if(role==="admin")for(const b of bindings.items.filter(b=>b.enabled))list.append(button(`Remove ${String(b.channel)} contact: ${String(b.actor_id)}`,async()=>{await api("/channels/bindings",{action:"archive",bindingId:b.id,reason:"Administrator removed endpoint from active directory; history retained."});await show("Channels");}));
+  list.append(el("p","Each person may have email, WhatsApp, or both. ILIEN selects the registered channel when the request needs it. Consent and past messages remain recorded.","muted"));
+  const names=new Map(configuration.policy.actors.map(a=>[a.id,a.name??words(a.id)]));
+  for(const b of bindings.items){const row=el("article","","binding-item");row.append(el("strong",names.get(String(b.actor_id))??words(b.actor_id)),el("span",`${words(b.channel)} · ${String(b.address)}`,"muted"),el("span",b.enabled?"Active":"Archived","badge"));if(role==="admin"&&b.enabled)row.append(button("Archive contact",async()=>{await api("/channels/bindings",{action:"archive",bindingId:b.id,reason:"Administrator archived endpoint; case history retained."});await show("Channels");}));list.append(row);}
+  if(!bindings.items.length)list.append(el("p","No people are connected to a live channel yet.","empty"));
   list.append(button("Refresh people",()=>show("Channels")));
   if(role==="admin"){
-    const create=card("Connect a consented recipient",tabs.panels.get("Add or update")!);
-    jsonForm(create,"Add or update binding","/channels/bindings",{actorId:"",channel:"email",address:"",consentRef:"",enabled:false,priority:10},{actorId:configuration.policy.actors.filter(a=>a.enabled).map(a=>a.id)});
+    const create=card("Connect a person",tabs.panels.get("Connect person")!);
+    create.append(el("p","Add one endpoint at a time. Choose Email or WhatsApp first; the address field changes to match.","muted"));
+    const person=options(configuration.policy.actors.filter(a=>a.enabled).map(a=>({value:a.id,label:`${a.name??words(a.id)} · ${words(a.group)} · ${words(a.role)}`}))),channel=options([{value:"email",label:"Email"},{value:"whatsapp",label:"WhatsApp"}]),address=input(),consent=input(),enabled=input("","checkbox"),priority=input("10","number");
+    const addressField=field("Email address",address);const sync=()=>{const whatsapp=channel.value==="whatsapp";addressField.firstChild!.textContent=whatsapp?"WhatsApp number":"Email address";address.placeholder=whatsapp?"+880…":"name@company.com";};channel.onchange=sync;sync();
+    create.append(field("Person",person),field("Channel",channel),addressField,field("Consent record",consent),field("Enable this endpoint now",enabled),field("Priority (lower sends first when options are equivalent)",priority),button("Connect channel",async()=>{await api("/channels/bindings",{actorId:person.value,channel:channel.value,address:required(address,"an address or number"),consentRef:required(consent,"a consent record"),enabled:enabled.checked,priority:Number(priority.value)});toast("Channel connected.");await show("Channels");},true));
   }
 }
 
@@ -1900,6 +1919,7 @@ async function inbox() {
       "Only messages without a case are shown here. Assigned conversations stay in their case’s Messages tab. Connecting a sender requires an authorised person and recorded consent.",
     ),
     button("Refresh messages", () => show("Inbox")),
+    button("Back to operations", () => show("Operations")),
     button("Manage people & channels", () => show("Channels")),
   );
   if (!unassigned.length)
@@ -2104,46 +2124,26 @@ async function settings() {
       "Manage recipients, approved reference material and workflow rules. Only workspace administrators can change these settings.",
     ),
   );
-  const tabs=panelTabs(content,["Workflows","AI controls","Access"]);
-  if(role==="admin")companySettings(tabs.panels.get("Workflows")!,configuration as unknown as {revision:number;policy:Policy;configuration:ProductConfiguration},api);
-  const c = card("Workflow rules",tabs.panels.get("Workflows")!);
+  const tabs=panelTabs(content,["Organization & rules","AI behavior","Workspace access"]);
+  if(role==="admin")companySettings(tabs.panels.get("Organization & rules")!,configuration as unknown as {revision:number;policy:Policy;configuration:ProductConfiguration},api);
+  const c = card("Active workflow rules",tabs.panels.get("Organization & rules")!);
   const configSummary = configuration.configuration as { workflows?: Row[] };
   for (const rule of configSummary.workflows ?? [])
     c.append(el("p", `${words(rule.eventType)} → ${words(rule.workflow)}`));
-  const advanced = fold("Advanced workflow configuration", c);
+  const advanced = fold("Technical configuration record", c);
   details("Current workflow settings", configuration, advanced);
   details("AI assistance settings", ai, advanced);
   if (role === "admin") {
-    c.append(
-      el(
-        "p",
-        "Changes to workflow rules are advanced administrator tasks. Preview before publishing. Existing requests retain their rules until explicitly updated.",
-        "muted",
-      ),
-    );
-    jsonForm(c, "Preview or publish configuration", "/configuration", {
-      action: "preview",
-      expectedRevision: configuration.revision,
-      policy: configuration.policy,
-      configuration: configuration.configuration,
-    });
-    jsonForm(tabs.panels.get("AI controls")!, "Update AI controls", "/ai/settings", {
-      enabled: ai.enabled,
-      autoReceipts: ai.auto_receipts,
-      executionMode: ai.execution_mode,
-      expectedRevision: ai.revision,
-    });
-    const m = card("Workspace access",tabs.panels.get("Access")!);
-    table(
-      (await api<{ items: Row[] }>("/members")).items,
-      ["subject", "role", "enabled", "created_at"],
-      m,
-    );
-    jsonForm(m, "Manage an existing identity", "/members", {
-      subject: "",
-      role: "viewer",
-      enabled: true,
-    });
+    const aiPanel=tabs.panels.get("AI behavior")!,aiCard=card("How ILIEN handles incoming replies",aiPanel);
+    aiCard.append(el("p","These settings control whether ILIEN reads replies and whether a validated coordination step is applied automatically. Business approvals still come only from the responsible person through their channel.","muted"));
+    const enabled=input("","checkbox"),automatic=input("","checkbox"),mode=options([{value:"autonomous",label:"Autonomous — apply validated coordination steps"},{value:"review",label:"Review first — hold AI suggestions for an operator"}]);enabled.checked=Boolean(ai.enabled);automatic.checked=Boolean(ai.auto_receipts);mode.value=String(ai.execution_mode??"autonomous");
+    aiCard.append(field("Use AI to process incoming replies",enabled),field("Process eligible replies automatically",automatic),field("How to apply AI suggestions",mode),button("Save AI behavior",async()=>{await api("/ai/settings",{enabled:enabled.checked,autoReceipts:automatic.checked,executionMode:mode.value,expectedRevision:ai.revision});toast("AI behavior updated.");await show("Settings");},true));
+    const m = card("Workspace access",tabs.panels.get("Workspace access")!);
+    m.append(el("p","These are application sign-in identities, separate from textile employees and channel contacts. Add only people who should administer or view this workspace.","muted"));
+    const members=(await api<{ items: Row[] }>("/members")).items.map(member=>({"Account ID":String(member.subject),Role:member.role,Active:member.enabled,Added:member.created_at}));
+    table(members,["Account ID","Role","Active","Added"],m);
+    const identity=input(),accessRole=options([{value:"viewer",label:"Viewer — read cases"},{value:"admin",label:"Administrator — change company settings"}]),active=input("","checkbox");active.checked=true;
+    m.append(field("Account ID from your identity provider",identity),field("Access role",accessRole),field("Enable access",active),button("Save workspace access",async()=>{await api("/members",{subject:required(identity,"an account ID"),role:accessRole.value,enabled:active.checked});toast("Workspace access updated.");await show("Settings");},true));
   }
 }
 async function operations() {
@@ -2156,6 +2156,8 @@ async function operations() {
     caseChecks: Row[];
   }>("/operations");
   const sections=panelTabs(content,["Status","Controls","Retention","Audit"]);
+  const actions=card("Operational activity",sections.panels.get("Status")!);
+  actions.append(el("p","Use this area only when automatic coordination needs review: unmatched messages, delivery issues, queue health, or recovery actions.","muted"),button("Unassigned messages",()=>show("Inbox")));
   const c = card("Recovery & processing controls",sections.panels.get("Controls")!);
   c.append(
     notice(
