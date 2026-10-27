@@ -1,5 +1,6 @@
 import type { CaseState } from "../../../packages/coordination/src/types.js";
 import { channelIcon, renderCommunicationNetwork, statusTone } from "./network.js";
+import { openMapPreview } from "./map-preview.js";
 export type RecordRow = Record<string, unknown>;
 export type Journey = {
   state: CaseState;
@@ -186,11 +187,11 @@ export function renderJourney(
       const d = levels.get(o.id) ?? 0;
       const row = columns.get(d) ?? 0;
       columns.set(d, row + 1);
-      positions.set(o.id, { x: 600 + d * 300, y: 35 + row * 190 });
+      positions.set(o.id, { x: 520 + d * 250, y: 28 + row * 158 });
     }
     const maxDepth = Math.max(0, ...levels.values()),
-      width = 1200 + maxDepth * 300,
-      height = Math.max(260, ...[...columns.values()].map((n) => n * 190 + 40));
+      width = 1080 + maxDepth * 250,
+      height = Math.max(240, ...[...columns.values()].map((n) => n * 158 + 32));
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -215,9 +216,9 @@ export function renderJourney(
     function edge(a: { x: number; y: number }, b: { x: number; y: number }) {
       const line = document.createElementNS(svg.namespaceURI, "path");
       const x = a.x + 250,
-        y = a.y + 70,
+        y = a.y + 64,
         x2 = b.x,
-        y2 = b.y + 70;
+        y2 = b.y + 64;
       line.setAttribute(
         "d",
         `M${x},${y} C${x + 30},${y} ${x2 - 30},${y2} ${x2},${y2}`,
@@ -315,7 +316,7 @@ export function renderJourney(
     }
     const current = data.results.find((r) => r.current === true);
     if (current) {
-      const end = { x: 900 + maxDepth * 300, y: 35 };
+      const end = { x: 790 + maxDepth * 250, y: 28 };
       box(
         "result",
         "Outcome to source",
@@ -339,20 +340,7 @@ export function renderJourney(
       full = node("button", "Actual size"),
       focus = node("button", "Focus on pending work");
     fit.dataset.fitMap="true";
-    fit.onclick = () =>
-      canvas.style.setProperty(
-        "zoom",
-        String(
-          Math.max(
-            0.4,
-            Math.min(
-              1,
-              (frame.clientWidth - 44) / width,
-              Math.max(300, Math.min(600, window.innerHeight - 300)) / height,
-            ),
-          ),
-        ),
-      );
+    fit.onclick = () => openMapPreview(canvas,"Workflow dependencies");
     full.onclick = () => canvas.style.setProperty("zoom", "1");
     focus.onclick = () => {
       canvas.classList.toggle("focus-pending");
@@ -360,9 +348,6 @@ export function renderJourney(
     };
     tools.append(fit);
     if(!options.compact)tools.append(full,focus);
-    requestAnimationFrame(() => {
-      if (canvas.isConnected) fit.click();
-    });
     meta.append(tools);
     view.append(
       node(
