@@ -187,11 +187,12 @@ export function renderJourney(
       const d = levels.get(o.id) ?? 0;
       const row = columns.get(d) ?? 0;
       columns.set(d, row + 1);
-      positions.set(o.id, { x: 314 + d * 150, y: 22 + row * 104 });
     }
     const maxDepth = Math.max(0, ...levels.values()),
-      width = Math.max(canvasWidth,480+(maxDepth+1)*150),
+      width = canvasWidth,
       height = Math.max(180, ...[...columns.values()].map((n) => n * 104 + 20));
+    const firstTaskX=314,resultX=width-nodeWidth-16,stageGap=Math.max(nodeWidth+14,(resultX-firstTaskX)/(maxDepth+2));
+    for(const o of state.obligations){const d=levels.get(o.id)??0,row=[...state.obligations].filter(candidate=>(levels.get(candidate.id)??0)===d).indexOf(o);positions.set(o.id,{x:firstTaskX+d*stageGap,y:22+row*104});}
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");

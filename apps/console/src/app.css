@@ -514,7 +514,7 @@ textarea {
   width: 132px;
   min-height: 78px;
   max-height: 78px;
-  overflow: auto;
+  overflow: hidden;
   padding: 7px;
   text-align: left;
   display: flex;
