@@ -181,17 +181,17 @@ export function renderJourney(
       return n;
     }
     for (const o of state.obligations) depth(o.id);
-    const columns = new Map<number, number>(),
+    const nodeWidth=132,nodeHeight=78,canvasWidth=Math.max(760,frame.clientWidth-4),columns = new Map<number, number>(),
       positions = new Map<string, { x: number; y: number }>();
     for (const o of state.obligations) {
       const d = levels.get(o.id) ?? 0;
       const row = columns.get(d) ?? 0;
       columns.set(d, row + 1);
-      positions.set(o.id, { x: 520 + d * 250, y: 28 + row * 158 });
+      positions.set(o.id, { x: 314 + d * 150, y: 22 + row * 104 });
     }
     const maxDepth = Math.max(0, ...levels.values()),
-      width = 1080 + maxDepth * 250,
-      height = Math.max(240, ...[...columns.values()].map((n) => n * 158 + 32));
+      width = Math.max(canvasWidth,480+(maxDepth+1)*150),
+      height = Math.max(180, ...[...columns.values()].map((n) => n * 104 + 20));
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -215,10 +215,10 @@ export function renderJourney(
     svg.append(defs);
     function edge(a: { x: number; y: number }, b: { x: number; y: number }) {
       const line = document.createElementNS(svg.namespaceURI, "path");
-      const x = a.x + 250,
-        y = a.y + 64,
+      const x = a.x + nodeWidth,
+        y = a.y + nodeHeight/2,
         x2 = b.x,
-        y2 = b.y + 64;
+        y2 = b.y + nodeHeight/2;
       line.setAttribute(
         "d",
         `M${x},${y} C${x + 30},${y} ${x2 - 30},${y2} ${x2},${y2}`,
@@ -252,8 +252,8 @@ export function renderJourney(
       b.dataset.node = id;
       canvas.append(b);
     }
-    const source = { x: 0, y: 35 },
-      hub = { x: 300, y: 35 };
+    const source = { x: 16, y: 22 },
+      hub = { x: 165, y: 22 };
     box(
       "source",
       `${words(state.subject.type)} · ${state.subject.id}`,
@@ -316,7 +316,7 @@ export function renderJourney(
     }
     const current = data.results.find((r) => r.current === true);
     if (current) {
-      const end = { x: 790 + maxDepth * 250, y: 28 };
+      const end = { x: width-nodeWidth-16, y: 22 };
       box(
         "result",
         "Outcome to source",
