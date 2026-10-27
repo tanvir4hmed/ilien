@@ -1,4 +1,5 @@
 import type { CaseState } from "../../../packages/coordination/src/types.js";
+import { channelIcon, renderCommunicationNetwork, statusTone } from "./network.js";
 export type RecordRow = Record<string, unknown>;
 export type Journey = {
   state: CaseState;
@@ -14,6 +15,8 @@ export type Journey = {
   observedAt: string;
   asOf?:string;
   nextPage?:number|null;
+  participantChannels?:{actor_id:string;channel:string}[];
+  participants?:{id:string;group:string;role:string;name?:string;capabilities?:string[];approvalScopes?:string[];enabled:boolean}[];
 };
 export const words = (value: unknown): string =>
   String(value ?? "")
@@ -51,6 +54,7 @@ export function node<K extends keyof HTMLElementTagNameMap>(
   const n = document.createElement(tag);
   n.textContent = text;
   n.className = cls;
+  if(cls.split(" ").includes("badge"))n.dataset.tone=statusTone(text.toLowerCase());
   return n;
 }
 export function object<T>(v: T | string): T {
@@ -91,7 +95,7 @@ export function renderJourney(
   host: HTMLElement,
   data: Journey,
   evidence: (id: string) => Promise<void>,
-  options: {mode?:"Workflow map"|"Communication flow"|"Activity";compact?:boolean;message?:(id:string)=>Promise<unknown>} = {},
+  options: {mode?:"Workflow map"|"Communication flow"|"Communication network"|"Activity";compact?:boolean;message?:(id:string)=>Promise<unknown>} = {},
 ) {
   host.replaceChildren();
   const selected = host.dataset.view || "Workflow map";
@@ -402,7 +406,9 @@ export function renderJourney(
         );
       for (const send of sends) {
         const s = node("button", "", "channel-step");
+        s.dataset.tone=statusTone(String(send.status));
         s.append(
+          channelIcon(String(send.channel)),
           node("strong", words(send.channel)),
           node(
             "span",
@@ -573,10 +579,11 @@ export function renderJourney(
     }
     view.append(list);
   }
-  if(options.mode){host.dataset.view=options.mode;({"Workflow map":workflow,"Communication flow":communication,Activity:timeline})[options.mode]();return;}
+  if(options.mode){host.dataset.view=options.mode;({"Workflow map":workflow,"Communication flow":communication,"Communication network":()=>renderCommunicationNetwork(view,data,evidence),Activity:timeline})[options.mode]();return;}
   const choices = [
     tab("Workflow map", workflow),
     tab("Communication flow", communication),
+    tab("Communication network",()=>renderCommunicationNetwork(view,data,evidence)),
     tab("Activity", timeline),
   ];
   const active = choices.find((b) => b.textContent === selected) ?? choices[0]!;

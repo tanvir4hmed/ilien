@@ -5,6 +5,7 @@ import { companySettings } from "./company-settings.js";
 import type {ProductConfiguration} from "../../../packages/product/src/configuration.js";
 import { WorkspaceSession, SessionError, SESSION_KEY } from "./session.js";
 import { authoredReplyText } from "../../../packages/channels/src/text.js";
+import { statusTone } from "./network.js";
 import {
   renderJourney,
   recordedRequirements,
@@ -101,6 +102,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
   const n = document.createElement(tag);
   n.textContent = text;
   n.className = className;
+  if(className.split(" ").includes("badge"))n.dataset.tone=statusTone(text.toLowerCase());
   return n;
 }
 function notice(text: string, error = false) {
@@ -670,6 +672,7 @@ async function casePage(id: string) {
   }
   const map = card("Live communication map",flowPanel),
     controls = el("div", "", "row"),
+    mapViews=el("div","","workspace-tabs map-views"),
     mapHost = el("div"),
     live = input("", "checkbox"),
     status = el("span", "Updates are off", "muted");
@@ -680,7 +683,7 @@ async function casePage(id: string) {
   const messagesHost=el("div"),historyHost=el("div");messagesPanel.append(messagesHost);historyPanel.append(historyHost);
   const draw = () => {
     const message=(messageId:string)=>api(`/cases/${id}/journey?messageId=${encodeURIComponent(messageId)}`);
-    renderJourney(mapHost,current,evidence,{mode:"Workflow map",compact:true,message});
+    renderJourney(mapHost,current,evidence,{mode:preferredJourneyView as "Workflow map"|"Communication network",compact:true,message});
     renderJourney(messagesHost,current,evidence,{mode:"Communication flow",compact:true,message});
     renderJourney(historyHost,current,evidence,{mode:"Activity",compact:true,message});
   };
@@ -738,13 +741,17 @@ async function casePage(id: string) {
     disposed = true;
     if (timer) clearTimeout(timer);
   };
+  for(const [view,title] of [["Workflow map","Dependencies"],["Communication network","Communication network"]]) {
+    const b=button(title!,()=>{preferredJourneyView=view!;for(const child of mapViews.children){child.classList.toggle("active",child===b);}draw();});
+    b.classList.toggle("active",view===preferredJourneyView);mapViews.append(b);
+  }
   controls.append(
     back,
     field("Live", live),
     status,
     button("Refresh", refresh),
   );
-  controls.classList.add("case-controls");heading.append(controls);map.append(mapHost);
+  controls.classList.add("case-controls");heading.append(controls);map.append(mapViews,mapHost);
   draw();
   historyPanel.append(evidenceHost);
   const requiredWork = state.obligations.filter(

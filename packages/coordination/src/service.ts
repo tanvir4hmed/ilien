@@ -533,6 +533,11 @@ export async function caseView(source: Source, id: string, section: string, hist
             tx,
           ),
         )[0];
+        const policy = await policyFor(source, tx);
+        const participantChannels=(policy?.actors??[])
+          .filter(actor=>actor.enabled&&actor.preferredChannel&&actor.role!=="coordinator")
+          .map(actor=>({actor_id:actor.id,channel:actor.preferredChannel!}));
+        const participants=(policy?.actors??[]).map(actor=>({id:actor.id,group:actor.group,role:actor.role,name:actor.name,capabilities:actor.capabilities,approvalScopes:actor.approvalScopes,enabled:actor.enabled}));
         const definitions: Record<string, string> = {
           contacts:
             "SELECT id,case_revision,contact,delivery_status,created_at FROM coordination_contacts WHERE case_id=CAST(:case AS uuid) ORDER BY created_at DESC,id DESC LIMIT 101",
@@ -572,6 +577,8 @@ export async function caseView(source: Source, id: string, section: string, hist
         return {
           state,
           sourceEvent,
+          participantChannels,
+          participants,
           ...records,
           truncated,
           asOf:snapshotAt,nextPage:truncated.length?historyPage+1:null,

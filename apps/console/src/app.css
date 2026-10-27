@@ -769,6 +769,31 @@ blockquote {
 .case-heading .case-controls { margin:0; padding-top:10px; }
 .case-map { padding:18px 20px; margin-top:0; }
 .case-map > h2 { margin:0 0 10px; }
+.map-views { position:static; background:transparent; margin:0; padding:0 0 8px; }
+.network-canvas .network-node { width:220px; min-height:135px; max-height:190px; border-left-color:var(--department-accent,#4a8d7c); }
+.network-node[data-tone="danger"] { border-color:#bd5145; background:#fff5f3; }
+.network-node[data-tone="waiting"] { border-color:#c08a29; background:#fffaf0; }
+.network-node[data-tone="success"] { border-color:#32845b; background:#f2fbf5; }
+.network-node[data-tone="paused"] { border-color:#79828b; background:#f4f5f6; }
+.network-node[data-tone="accepted"] { border-color:#377fa6; background:#eef8ff; }
+.network-legend,.network-channels { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+.network-legend { margin:4px 0 8px; }
+.badge[data-tone="active"] { background:#dcedff; color:#134f87; }
+.badge[data-tone="received"] { background:#e8e6fa; color:#55408c; }
+.badge[data-tone="waiting"] { background:#fff1c9; color:#795300; }
+.badge[data-tone="accepted"] { background:#dcefeb; color:#175b50; }
+.badge[data-tone="success"] { background:#d8efdf; color:#1c6335; }
+.badge[data-tone="danger"] { background:#fde1dd; color:#922f28; }
+.badge[data-tone="paused"] { background:#e8e9ee; color:#50596a; }
+.channel-step[data-tone="danger"] { background:#fff2ef; border-left-color:#b8463d; }
+.channel-step[data-tone="waiting"] { background:#fffdf4; }
+.network-channels { margin:4px 0; }
+.channel-tag { display:inline-flex; gap:4px; align-items:center; font-size:.75rem; }
+.channel-icon { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.channel-email { color:#436ba6; }.channel-whatsapp { color:#16844a; }.channel-source { color:#7657ad; }
+.network-edge { fill:none; stroke-width:2; }
+.edge-outbound { stroke:#237c70; }.edge-inbound { stroke:#397eb2; }.edge-planned { stroke:#8b9693; stroke-dasharray:7 6; }.edge-failure { stroke:#bb5749; stroke-dasharray:7 5; }
+.failure-label,.simulation-label { font-size:.75rem; color:#9a453a; }
 .case-map .journey-scroll { margin:12px 0; max-height:min(560px,55vh); }
 .case-map .journey-scroll + p { margin-bottom:0; font-size:.8rem; }
 @media (min-width:900px) {.main:has(.case-heading) .top {margin-bottom:16px;} }
