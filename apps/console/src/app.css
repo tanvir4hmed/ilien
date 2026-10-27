@@ -817,7 +817,7 @@ blockquote {
 .network-node .network-channels { position:absolute; right:9px; bottom:8px; margin:0; gap:4px; }
 .network-node .channel-tag { display:inline-flex; align-items:center; }
 .network-node .channel-tag span { display:none; }
-.network-node .channel-icon { width:18px; height:18px; flex:0 0 18px; stroke-width:1.45; stroke-linecap:round; stroke-linejoin:round; }
+.network-node .channel-icon { width:36px; height:36px; flex:0 0 36px; stroke-width:1.45; stroke-linecap:round; stroke-linejoin:round; }
 .channel-email,.channel-whatsapp,.channel-source { color:inherit; }
 .network-edge { fill:none; stroke-width:2; }
 .edge-outbound { stroke:#237c70; }.edge-inbound { stroke:#397eb2; }.edge-planned { stroke:#8b9693; stroke-dasharray:7 6; }.edge-failure { stroke:#bb5749; stroke-dasharray:7 5; }

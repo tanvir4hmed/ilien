@@ -48,7 +48,7 @@ const pageLabels: Record<string, string> = {
   Channels: "People & channels",
   Inbox: "Unassigned messages",
   Knowledge: "Reference library",
-  Operations: "Advanced operations",
+  Operations: "Operations",
   Help: "User guide",
   "Agent review": "AI suggestion",
 };
@@ -808,7 +808,7 @@ async function casePage(id: string) {
     if (o.decision) details("Decision", o.decision, c);
   }
   if (role !== "viewer" && !state.autonomous) {
-    caseActions(state, policy, id,fold("Advanced case controls",historyPanel));
+    caseActions(state, policy, id,fold("Practice response",historyPanel));
   }
   if(role!=="viewer" && state.autonomous && ["blocked","paused"].includes(state.status)){
     const recoveryHost=fold("Exception recovery",flowPanel);
@@ -962,17 +962,6 @@ async function casePage(id: string) {
       );
     }),
   );
-  if (role === "admin")
-    details(
-      "Advanced request identifiers",
-      {
-        id: state.id,
-        revision: state.revision,
-        configuration: state.configurationVersion,
-        sourceEvidenceId: state.sourceEvidenceId,
-      },
-      historyPanel,
-    );
 }
 function caseActions(state: CaseState, policy: Policy, id: string,parent:HTMLElement=content) {
   const c = card("Practice a response",parent);
@@ -1239,7 +1228,7 @@ async function runPage(id: string) {
   } else
     summary({ message: "No suggestion is ready yet.", reason: run.reason }, c);
   if (data.review) details("Review decision", data.review, c);
-  if (role === "admin") details("Advanced investigation details", data, c);
+  if (role === "admin") c.append(el("p","Technical trace, source evidence, and audit records are retained automatically. They are intentionally kept out of this decision view.","muted"));
   if (
     role !== "viewer" &&
     run.proposal_hash &&
@@ -2155,16 +2144,16 @@ async function operations() {
     retention: Row[];
     caseChecks: Row[];
   }>("/operations");
-  const sections=panelTabs(content,["Status","Controls","Retention","Audit"]);
+  const sections=panelTabs(content,["Status","History"]);
   const actions=card("Operational activity",sections.panels.get("Status")!);
   actions.append(el("p","Use this area only when automatic coordination needs review: unmatched messages, delivery issues, queue health, or recovery actions.","muted"),button("Unassigned messages",()=>show("Inbox")));
-  const c = card("Recovery & processing controls",sections.panels.get("Controls")!);
+  const c = card("Automatic safeguards",sections.panels.get("Status")!);
   c.append(
     notice(
-      "Recovery changes require an operator reason and are audited. Pausing stops new work at the next gate; in-flight provider/model calls may already have happened. Uncertain outcomes require evidence review.",
+      "ILIEN coordinates normal work without this page. When a specific case is blocked or uncertain, use that case’s Exception recovery section. Every recovery action is recorded automatically.",
     ),
   );
-  details("Current controls", data.controls, c);
+  c.append(el("p","Processing safeguards and retention rules are active. There is no routine control to operate here.","muted"));
   const queues = card("Queue health",sections.panels.get("Status")!);
   queues.append(
     button("Refresh queue counts", async () => {
@@ -2190,75 +2179,15 @@ async function operations() {
       }
     }),
   );
-  table(
-    data.work,
-    ["lane", "id", "state", "attempts", "created_at"],
-    card("Pending and interrupted work",sections.panels.get("Status")!),
-  );
-  table(
-    data.caseChecks,
-    ["case_id", "checked_revision", "status", "issues", "checked_at"],
-    card("Independent structural supervision",sections.panels.get("Status")!),
-  );
-  table(
-    data.deliveries,
-    ["id", "channel", "status", "reason", "queue_attempts"],
-    card("Delivery attention",sections.panels.get("Status")!),
-  );
-  const mutation = (title: string, body: Row) =>
-    jsonForm(c, title, "/operations", {
-      requestId: crypto.randomUUID(),
-      reason: "",
-      ...body,
-    });
-  mutation("Pause or resume processing", {
-    action: "controls",
-    expectedRevision: data.controls.revision,
-    intakePaused: data.controls.intake_paused,
-    agentPaused: data.controls.agent_paused,
-    outboundPaused: data.controls.outbound_paused,
-    resultsPaused: data.controls.results_paused,
-    retentionDays: data.controls.retention_days,
-    legalHold: data.controls.legal_hold,
-  });
-  mutation("Run bounded reconciliation", { action: "reconcile" });
-  mutation("Requeue eligible durable work", {
-    action: "requeue_work",
-    lane: "intake",
-    targetId: "",
-  });
-  mutation("Reconcile an uncertain provider send", {
-    action: "resolve_delivery",
-    targetId: "",
-    outcome: "not_sent",
-    evidenceRef: "",
-  });
-  mutation("Retry a definitively unsent delivery", {
-    action: "retry_delivery",
-    targetId: "",
-    evidenceRef: "",
-  });
-  const r = card("Retention review",sections.panels.get("Retention")!);
-  r.append(
-    el(
-      "p",
-      "Legal hold is enabled by default. No evidence is automatically deleted. This action redacts eligible finished AI traces from aged terminal cases and retains hash tombstones; it does not erase original case evidence or backups.",
-      "muted",
-    ),
-  );
-  table(data.retention, ["id", "status", "updated_at", "eligible_traces"], r);
-  jsonForm(r, "Redact eligible AI traces", "/operations", {
-    requestId: crypto.randomUUID(),
-    action: "redact_ai_traces",
-    targetId: "",
-    reason: "",
-  });
-  for (const row of data.audit)
-    details(
-      `${String(row.action)} · ${String(row.created_at)}`,
-      row,
-      card("Recovery audit",sections.panels.get("Audit")!),
-    );
+  table(data.work.map(row=>({"Work area":words(row.lane),Status:words(row.state),Attempts:row.attempts,Started:row.created_at})),["Work area","Status","Attempts","Started"],card("Pending and interrupted work",sections.panels.get("Status")!));
+  table(data.caseChecks.map(row=>({Status:words(row.status),Issues:Array.isArray(row.issues)?row.issues.length:"None",Checked:row.checked_at})),["Status","Issues","Checked"],card("Case supervision",sections.panels.get("Status")!));
+  table(data.deliveries.map(row=>({Channel:words(row.channel),Status:words(row.status),Reason:row.reason?words(row.reason):"No attention needed",Attempts:row.queue_attempts})),["Channel","Status","Reason","Attempts"],card("Delivery attention",sections.panels.get("Status")!));
+  const history=card("Recovery history",sections.panels.get("History")!);
+  history.append(el("p","This is a readable record of exceptional operator actions. Technical identifiers remain protected in the audit trail and are not needed to understand the outcome.","muted"));
+  table(data.audit.map(row=>({Action:words(row.action),When:row.created_at,Reason:row.reason??"Recorded automatically",Outcome:row.outcome?words(row.outcome):"Recorded"})),["Action","When","Reason","Outcome"],history);
+  const retention=card("Evidence retention",sections.panels.get("History")!);
+  retention.append(el("p","Original communication evidence is retained under legal hold. Routine users do not delete evidence or alter retention from the app.","muted"));
+  table(data.retention.map(row=>({Status:words(row.status),Updated:row.updated_at,"Eligible AI traces":row.eligible_traces})),["Status","Updated","Eligible AI traces"],retention);
   content.append(button("Refresh operations", () => show("Operations")));
 }
 async function boot() {
