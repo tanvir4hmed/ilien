@@ -257,8 +257,8 @@ export function renderJourney(
       hub = { x: 16+nodeWidth+32, y: height/2-nodeHeight/2 };
     box(
       "source",
-      state.origin==="simulated"?"Intelactory (simulated)":"Requesting source",
-      "Sender API",
+      state.origin==="simulated"?"Intelactory":"Requesting source",
+      state.origin==="simulated"?"Simulated source · Sender API":"Sender API",
       `${state.origin === "simulated" ? "Simulated" : "Recorded"} · ${words(data.sourceEvent?.event_type || "source event")}`,
       source,
       "received",
@@ -320,8 +320,8 @@ export function renderJourney(
       const end = { x: width-nodeWidth-16, y: height/2-nodeHeight/2 };
       box(
         "result",
-        state.origin==="simulated"?"Intelactory (simulated)":"Requesting source",
-        "Receiver API",
+        state.origin==="simulated"?"Intelactory":"Requesting source",
+        state.origin==="simulated"?"Simulated source · Receiver API":"Receiver API",
         current.acknowledgement
           ? `Source ${words(current.acknowledgement)}`
           : `Delivery: ${words(current.dispatch_state || "not recorded")}`,
