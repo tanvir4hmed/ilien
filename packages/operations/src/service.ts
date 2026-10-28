@@ -6,11 +6,13 @@ import {
   rows,
   transaction,
 } from "../../persistence/src/database.js";
-import type { Source } from "../../coordination/src/service.js";
+import {getCase,policyFor,applyCommand,type Source} from "../../coordination/src/service.js";
 import { CoordinationError } from "../../coordination/src/types.js";
 import { controlsFor } from "./controls.js";
 const base = { requestId: z.uuid(), reason: z.string().min(10).max(1000) };
 export const requestSchema = z.discriminatedUnion("action", [
+  z.strictObject({...base,action:z.literal('delete_case'),targetId:z.uuid()}),
+  z.strictObject({...base,action:z.literal('restore_case'),targetId:z.uuid()}),
   z.strictObject({ ...base, action: z.literal("reconcile") }),
   z.strictObject({
     ...base,
@@ -162,7 +164,22 @@ export async function operationsWrite(
         ["requeue_work", "retry_delivery"].includes(request.action)
       )
         fail("manual_recovery_budget_exhausted");
-      if (request.action === "requeue_work") {
+      if(request.action==='delete_case'){
+        const state=await getCase(source,target,tx,true);
+        if(state.origin!=='simulated')fail('simulated_case_required');
+        if(!['completed','cancelled','handed_off'].includes(state.status)){
+          const policy=await policyFor(source,tx),coordinator=policy?.actors.find(a=>a.enabled&&a.role==='coordinator');
+          if(!coordinator)fail('coordinator_required');
+          await applyCommand(source,target,JSON.stringify({commandId:request.requestId,expectedRevision:state.revision,actorId:coordinator!.id,operation:{type:'cancel',reason:request.reason}}),tx);
+        }
+        await query("UPDATE result_dispatches SET state='superseded' WHERE case_id=CAST(:target AS uuid) AND connection_id=CAST(:source AS uuid) AND state='pending'",p,tx);
+        await query("UPDATE channel_deliveries SET status='blocked',reason='case_removed' WHERE case_id=CAST(:target AS uuid) AND connection_id=CAST(:source AS uuid) AND status='pending'",p,tx);
+        detail={caseId:target,removed:true,recoverable:true,evidenceRetained:true};
+      }else if(request.action==='restore_case'){
+        const exists=rows<{id:string;status:string}>(await query("SELECT id,status FROM coordination_cases WHERE id=CAST(:target AS uuid) AND connection_id=CAST(:source AS uuid)",p,tx))[0];
+        if(!exists)fail('case_not_found');
+        detail={caseId:target,removed:false,status:exists!.status};
+      }else if (request.action === "requeue_work") {
         const sql =
           request.lane === "intake"
             ? "UPDATE outbox_jobs j SET state='pending',attempts=0,lease_until=NULL,lease_token=NULL WHERE j.id=CAST(:target AS uuid) AND EXISTS(SELECT 1 FROM inbox_events i WHERE i.tenant_id=j.tenant_id AND i.id=j.inbox_id AND i.connection_id=CAST(:source AS uuid)) AND (j.state='exhausted' OR (j.state='dispatched' AND coalesce(j.dispatched_at,j.created_at)<now()-interval '20 minutes') OR (j.state='leased' AND j.lease_until<now())) RETURNING j.id"

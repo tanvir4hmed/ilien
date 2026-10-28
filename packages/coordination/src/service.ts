@@ -21,6 +21,7 @@ import {
 } from "./types.js";
 import { createDelivery } from "../../channels/src/intents.js";
 import { contactBindings } from "../../channels/src/routing.js";
+import {caseVisibleSql} from './visibility.js';
 import { enqueueAutonomousCase } from "../../ai/src/store.js";
 export type Source = { tenant_id: string; id: string; origin: string };
 const digest = (raw: string) => createHash("sha256").update(raw).digest("hex");
@@ -89,7 +90,7 @@ export async function getCase(
 ): Promise<CaseState> {
   const record = rows<{ snapshot: CaseState | string }>(
     await query(
-      `SELECT snapshot FROM coordination_cases WHERE id=CAST(:case AS uuid) AND connection_id=CAST(:source AS uuid)${lock ? " FOR UPDATE" : ""}`,
+      `SELECT c.snapshot FROM coordination_cases c WHERE c.id=CAST(:case AS uuid) AND c.connection_id=CAST(:source AS uuid) AND ${caseVisibleSql('c')}${lock ? " FOR UPDATE" : ""}`,
       [param("case", id), param("source", source.id)],
       tx,
     ),
@@ -499,7 +500,7 @@ export async function listCases(source: Source) {
   return transaction(source.tenant_id, async (tx) =>
     rows(
       await query(
-        "SELECT id,inbox_id,workflow,revision,status,updated_at,snapshot->>'goal' AS goal,snapshot->'subject' AS subject,snapshot->>'deadline' AS deadline,snapshot->>'origin' AS origin FROM coordination_cases WHERE connection_id=CAST(:source AS uuid) ORDER BY updated_at DESC LIMIT 50",
+        `SELECT c.id,c.inbox_id,c.workflow,c.revision,c.status,c.updated_at,c.snapshot->>'goal' AS goal,c.snapshot->'subject' AS subject,c.snapshot->>'deadline' AS deadline,c.snapshot->>'origin' AS origin FROM coordination_cases c WHERE c.connection_id=CAST(:source AS uuid) AND ${caseVisibleSql('c')} ORDER BY c.updated_at DESC LIMIT 50`,
         [param("source", source.id)],
         tx,
       ),

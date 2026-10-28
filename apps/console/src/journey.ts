@@ -1,6 +1,7 @@
 import type { CaseState } from "../../../packages/coordination/src/types.js";
 import { channelIcon, renderCommunicationNetwork, statusTone } from "./network.js";
 import { openMapPreview } from "./map-preview.js";
+import {taskMapStatus,taskSends,attempted,publishedFinalResult} from './map-state.js';
 export type RecordRow = Record<string, unknown>;
 export type Journey = {
   state: CaseState;
@@ -113,7 +114,7 @@ export function renderJourney(
     meta,
     node(
       "p",
-      `Updated ${date(data.observedAt)} · Recorded work only. Select a step for details.`,
+      `Updated ${date(data.observedAt)} · ${options.mode==='Workflow map'?'Planned dependencies and live task states.':'Recorded communication activity.'} Select a step for details.`,
       "muted",
     ),
     view,
@@ -138,7 +139,9 @@ export function renderJourney(
   };
   const inspectTask=(id:string)=>{
     const o=data.state.obligations.find(o=>o.id===id)!;
-    show(o.question,{owner:o.assignee,status:o.skipped?"not applicable":o.status,skipReason:o.skipped?.reason,satisfiedFrom:o.satisfiedFrom,waitingFor:o.dependencies.filter(id=>!data.state.obligations.some(d=>d.id===id&&(d.skipped||["accepted","verified"].includes(d.status)))),conflicts:o.conflicts,requiredFacts:o.requiredFacts,reply:o.reply,proposal:o.proposal,decision:o.decision,nextContactAt:o.nextContactAt,responseDeadline:data.state.deadline,businessDeadline:data.state.businessDeadline},o.reply?.evidenceId);
+    const creation=data.journal.find(j=>j.action==='add_child'&&j.obligation_id===id);
+    const lifecycle={created:creation?'Added during coordination':'Included in the intake work plan',createdAt:creation?.created_at??data.state.createdAt,required:!o.optional,displayStatus:taskMapStatus(data,o)};
+    show(o.question,{...lifecycle,owner:o.assignee,status:o.skipped?"not applicable":o.status,skipReason:o.skipped?.reason,satisfiedFrom:o.satisfiedFrom,waitingFor:o.dependencies.filter(id=>!data.state.obligations.some(d=>d.id===id&&(d.skipped||["accepted","verified"].includes(d.status)))),conflicts:o.conflicts,requiredFacts:o.requiredFacts,reply:o.reply,proposal:o.proposal,decision:o.decision,nextContactAt:o.nextContactAt,responseDeadline:data.state.deadline,businessDeadline:data.state.businessDeadline},o.reply?.evidenceId);
     for(const d of data.deliveries.filter(d=>d.obligation_id===id)){
       const b=node("button",`${words(d.channel)} · ${words(d.status)} · ${date(d.created_at)}${d.reason?` · ${words(d.reason)}`:""}`);
       b.onclick=async()=>{show("Outgoing message",d);if(options.message){try{show("Full outgoing message",await options.message(String(d.id)));}catch(e){show("Message unavailable",String(e));}}};inspector.append(b);
@@ -181,7 +184,8 @@ export function renderJourney(
       return n;
     }
     for (const o of state.obligations) depth(o.id);
-    const nodeWidth=132,nodeHeight=78,columns = new Map<number, number>(),
+    canvas.classList.add('dependency-canvas');
+    const nodeWidth=176,nodeHeight=112,stageGap=nodeWidth+44,firstTaskX=16+2*stageGap,current=publishedFinalResult(data),columns = new Map<number, number>(),
       positions = new Map<string, { x: number; y: number }>();
     for (const o of state.obligations) {
       const d = levels.get(o.id) ?? 0;
@@ -189,10 +193,9 @@ export function renderJourney(
       columns.set(d, row + 1);
     }
     const maxDepth = Math.max(0, ...levels.values()),
-      width = 32+(maxDepth+4)*nodeWidth+(maxDepth+2)*32+80,
-      height = Math.max(180, ...[...columns.values()].map((n) => n * 104 + 20));
-    const firstTaskX=16+2*(nodeWidth+32),stageGap=nodeWidth+32;
-    for(const o of state.obligations){const d=levels.get(o.id)??0,row=[...state.obligations].filter(candidate=>(levels.get(candidate.id)??0)===d).indexOf(o);positions.set(o.id,{x:firstTaskX+d*stageGap,y:(height-((columns.get(d)??1)-1)*104-nodeHeight)/2+row*104});}
+      width = firstTaskX+maxDepth*stageGap+nodeWidth+16+(current?nodeWidth+110:0),
+      height = Math.max(200, ...[...columns.values()].map((n) => n * 146 + 20));
+    for(const o of state.obligations){const d=levels.get(o.id)??0,row=[...state.obligations].filter(candidate=>(levels.get(candidate.id)??0)===d).indexOf(o);positions.set(o.id,{x:firstTaskX+d*stageGap,y:(height-((columns.get(d)??1)-1)*146-nodeHeight)/2+row*146});}
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -214,7 +217,7 @@ export function renderJourney(
     marker.append(tip);
     defs.append(marker);
     svg.append(defs);
-    function edge(a: { x: number; y: number }, b: { x: number; y: number }) {
+    function edge(a: { x: number; y: number }, b: { x: number; y: number },planned=false) {
       const line = document.createElementNS(svg.namespaceURI, "path");
       const x = a.x + nodeWidth,
         y = a.y + nodeHeight/2,
@@ -227,6 +230,7 @@ export function renderJourney(
       line.setAttribute("fill", "none");
       line.setAttribute("stroke", "#79979b");
       line.setAttribute("stroke-width", "2");
+      if(planned)line.setAttribute('stroke-dasharray','6 5');
       line.setAttribute("marker-end", "url(#journey-arrow)");
       svg.append(line);
     }
@@ -241,6 +245,7 @@ export function renderJourney(
     ) {
       const b = node("button", "", "journey-node");
       b.dataset.status = status;
+      b.dataset.tone=statusTone(status);
       b.style.left = `${pos.x}px`;
       b.style.top = `${pos.y}px`;
       b.append(
@@ -254,7 +259,7 @@ export function renderJourney(
       canvas.append(b);
     }
     const source = { x: 16, y: height/2-nodeHeight/2 },
-      hub = { x: 16+nodeWidth+32, y: height/2-nodeHeight/2 };
+      hub = { x: 16+stageGap, y: height/2-nodeHeight/2 };
     box(
       "source",
       state.origin==="simulated"?"Intelactory":"Requesting source",
@@ -293,29 +298,29 @@ export function renderJourney(
     edge(source, hub);
     for (const o of state.obligations) {
       const pos = positions.get(o.id)!;
+      const planned=!taskSends(data,o.id).some(attempted),status=taskMapStatus(data,o);
       for (const dep of o.dependencies) {
         const from = positions.get(dep);
-        if (from) edge(from, pos);
+        if (from) edge(from, pos,planned);
       }
-      if (!o.dependencies.length) edge(hub, pos);
+      if (!o.dependencies.length) edge(hub, pos,planned);
       const channels = [
         ...new Set(
-          data.deliveries
-            .filter((d) => d.obligation_id === o.id)
+          taskSends(data,o.id)
+            .filter(attempted)
             .map((d) => `${words(d.channel)}${["blocked","uncertain"].includes(String(d.status)) ? ` · ${words(d.status)}` : ""}`),
         ),
       ];
       box(
         o.id,
         words(o.group),
-        channels.join(" / ") || "No channel send recorded",
+        `${o.optional?'Optional':'Required'} · ${channels.join(" / ") || 'Planned'}`,
         o.question,
         pos,
-        o.skipped ? "not applicable" : o.satisfiedFrom ? "evidence reused" : ["accepted","verified","blocked","disputed"].includes(o.status)?o.status:o.dependencies.some(id=>!state.obligations.some(d=>d.id===id&&(d.skipped||["accepted","verified"].includes(d.status))))?"waiting for prerequisites":"awaiting answer",
+        status,
         () => inspectTask(o.id),
       );
     }
-    const current = data.results.find((r) => r.current === true);
     if (current) {
       const end = { x: width-nodeWidth-16, y: height/2-nodeHeight/2 };
       box(
@@ -326,7 +331,7 @@ export function renderJourney(
           ? `Source ${words(current.acknowledgement)}`
           : `Delivery: ${words(current.dispatch_state || "not recorded")}`,
         end,
-        state.status==="completed"?"completed":current.dispatch_state==="published"?"progress report sent":"report pending",
+        current.acknowledgement==='accepted'?'received':'published',
         () =>
           show("Outcome", {
             outcome: object(current.result),
@@ -334,7 +339,7 @@ export function renderJourney(
             acknowledgement: current.acknowledgement,
           }),
       );
-      for (const o of state.obligations) edge(positions.get(o.id)!, end);
+      for (const o of state.obligations.filter(o=>!o.optional&&!o.skipped)) edge(positions.get(o.id)!, end);
     }
     const tools = node("div", "", "map-tools");
     const fit = node("button", "Fit map to screen"),
@@ -353,7 +358,7 @@ export function renderJourney(
     view.append(
       node(
         "p",
-        "Arrows show prerequisites → dependent work. Accepted means the configured responsible-person rule was met; verified means an independent check. Provider acceptance is not confirmed delivery.",
+        "This is the work plan. Grey tasks and dashed dependencies have not started; they do not imply messages were sent. New prerequisites appear when recorded. Required and optional work are separate. Communication network shows actual channel attempts.",
         "muted",
       ),
     );

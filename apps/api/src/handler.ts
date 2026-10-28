@@ -5,6 +5,7 @@ import type {
 import { createHash, randomUUID } from "node:crypto";
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import { sourceEventSchema } from "../../../packages/contracts/src/validation.js";
+import {caseVisibleSql} from '../../../packages/coordination/src/visibility.js';
 import {
   param,
   query,
@@ -391,7 +392,7 @@ export async function handler(
     ) {
       const items = await transaction(source.tenant_id, (tx) =>
         query(
-          "SELECT i.id,i.external_id,i.event_type,i.status,i.disposition,i.received_at,c.id AS case_id,c.status AS case_status FROM inbox_events i LEFT JOIN LATERAL (SELECT id,status FROM coordination_cases WHERE inbox_id=i.id AND connection_id=i.connection_id ORDER BY updated_at DESC LIMIT 1) c ON true WHERE i.connection_id=CAST(:connection AS uuid) ORDER BY i.received_at DESC LIMIT 50",
+          `SELECT i.id,i.external_id,i.event_type,i.status,i.disposition,i.received_at,c.id AS case_id,c.status AS case_status FROM inbox_events i LEFT JOIN LATERAL (SELECT id,status FROM coordination_cases WHERE inbox_id=i.id AND connection_id=i.connection_id ORDER BY updated_at DESC LIMIT 1) c ON true WHERE i.connection_id=CAST(:connection AS uuid) AND NOT EXISTS(SELECT 1 FROM coordination_cases removed WHERE removed.inbox_id=i.id AND removed.connection_id=i.connection_id AND NOT (${caseVisibleSql('removed')})) ORDER BY i.received_at DESC LIMIT 50`,
           [param("connection", source.id)],
           tx,
         ),

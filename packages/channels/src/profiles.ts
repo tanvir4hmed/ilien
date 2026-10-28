@@ -33,7 +33,7 @@ export function renderProfile(d: Delivery, profile: MessageProfile): string {
   return [`ILIEN ${d.token}`,salutation,`Department: ${d.request.department ?? d.request.profile?.group ?? d.actor_id} / Responsible role: ${d.actor_id}`,d.request.contact.question,
     `${bn?"রেফারেন্স":"Reference"}: ${d.request.subject.id} / ${d.request.subject.revision}`,
     meaningText(d,profile),
-    ...(d.request.demo ? ["DEMO: this endpoint represents a configured participant role; it is not independent employee identity."] : []),
+    ...(d.request.demo ? ["The registered recipient represents the named department for this simulated source."] : []),
     `${bn?"উত্তরের সময়সীমা":"Response deadline"}: ${d.request.deadline}`,
     bn?"এই message-এর reply দিন। পরিমাণ, unit, সময় এবং অনিশ্চয়তা অক্ষুণ্ণ রাখুন।":"Reply directly in your own words. Preserve quantities, units, timing and uncertainty.",
     d.request.contact.kind==="decision_notice" ? "This relays the referenced authorized decision; it grants no additional authority." : "This requests information or a decision and grants no operational permission.",
