@@ -26,6 +26,11 @@ import { projectProviderEvents } from "./events.js";
 import { renderProfile } from "./profiles.js";
 const social = new SocialMessagingClient({ maxAttempts: 1 });
 const email = new SESv2Client({ maxAttempts: 1 });
+const escapeHtml=(text:string)=>text.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]!);
+export function emailPresentation(d:Delivery,body:string) {
+ const department=d.request.department ?? d.request.profile?.group ?? d.actor_id;
+ return {subject:`ILIEN · ${department} · ${d.request.subject.id}`,html:`<!doctype html><html><body style="font-family:Arial,sans-serif;color:#173139"><h1 style="font-size:24px;font-weight:700">Department: ${escapeHtml(department)}</h1><p>Responsible role: ${escapeHtml(d.actor_id)}</p><div style="white-space:pre-wrap;line-height:1.5">${escapeHtml(body)}</div></body></html>`};
+}
 
 export function render(d: Delivery) {
   if(d.request.profile) return renderProfile(d,d.request.profile);
@@ -225,10 +230,10 @@ export async function sendDelivery(tenant: string, id: string) {
           Content: {
             Simple: {
               Subject: {
-                Data: "ILIEN: coordination request",
+                Data: emailPresentation(d,body).subject,
                 Charset: "UTF-8",
               },
-              Body: { Text: { Data: body, Charset: "UTF-8" } },
+              Body: { Text: { Data: body, Charset: "UTF-8" }, Html: {Data:emailPresentation(d,body).html,Charset:"UTF-8"} },
             },
           },
         }),
