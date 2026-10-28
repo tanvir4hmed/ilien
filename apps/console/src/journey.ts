@@ -563,11 +563,11 @@ export function renderJourney(
     }
     view.append(list);
   }
-  if(options.mode){host.dataset.view=options.mode;({"Workflow map":workflow,"Communication flow":communication,"Communication network":()=>renderCommunicationNetwork(view,data,evidence),Activity:timeline})[options.mode]();return;}
+  if(options.mode){host.dataset.view=options.mode;({"Workflow map":workflow,"Communication flow":communication,"Communication network":()=>renderCommunicationNetwork(view,data,evidence,meta),Activity:timeline})[options.mode]();return;}
   const choices = [
     tab("Workflow map", workflow),
     tab("Communication flow", communication),
-    tab("Communication network",()=>renderCommunicationNetwork(view,data,evidence)),
+    tab("Communication network",()=>renderCommunicationNetwork(view,data,evidence,meta)),
     tab("Activity", timeline),
   ];
   const active = choices.find((b) => b.textContent === selected) ?? choices[0]!;
