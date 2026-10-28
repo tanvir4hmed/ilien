@@ -1,11 +1,34 @@
-# Submission deliverables
+# Hackathon submission guide
 
-This file tracks deliverable readiness; it is not evidence that submission is complete.
+ILIEN is an evidence-preserving coordination service for textile operations. It uses Amazon SES and AWS End User Messaging Social (WhatsApp) as conversational channels, with Amazon Bedrock Runtime for bounded coordination proposals.
 
-Required before evaluation: runnable source and assets; reproducible instructions; actual qualifying AWS CDS SDK calls at runtime; deployed AI functionality; architecture documentation; English submission materials; public demonstration video; and required evaluator access. Public repositories must include an open-source license. Incorporated pre-existing work must be disclosed truthfully.
+## Required repository materials
 
-Current contents: intake, deterministic coordination, channel adapters and bounded autonomous/review AI source, versioned contracts, synthetic catalogue, Terraform infrastructure, GitHub delivery workflow, documentation and MIT license. Targeted real SES traffic, bounded Bedrock behavior and a communication-only source handback are recorded in [acceptance evidence](ACCEPTANCE.md). WhatsApp outbound remains externally blocked; broader evaluation, final rules review and owner-managed video/submission remain pending. This evidence alone does not certify submission eligibility or completeness.
+- [Architecture diagram](architecture.svg)
+- [Coordination flow](coordination-flow.svg)
+- Submission narrative — maintained outside the repository so it can be copied into Devpost without becoming a software deliverable
+- [MIT License](../LICENSE)
 
-Private working notes, credentials and customer information are excluded. Their exclusion must not remove source, configuration examples or instructions needed to run the submitted project.
+## Devpost fields
 
-Review the [official rules](https://aws-cds-partner.devpost.com/rules), [FAQ](https://aws-cds-partner.devpost.com/details/faq), and [resources](https://aws-cds-partner.devpost.com/resources) before submission. Checked 20 October 2026. The rules require a net-new ACE opportunity with the exact hackathon campaign code and a public approximately three-minute YouTube/Vimeo video; these owner-managed submission actions remain open. The working account has SES production access disabled and the linked WhatsApp account currently returns Meta 131031, so the successful real SES exchange is the only fully verified outbound/reply channel in the current acceptance evidence. See [acceptance evidence](ACCEPTANCE.md) for limits; do not describe the WhatsApp attempt as delivered.
+| Field | Submission content |
+|---|---|
+| Project name | ILIEN — Evidence-Preserving Textile Coordination |
+| Tagline | Evidence-bound omnichannel coordination for textile production exceptions. |
+| Description | Use the Problem, Solution, What it does, and How it works sections of the submission narrative. |
+| Built with | AWS Lambda, Amazon SQS, Amazon Aurora, Amazon Bedrock Runtime, Amazon SES, AWS End User Messaging Social, Amazon SNS, Amazon S3, AWS Secrets Manager, TypeScript. |
+| Repository | GitHub repository URL. |
+| Architecture | `docs/architecture.svg` |
+| Demo video | Public YouTube or Vimeo URL, approximately three minutes. |
+| Test/deployment instructions | Repository README. |
+| ACE opportunity | Add the net-new Partner Central ACE Opportunity ID. |
+| WhatsApp prize | State that AWS End User Messaging Social sends and receives WhatsApp Business communication within the evidence-bound case flow. |
+
+## Release checklist
+
+1. Confirm the public repository shows the `LICENSE` file.
+2. Confirm the deployed console URL and judge test instructions work without paid access.
+3. Confirm the demo video shows a live case, a channel message, reply evidence, blocked/uncertain behavior, and final source outcome.
+4. Create or verify the ACE opportunity and campaign code: `AWS CDS Agentic AI Hackathon -Sept. 2026`.
+5. Use the actual deployed URL, repository URL, video URL, and ACE ID in Devpost; do not invent values in source files.
+

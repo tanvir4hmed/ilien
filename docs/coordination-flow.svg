@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="520" viewBox="0 0 1600 520" role="img" aria-labelledby="title desc">
+  <title id="title">ILIEN coordination flow</title><desc id="desc">A source request becomes an evidence-bound case, then authorized channel communication, reply evaluation, dependency routing, and a scoped source outcome.</desc>
+  <defs><style>text{font-family:Arial,sans-serif;fill:#102a43}.title{font-size:29px;font-weight:700}.label{font-size:18px;font-weight:700}.small{font-size:14px;fill:#486581}.box{fill:#fff;stroke:#2f855a;stroke-width:2}.warn{fill:#fffaf0;stroke:#c08a29;stroke-width:2}.block{fill:#fff5f3;stroke:#bd5145;stroke-width:2}.line{stroke:#627d98;stroke-width:3;fill:none;marker-end:url(#a)}</style><marker id="a" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0 0L10 5 0 10z" fill="#627d98"/></marker></defs>
+  <rect width="1600" height="520" fill="#f8fbfd"/><text x="70" y="68" class="title">ILIEN coordination flow</text>
+  <g><rect x="70" y="190" width="180" height="110" rx="14" class="box"/><text x="98" y="230" class="label">1. Intake</text><text x="98" y="257" class="small">retain original request</text></g>
+  <g><rect x="330" y="190" width="190" height="110" rx="14" class="box"/><text x="357" y="230" class="label">2. Case graph</text><text x="357" y="257" class="small">requirements &amp; dependencies</text></g>
+  <g><rect x="600" y="190" width="190" height="110" rx="14" class="box"/><text x="627" y="230" class="label">3. Handoff gate</text><text x="627" y="257" class="small">facts, holds, scope</text></g>
+  <g><rect x="870" y="190" width="190" height="110" rx="14" class="box"/><text x="897" y="230" class="label">4. Channel</text><text x="897" y="257" class="small">SES email / WhatsApp</text></g>
+  <g><rect x="1140" y="190" width="190" height="110" rx="14" class="box"/><text x="1167" y="230" class="label">5. Evidence</text><text x="1167" y="257" class="small">reply is evaluated</text></g>
+  <g><rect x="1370" y="190" width="170" height="110" rx="14" class="box"/><text x="1397" y="230" class="label">6. Outcome</text><text x="1397" y="257" class="small">scoped source reply</text></g>
+  <path d="M250 245H330M520 245H600M790 245H870M1060 245H1140M1330 245H1370" class="line"/>
+  <rect x="850" y="370" width="230" height="85" rx="14" class="warn"/><text x="878" y="405" class="label">Missing information?</text><text x="878" y="431" class="small">ask precisely; retain valid facts</text><path d="M1235 300C1235 390 1080 390 1080 412" class="line"/>
+  <rect x="510" y="370" width="230" height="85" rx="14" class="block"/><text x="538" y="405" class="label">Blocked or uncertain?</text><text x="538" y="431" class="small">preserve state; no false completion</text><path d="M695 300C695 360 650 360 650 370" class="line"/>
+</svg>
