@@ -30,7 +30,7 @@ export function renderProfile(d: Delivery, profile: MessageProfile): string {
   }
   const bn=profile.language === "bn";
   const salutation=profile.style === "formal" ? (bn?"সম্মানিত দায়িত্বপ্রাপ্ত,":"Dear responsible colleague,") : "";
-  return [`ILIEN ${d.token}`,salutation,d.request.contact.question,
+  return [`ILIEN ${d.token}`,salutation,`Department: ${d.request.department ?? d.request.profile?.group ?? d.actor_id} / Responsible role: ${d.actor_id}`,d.request.contact.question,
     `${bn?"রেফারেন্স":"Reference"}: ${d.request.subject.id} / ${d.request.subject.revision}`,
     meaningText(d,profile),
     ...(d.request.demo ? ["DEMO: this endpoint represents a configured participant role; it is not independent employee identity."] : []),
