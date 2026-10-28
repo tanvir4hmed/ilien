@@ -1412,7 +1412,7 @@ async function reviewIncoming(r: Row) {
 function formFields(
   seed: Row,
   parent: HTMLElement,
-  settings: { hidden?: string[]; choices?: Record<string, string[]> } = {},
+  settings: { hidden?: string[]; choices?: Record<string, string[]>; blank?: boolean } = {},
 ) {
   const readers: Record<string, () => unknown> = {};
   const labels: Record<string, string> = {
@@ -1628,6 +1628,14 @@ function formFields(
         return text;
       };
     }
+    if(settings.blank && typeof value!=="boolean") {
+      if(n instanceof HTMLSelectElement) {
+        const prompt=el("option","Choose an option");prompt.value="";n.prepend(prompt);
+        const readChoice=readers[key]!;
+        readers[key]=()=>{if(!n.value)throw new Error(`Please choose ${labels[key] ?? label(key)}.`);return readChoice();};
+      } else if(n.type!=="datetime-local") n.placeholder=Array.isArray(value)?value.join("\n"):`For example: ${String(value ?? "")}`;
+      n.value="";
+    }
     parent.append(field(labels[key] ?? label(key), n));
   }
   return () =>
@@ -1678,16 +1686,20 @@ async function simulator() {
   const fields = el("div"),
     feedback = el("div");
   let custom = false;
+  let loadSequence = 0, loaded = false;
   let event: Row = {},
     read = () => ({}) as Row;
   async function load(value: string) {
+    const sequence=++loadSequence;
+    loaded=false;
+    fields.replaceChildren(el("p","Loading request fields…","muted"));
     feedback.replaceChildren();
     const selected = catalog.find((c) => c.eventType === value);
     const url = selected
       ? `/fixtures/${encodeURIComponent(selected.fixture)}`
       : `/examples/${value}.event.json`;
     custom = value === "custom";
-    event = custom
+    const nextEvent:Row = custom
       ? {
           contractVersion: "1.0",
           eventId: crypto.randomUUID(),
@@ -1702,6 +1714,8 @@ async function simulator() {
           },
         }
       : await fetch(url).then((r) => r.json());
+    if(sequence!==loadSequence)return;
+    event=nextEvent;
     event.eventId = crypto.randomUUID();
     event.occurredAt = new Date().toISOString();
     const payload = event.payload as Row;
@@ -1711,6 +1725,7 @@ async function simulator() {
     read =
       scenarioFields(event, fields) ??
       formFields(event, fields, {
+        blank:true,
         hidden: [
           "eventId",
           "occurredAt",
@@ -1720,6 +1735,7 @@ async function simulator() {
           ...(custom ? [] : ["eventType"]),
         ],
       });
+    loaded=true;
   }
   choice.onchange = () =>
     void load(choice.value).catch((e) => toast(String(e)));
@@ -1764,6 +1780,7 @@ async function simulator() {
       button(
         "Start request & open map",
         async () => {
+          if(!loaded)throw new Error("Wait for the selected request fields to finish loading.");
           const original = read();
           const result = await api<Row>("/events", original);
           feedback.replaceChildren(
@@ -1780,6 +1797,7 @@ async function simulator() {
           read =
             scenarioFields(event, fields) ??
             formFields(event, fields, {
+              blank:true,
               hidden: [
                 "eventId",
                 "occurredAt",

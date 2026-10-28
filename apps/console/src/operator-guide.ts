@@ -8,16 +8,17 @@ export function scenarioFields(
     host.replaceChildren();
     const draft=structuredClone(event), payload=draft.payload as Row, subject=draft.subject as Row;
     const wrap=node("section","","scenario-fields");host.append(wrap);
-    const ref=node("input");ref.value=String(subject.id ?? "REQ-001");
-    const request=node("textarea");request.value=String(payload.summary ?? "");request.rows=4;
+    const ref=node("input");ref.placeholder="For example: PO-ILN-2048";
+    const request=node("textarea");request.placeholder="Describe the issue and the outcome ILIEN should obtain.";request.rows=4;
     const group=node("select"),kind=node("select"),proposal=node("textarea");
     for(const [value,label] of [["stores","Stores"],["quality","Quality"],["planning","Planning"],["production","Production"],["procurement","Procurement"],["supplier","Supplier"]]) {const o=node("option",label);o.value=value!;group.append(o);}
     for(const [value,label] of [["fact","Information"],["evidence","Evidence or validation"],["decision","Business approval"],["acknowledgement","Acknowledgement"],["commitment","Commitment or timeline"],["completion","Completion tracking"]]) {const o=node("option",label);o.value=value!;kind.append(o);}
-    group.value=String(payload.group);kind.value=String(payload.kind);proposal.value=String(payload.proposal ?? "");
+    for(const select of [group,kind]) {const prompt=node("option","Choose an option");prompt.value="";select.prepend(prompt);select.value="";}
+    proposal.placeholder="Enter the exact terms that require approval.";
     const field=(title:string,input:HTMLElement)=>{const l=node("label",title);l.append(input);wrap.append(l);};
     wrap.append(node("h3","Describe a communication request"),node("p","The team is an initial routing hint. ILIEN analyses the request and may clarify or correct the route within configured permissions.","muted"));
     field("Request reference",ref);field("What should ILIEN coordinate?",request);field("Initial responsible team",group);field("Response needed",kind);field("Exact proposal, when requesting approval",proposal);
-    return ()=>{if(!ref.value.trim() || !request.value.trim())throw new Error("Enter a reference and a request.");if(kind.value==="decision" && !proposal.value.trim())throw new Error("Enter the exact proposal to approve.");subject.id=ref.value.trim();draft.correlationId=ref.value.trim();payload.summary=request.value.trim();payload.group=group.value;payload.kind=kind.value;if(kind.value==="decision")payload.proposal=proposal.value.trim();else delete payload.proposal;return draft;};
+    return ()=>{if(!ref.value.trim() || !request.value.trim())throw new Error("Enter a reference and a request.");if(!group.value||!kind.value)throw new Error("Choose a responsible team and the response needed.");if(kind.value==="decision" && !proposal.value.trim())throw new Error("Enter the exact proposal to approve.");subject.id=ref.value.trim();draft.correlationId=ref.value.trim();payload.summary=request.value.trim();payload.group=group.value;payload.kind=kind.value;if(kind.value==="decision")payload.proposal=proposal.value.trim();else delete payload.proposal;return draft;};
   }
   const subject = event.subject as Row,
     payload = event.payload as Row;
@@ -73,7 +74,8 @@ export function scenarioFields(
       help = node("small", hint, "muted");
     input.type = type;
     input.required = true;
-    input.value = String(value ?? "");
+    input.value = "";
+    if(type!=="datetime-local")input.placeholder = `For example: ${String(value ?? "")}`;
     label.append(input, help);
     group.append(label);
     readers.push(() => {
