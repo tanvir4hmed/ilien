@@ -18,6 +18,7 @@ import { resolveActor, satisfied, transition } from "../../coordination/src/engi
 import { CoordinationError } from "../../coordination/src/types.js";
 import {
   contactCurrent,
+  bindingMatches,
   type Delivery,
   type Binding,
 } from "../../channels/src/intents.js";
@@ -42,6 +43,7 @@ import { autonomousGate } from "./autonomy.js";
 import { caseHeld } from "../../operations/src/supervision.js";
 import type { Operation } from "../../coordination/src/types.js";
 import { configurationFor } from "../../product/src/configuration.js";
+import { contactBindings } from "../../channels/src/routing.js";
 function fail(s: string): never {
   throw new CoordinationError(s);
 }
@@ -172,6 +174,7 @@ export async function buildContext(
     (a) => a.enabled && a.role === "coordinator",
   );
   if (!actor) fail("ai_coordinator_unavailable");
+  const product=(await configurationFor(source.id,tx)).configuration;
   const context: Context = {
     executionMode: cfg.execution_mode,
     state,
@@ -180,9 +183,10 @@ export async function buildContext(
     actorId: actor.id,
     evidence: [],
     knowledge: [],
-    participantProfiles: ((await configurationFor(source.id,tx)).configuration.messageProfiles ?? []).map(({group,channel,language,style,format,factKeys})=>({group,channel,language,style,format,factKeys})),
+    participantProfiles: (product.messageProfiles ?? []).map(({group,channel,language,style,format,factKeys})=>({group,channel,language,style,format,factKeys})),
   };
-  context.channelOptions=rows<{actor_id:string;channel:string;priority:number;last_inbound_at?:string}>(await query("SELECT actor_id,channel,priority,last_inbound_at FROM channel_bindings WHERE connection_id=CAST(:source AS uuid) AND enabled",[param("source",source.id)],tx)).map(b=>({actorId:b.actor_id,channel:b.channel,priority:b.priority,available:true,requiresTemplate:b.channel==="whatsapp"&&(!b.last_inbound_at||Date.parse(b.last_inbound_at)<Date.now()-23.9*3600000)}));
+  const endpoints=rows<{actor_id:string;channel:string;enabled:boolean;priority:number;last_inbound_at?:string}>(await query("SELECT actor_id,channel,enabled,priority,last_inbound_at FROM channel_bindings WHERE connection_id=CAST(:source AS uuid) AND enabled",[param("source",source.id)],tx));
+  context.channelOptions=policy.actors.filter(a=>a.enabled&&a.role!=="coordinator").flatMap(a=>contactBindings(endpoints,a.id,a.group,state.origin,product).map(b=>({actorId:a.id,channel:b.channel,priority:b.priority,available:true,requiresTemplate:b.channel==="whatsapp"&&(!b.last_inbound_at||Date.parse(b.last_inbound_at)<Date.now()-23.9*3600000)})));
   const ids = new Set([
     state.sourceEvidenceId,
     ...(state.sourceQuestions ?? []).flatMap(q=>q.evidenceId ? [q.evidenceId] : []),
@@ -261,7 +265,7 @@ export async function buildContext(
         tx,
       ),
     )[0];
-    if (!b?.enabled || !d || !(b.actor_id === d.actor_id || (decode(d.request).demo && decode(d.request).demoActorId === b.actor_id)))
+    if (!b?.enabled || !d || !bindingMatches(d,b))
       fail("ai_receipt_identity_changed");
     d.request = decode(d.request);
     if (

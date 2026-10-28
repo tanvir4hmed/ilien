@@ -14,7 +14,7 @@ import {
 import { communicationContext } from "../../domain-packs/src/communication.js";
 import { configurationFor } from "../../product/src/configuration.js";
 import type { MessageProfile, Fact } from "../../contracts/src/communication.js";
-import { chooseBinding } from "./routing.js";
+import { chooseBinding, contactBindings } from "./routing.js";
 
 export interface Binding {
   id: string;
@@ -53,6 +53,7 @@ export interface Delivery {
     routingReason?: string;
     demo?: boolean;
     demoActorId?: string;
+    sharedReplyBindings?: {bindingId:string;actorId:string;channel:string}[];
     department?: string;
   };
 }
@@ -72,19 +73,16 @@ export async function createDelivery(
   const obligation = state.obligations.find(o=>o.id===contact.obligationId);
   if(!obligation)throw new CoordinationError("obligation_not_found",404);
   const demo=state.origin==="simulated" && configuration.demoRouting?.enabled===true;
-  const bindingActor=demo ? configuration.demoRouting!.actorId : contact.actorId;
-  const bindings = rows<Binding>(
+  const bindings = contactBindings(rows<Binding>(
     await query(
-      `SELECT * FROM channel_bindings WHERE connection_id=CAST(:source AS uuid) AND actor_id=:actor AND enabled ${bindingId ? "AND id=CAST(:binding AS uuid)" : ""} ORDER BY priority,id`,
+      `SELECT * FROM channel_bindings WHERE connection_id=CAST(:source AS uuid) AND enabled ORDER BY priority,id`,
       [
         param("source", state.sourceId),
-        param("actor", bindingActor),
-        ...(bindingId ? [param("binding", bindingId)] : []),
       ],
       tx,
     ),
-  );
-  const route=chooseBinding(bindings,obligation,undefined,!!configuration.whatsappTemplate?.enabled);
+  ),contact.actorId,obligation.group,state.origin,configuration);
+  const route=chooseBinding(bindingId?bindings.filter(b=>b.id===bindingId):bindings,obligation,undefined,!!configuration.whatsappTemplate?.enabled);
   const binding = route?.binding;
   if (!binding) {
     if (bindingId)
@@ -150,7 +148,7 @@ export async function createDelivery(
             instructions,
             routingReason:route?.reason,
             demo,
-            ...(demo ? {demoActorId:bindingActor} : {}),
+            ...(demo ? {demoActorId:binding.actor_id,sharedReplyBindings:bindings.map(b=>({bindingId:b.id,actorId:b.actor_id,channel:b.channel}))} : {}),
             autonomous:state.autonomous ?? false,
             ...(obligation.proposal ? { proposal: obligation.proposal } : {}),
             ...(contact.kind === "verify_request"
@@ -194,7 +192,7 @@ export function contactCurrent(state: CaseState, d: Delivery) {
 /** Demo identity is explicitly snapshotted by configuration, never inferred from message text. */
 export function bindingMatches(d:Delivery,b:Binding) {
   const request=decode(d.request);
-  return b.enabled && (d.actor_id===b.actor_id || (request.demo===true && request.demoActorId===b.actor_id));
+  return b.enabled && (d.actor_id===b.actor_id || (request.demo===true && (request.demoActorId===b.actor_id||request.sharedReplyBindings?.some(r=>r.bindingId===b.id&&r.actorId===b.actor_id&&r.channel===b.channel))));
 }
 
 /** A definitive failure may use one other consented channel. Unknown sends never fall back. */
@@ -261,17 +259,20 @@ export async function fallbackDelivery(tenant: string, id: string) {
       ),
     );
     if (prior.length) return null;
-    const next = rows<Binding>(
+    const state=decode(c.snapshot),configuration=(await configurationFor(d.connection_id,tx)).configuration;
+    const obligation=state.obligations.find(o=>o.id===d.obligation_id);
+    if(!obligation)return null;
+    const alternatives=contactBindings(rows<Binding>(
       await query(
-        "SELECT * FROM channel_bindings WHERE connection_id=CAST(:source AS uuid) AND actor_id=:actor AND enabled AND channel<>:channel ORDER BY priority,id LIMIT 1",
+        "SELECT * FROM channel_bindings WHERE connection_id=CAST(:source AS uuid) AND enabled AND channel<>:channel ORDER BY priority,id",
         [
           param("source", d.connection_id),
-          param("actor", d.request.demoActorId ?? d.actor_id),
           param("channel", d.channel),
         ],
         tx,
       ),
-    )[0];
+    ),d.actor_id,obligation.group,state.origin,configuration);
+    const next=chooseBinding(alternatives,obligation,undefined,!!configuration.whatsappTemplate?.enabled)?.binding;
     if (!next) return null;
     return createDelivery(
       tenant,

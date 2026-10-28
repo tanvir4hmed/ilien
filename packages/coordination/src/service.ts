@@ -20,6 +20,7 @@ import {
   type Policy,
 } from "./types.js";
 import { createDelivery } from "../../channels/src/intents.js";
+import { contactBindings } from "../../channels/src/routing.js";
 import { enqueueAutonomousCase } from "../../ai/src/store.js";
 export type Source = { tenant_id: string; id: string; origin: string };
 const digest = (raw: string) => createHash("sha256").update(raw).digest("hex");
@@ -538,9 +539,10 @@ export async function caseView(source: Source, id: string, section: string, hist
         const participantChannels=(policy?.actors??[])
           .filter(actor=>actor.enabled&&actor.preferredChannel&&actor.role!=="coordinator")
           .map(actor=>({actor_id:actor.id,channel:actor.preferredChannel!}));
-        const channelBindings=rows<{actor_id:string;channel:string;enabled:boolean;last_inbound_at?:string}>(await query(
+        const endpoints=rows<{actor_id:string;channel:string;enabled:boolean;last_inbound_at?:string}>(await query(
           "SELECT actor_id,channel,enabled,last_inbound_at FROM channel_bindings WHERE connection_id=CAST(:source AS uuid) ORDER BY actor_id,priority,id",
           [param("source",source.id)],tx));
+        const channelBindings=(policy?.actors??[]).filter(a=>a.enabled&&a.role!=="coordinator").flatMap(a=>contactBindings(endpoints,a.id,a.group,state.origin,configuration).map(b=>({...b,actor_id:a.id})));
         const participants=(policy?.actors??[]).map(actor=>({id:actor.id,group:actor.group,role:actor.role,name:actor.name,capabilities:actor.capabilities,approvalScopes:actor.approvalScopes,enabled:actor.enabled}));
         const definitions: Record<string, string> = {
           contacts:

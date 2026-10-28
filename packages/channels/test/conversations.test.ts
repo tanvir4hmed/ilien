@@ -14,6 +14,9 @@ import {
   type OpenDelivery,
 } from "../src/matching.js";
 import type { Binding } from "../src/intents.js";
+import {bindingMatches} from "../src/intents.js";
+import {contactBindings} from "../src/routing.js";
+import type {Delivery} from "../src/intents.js";
 import { textilePolicy } from "../../domain-packs/src/textile.js";
 import {
   initialize,
@@ -23,6 +26,25 @@ import {
 import type { CaseState } from "../../coordination/src/types.js";
 const now = new Date().toISOString();
 const later = new Date(Date.now() + 1800000).toISOString();
+
+test("shared recipients are explicitly scoped by department and channel, only for simulated sources",()=>{
+ const endpoints=[{id:"qa",actor_id:"qa_endpoint",channel:"email",enabled:true},{id:"operations",actor_id:"operations_endpoint",channel:"email",enabled:true},{id:"phone",actor_id:"phone_endpoint",channel:"whatsapp",enabled:true}];
+ const config={demoRouting:{enabled:true,actorId:"qa_endpoint",routes:[{group:"quality",channel:"email",actorId:"qa_endpoint"},{group:"stores",channel:"email",actorId:"operations_endpoint"},{group:"stores",channel:"whatsapp",actorId:"phone_endpoint"},{group:"procurement",channel:"email",actorId:"operations_endpoint"}]}};
+ assert.deepEqual(contactBindings(endpoints,"stores_owner","stores","simulated",config).map(b=>b.id),["operations","phone"]);
+ assert.deepEqual(contactBindings(endpoints,"quality_owner","quality","simulated",config).map(b=>b.id),["qa"]);
+ assert.deepEqual(contactBindings(endpoints,"supplier_owner","supplier","simulated",config),[]);
+ assert.deepEqual(contactBindings(endpoints,"stores_owner","stores","external",config),[]);
+ assert.deepEqual(contactBindings(endpoints,"qa_endpoint","quality","external",config).map(b=>b.id),["qa"]);
+});
+
+test("an explicitly shared alternate channel can answer the same role without granting other roles authority",()=>{
+ const delivery={actor_id:"stores_owner",request:{demo:true,demoActorId:"phone_endpoint",sharedReplyBindings:[{bindingId:"operations",actorId:"operations_endpoint",channel:"email"}]}} as unknown as Delivery;
+ const email={id:"operations",actor_id:"operations_endpoint",channel:"email",enabled:true} as Binding;
+ assert.equal(bindingMatches(delivery,email),true);
+ assert.equal(bindingMatches(delivery,{...email,id:"unrelated"}),false);
+ assert.equal(bindingMatches(delivery,{...email,enabled:false}),false);
+ assert.equal(bindingMatches({...delivery,request:{...delivery.request,demo:false}},email),false);
+});
 test("quoted Gmail requests are not interpreted as a new participant request", () => {
   const text =
     "1100 metre passes; 100 remains quarantined.\n\nOn Tue, Oct 20 at 5:10 PM ILIEN <requests@example.com>\nwrote:\n\n> Confirm quality disposition.\n> Ask for the certificate.";

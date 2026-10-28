@@ -1,5 +1,13 @@
 import type { Binding } from "./intents.js";
 import type { Actor, Obligation } from "../../coordination/src/types.js";
+type SharedRouting={demoRouting?:{enabled:boolean;actorId:string;routes?:{group:string;channel:string;actorId:string}[]}};
+/** Explicit shared recipients are limited to simulated sources; logical business roles stay distinct. */
+export function contactBindings<T extends {actor_id:string;channel:string;enabled:boolean}>(bindings:T[],actorId:string,group:string,origin:string,configuration:SharedRouting):T[] {
+ const shared=configuration.demoRouting;
+ if(origin!=="simulated"||!shared?.enabled)return bindings.filter(b=>b.enabled&&b.actor_id===actorId);
+ if(shared.routes?.length)return bindings.filter(b=>b.enabled&&shared.routes!.some(r=>r.group===group&&r.channel===b.channel&&r.actorId===b.actor_id));
+ return bindings.filter(b=>b.enabled&&b.actor_id===shared.actorId);
+}
 
 /** Model preferences are constrained to consented contacts; never invent addresses. */
 export function chooseBinding(bindings:Binding[],task:Obligation,actor:Actor|undefined,hasTemplate:boolean) {

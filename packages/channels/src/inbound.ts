@@ -172,8 +172,8 @@ export async function receive(
     ) {
       const open = rows<OpenDelivery>(
         await query(
-          "SELECT d.*,c.snapshot FROM channel_deliveries d JOIN coordination_cases c ON c.tenant_id=d.tenant_id AND c.id=d.case_id WHERE d.connection_id=CAST(:source AS uuid) AND (d.actor_id=:actor OR (d.request->>'demo'='true' AND d.request->>'demoActorId'=:actor)) AND d.status IN ('accepted','uncertain','sending') AND c.status='active' ORDER BY d.attempt_at DESC,d.id LIMIT 101",
-          [param("source", sourceId), param("actor", binding.actor_id)],
+          "SELECT d.*,c.snapshot FROM channel_deliveries d JOIN coordination_cases c ON c.tenant_id=d.tenant_id AND c.id=d.case_id WHERE d.connection_id=CAST(:source AS uuid) AND (d.actor_id=:actor OR (d.request->>'demo'='true' AND (d.request->>'demoActorId'=:actor OR d.request->'sharedReplyBindings' @> CAST(:shared AS jsonb)))) AND d.status IN ('accepted','uncertain','sending') AND c.status='active' ORDER BY d.attempt_at DESC,d.id LIMIT 101",
+          [param("source", sourceId), param("actor", binding.actor_id),param("shared",JSON.stringify([{bindingId:binding.id,actorId:binding.actor_id,channel:binding.channel}]))],
           tx,
         ),
       );
@@ -389,7 +389,7 @@ export async function receive(
       status === "needs_review" &&
       reason === "unstructured_reply" &&
       d &&
-      binding?.actor_id === d.actor_id
+      binding && bindingMatches(d,binding)
     )
       await enqueueAgent(
         { tenant_id: tenant, id: sourceId, origin: "simulated" },

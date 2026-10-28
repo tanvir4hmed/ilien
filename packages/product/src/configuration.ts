@@ -51,7 +51,7 @@ export const configurationSchema = z.strictObject({
   automaticFallback: z.boolean(),
   assistedIntake:z.boolean().optional(),
   intakeGroup:identifier.optional(),
-  demoRouting:z.strictObject({enabled:z.boolean(),actorId:identifier}).optional(),
+  demoRouting:z.strictObject({enabled:z.boolean(),actorId:identifier,routes:z.array(z.strictObject({group:identifier,channel:z.enum(["email","whatsapp"]),actorId:identifier})).max(64).optional()}).optional(),
   whatsappTemplate: z
     .strictObject({
       name: z.string().regex(/^[a-z0-9_]{1,128}$/),
@@ -159,6 +159,9 @@ export async function publishConfiguration(
   if(input.policy.supervisorActorId&&!input.policy.actors.some(a=>a.id===input.policy.supervisorActorId&&a.enabled&&a.role==="coordinator"))throw new CoordinationError("supervisor_coordinator_required");
   if(input.configuration.assistedIntake&&!input.policy.actors.some(a=>a.enabled&&a.role==="respondent"&&a.group===input.configuration.intakeGroup))throw new CoordinationError("intake_owner_required");
   if(input.configuration.demoRouting?.enabled&&(source.origin!=="simulated"||!input.policy.actors.some(a=>a.id===input.configuration.demoRouting!.actorId&&a.enabled)))throw new CoordinationError("simulated_demo_identity_required");
+  const sharedRoutes=input.configuration.demoRouting?.routes??[];
+  if(new Set(sharedRoutes.map(r=>`${r.group}/${r.channel}`)).size!==sharedRoutes.length)throw new CoordinationError("duplicate_shared_participant_route");
+  if(sharedRoutes.some(r=>!input.policy.groups.includes(r.group)||!input.policy.actors.some(a=>a.id===r.actorId&&a.enabled)))throw new CoordinationError("invalid_shared_participant_route");
   if (
     new Set(input.configuration.workflows.map((w) => w.eventType)).size !==
     input.configuration.workflows.length
