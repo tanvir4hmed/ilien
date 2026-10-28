@@ -53,6 +53,7 @@ export interface Delivery {
     routingReason?: string;
     demo?: boolean;
     demoActorId?: string;
+    department?: string;
   };
 }
 export const decode = <T>(v: T | string): T =>
@@ -139,6 +140,7 @@ export async function createDelivery(
           "request",
           JSON.stringify({
             contact,
+            department:obligation.group,
             subject: state.subject,
             obligationRevision: obligation.revision,
             deadline: state.deadline,
