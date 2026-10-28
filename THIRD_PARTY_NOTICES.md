@@ -1,5 +1,7 @@
-# Third-party notices and provenance
+# Third-party notices
 
-The repository contains original ILIEN application source, documentation and a standard MIT license. Runtime/build dependencies are pinned in `package-lock.json`. Their license texts are collected in [the dependency inventory](docs/DEPENDENCY_LICENSES.md); refresh it with `node scripts/licenses.mjs` after dependency changes. Bundled deployment files retain esbuild's legal comments.
+ILIEN source and documentation are licensed under the repository [MIT License](LICENSE). Runtime and build dependencies are pinned in `package-lock.json` and retain their own licenses.
 
-Before incorporating dependencies, code, templates, assets or datasets, record their source, version, license and required attribution here or in an accompanying generated notice inventory. Disclose incorporated pre-existing work as required by the submission rules. An original-project license does not relicense third-party material or grant permission to publish proprietary work.
+The generated dependency license inventory is available in [docs/DEPENDENCY_LICENSES.md](docs/DEPENDENCY_LICENSES.md). Refresh it with `node scripts/licenses.mjs` whenever dependencies change.
+
+AWS, Amazon SES, Amazon Bedrock, Amazon Aurora, Amazon SQS, Amazon SNS, Amazon S3, AWS Lambda, AWS End User Messaging Social, and WhatsApp are trademarks of their respective owners. The diagrams in this repository are original explanatory artwork, not official provider asset packs.

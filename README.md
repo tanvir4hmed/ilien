@@ -1,36 +1,62 @@
 # ILIEN
 
-Evidence-backed communication and coordination for people and AI-enabled applications.
+ILIEN coordinates time-sensitive textile exceptions across the people and channels that own the information. It receives a source request, preserves the original evidence, asks the right authorized participant for the missing information, and returns a traceable communication outcome to the source application.
 
-ILIEN is a source-integrated communication service that receives a request, contacts authorized participants, collects information and decisions across channels, manages dependent replies and returns a traceable result. The initial demonstration domain is textile and apparel manufacturing.
+The demonstration focuses on material, quality, planning, procurement, and dispatch coordination. It does not execute factory actions: release, production, and shipment remain controlled by the source business systems.
 
-**Status:** channel integration and deterministic coordination implementation: authenticated event intake, tenant-scoped persistence, immutable evidence, versioned cases/dependencies, independent reply verification, bounded reminders/escalation, durable timer work and source result acknowledgement. WhatsApp and SES adapters, participant bindings, cross-channel correlation and delivery records are implemented. Recipient consent/readiness remains mandatory. Targeted real SES/Gmail and Bedrock acceptance has completed; The latest WhatsApp rehearsal was gated before send by an expired customer-service window and no enabled supported approved template; earlier provider restrictions remain in the history. A bounded Bedrock agent with scoped knowledge retrieval, budgets, evidence citations and autonomous policy-gated execution is implemented alongside explicit review mode; general unattended accuracy is not established. See [autonomous runtime scope](docs/AUTONOMOUS_COORDINATION.md). See [targeted acceptance evidence and limits](docs/ACCEPTANCE.md); check the latest Actions run for deployment status.
+![ILIEN AWS architecture](docs/architecture.svg)
 
-The demonstration uses synthetic manufacturing events. Channel adapters call AWS End User Messaging Social and SES. ILIEN interprets correlated replies and coordinates participant decisions; source applications retain operational planning and execution. With consented channel bindings enabled, configured workflow events can trigger real messages. No fixture controls factory systems.
+## What it does
 
-## Build
+- turns an authenticated source event into a versioned coordination case;
+- represents requirements and dependencies as a live case graph instead of a fixed message sequence;
+- sends recipient-scoped messages through Amazon SES email or AWS End User Messaging Social for WhatsApp when a consented, enabled channel is available;
+- correlates replies, provider delivery events, and original evidence back to the correct case;
+- preserves quantities, units, holds, restrictions, conditions, uncertainty, and provenance through handoffs;
+- uses Amazon Bedrock only within a bounded, policy-gated coordination loop; deterministic checks retain authority over sends, approvals, and completion;
+- publishes a scoped outcome through Amazon SNS or the authenticated result API.
 
-Use Node.js 24 and Terraform 1.15.8. Run `npm ci --ignore-scripts` and `npm run build`. See the runbook for deployment and authenticated simulation. The browser is an observer/tuning console: Cases, Settings and Guide, with per-case Flow / Messages / Outcome / History. It restores sign-in across reloads within a 24-hour absolute session. See [operator workspace](docs/OPERATOR_WORKSPACE.md) for scope and verification limits.
+![ILIEN working flow](docs/coordination-flow.svg)
 
-## Documentation
+## AWS services
 
-- [Partial-dispatch communication scenario](docs/COMMUNICATION_SCENARIO.md)
-- [Workspace user guide](docs/USER_GUIDE.md)
+| Service | Purpose in ILIEN |
+| --- | --- |
+| AWS End User Messaging Social | WhatsApp Business send and provider event integration |
+| Amazon SES | Two-way email send, receive, and delivery events |
+| Amazon Bedrock | Bounded coordination proposals based on current case evidence |
+| AWS Lambda and Amazon SQS | Event-driven intake, coordination, channel, result, and agent workers |
+| Amazon Aurora PostgreSQL / RDS Data API | Cases, dependencies, evidence references, delivery state, and audit data |
+| Amazon S3 and AWS Secrets Manager | Raw channel evidence and managed database credentials |
+| Amazon SNS | Encrypted source-result publication and channel notifications |
 
-- [Operations, recovery and retention](docs/OPERATIONS.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [AI agent, review and knowledge contracts](docs/AI.md)
-- [Channels, identity and setup](docs/CHANNELS.md)
-- [Coordination API and limits](docs/COORDINATION.md)
-- [Integration contracts](packages/contracts/README.md)
-- [Configuration and credentials](docs/CONFIGURATION.md)
-- [Setup and runtime status](docs/RUNBOOK.md)
-- [Submission deliverables](docs/SUBMISSION.md)
-- [Security](SECURITY.md)
-- [Third-party notices](THIRD_PARTY_NOTICES.md)
+## Run locally
+
+Prerequisites: Node.js 24, npm, and Terraform 1.15.8 for infrastructure work.
+
+```sh
+npm ci --ignore-scripts
+npm run build
+npm run test:channels
+npm run test:ai
+npm run test:autonomy
+npm run test:console
+```
+
+The tests use synthetic fixtures and deterministic checks. They do not send messages or provision AWS resources.
+
+## Repository guide
+
+- [Architecture and data boundaries](docs/ARCHITECTURE.md)
+- [Channels and message lifecycle](docs/CHANNELS.md)
+- [Operational setup and safety](docs/OPERATIONS.md)
+- [Workspace guide](docs/USER_GUIDE.md)
+- [Hackathon submission checklist](docs/SUBMISSION.md)
+
+## Demonstration boundary
+
+Channel use requires an authorized sender, a consented recipient binding, and provider readiness. A delivery acknowledgement is not treated as a business answer, and a participant answer is not treated as factory execution. WhatsApp outbound initiation can be blocked by the WhatsApp service-window or approved-template requirement; that state remains visible in the case rather than being hidden or retried blindly.
 
 ## License
 
-Original ILIEN material is available under the [MIT License](LICENSE). Third-party material retains its own license.
-
-Deployment evidence and verification limits: [deployment record](docs/DEPLOYMENT.md).
+ILIEN is released under the [MIT License](LICENSE). Third-party dependencies retain their own licenses; see [third-party notices](THIRD_PARTY_NOTICES.md).

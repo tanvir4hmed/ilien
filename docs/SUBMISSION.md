@@ -1,34 +1,39 @@
-# Hackathon submission guide
+# AWS CDS Agentic AI Partner Hackathon submission
 
-ILIEN is an evidence-preserving coordination service for textile operations. It uses Amazon SES and AWS End User Messaging Social (WhatsApp) as conversational channels, with Amazon Bedrock Runtime for bounded coordination proposals.
+## Project summary
 
-## Required repository materials
+**Name:** ILIEN — Evidence-Preserving Textile Coordination
+**Tagline:** Omnichannel coordination that preserves the facts, restrictions, and evidence behind textile decisions.
+
+ILIEN receives a production exception from a source application, creates a live dependency graph, contacts authorized people through their available channels, records replies as evidence, and returns a scoped outcome. It uses Amazon SES and AWS End User Messaging Social for two-way communication and Amazon Bedrock for bounded next-step proposals. Deterministic policy checks retain authority over sending, approvals, and completion.
+
+## Repository material
 
 - [Architecture diagram](architecture.svg)
-- [Coordination flow](coordination-flow.svg)
-- Submission narrative — maintained outside the repository so it can be copied into Devpost without becoming a software deliverable
+- [Working flow](coordination-flow.svg)
+- [Run and safety instructions](OPERATIONS.md)
 - [MIT License](../LICENSE)
 
-## Devpost fields
+The code imports and calls both qualifying AWS CDS SDK clients: `@aws-sdk/client-sesv2` for `SendEmailCommand`, and `@aws-sdk/client-socialmessaging` for `SendWhatsAppMessageCommand`.
 
-| Field | Submission content |
-|---|---|
+## Devpost form content
+
+| Field | Value to enter |
+| --- | --- |
 | Project name | ILIEN — Evidence-Preserving Textile Coordination |
-| Tagline | Evidence-bound omnichannel coordination for textile production exceptions. |
-| Description | Use the Problem, Solution, What it does, and How it works sections of the submission narrative. |
-| Built with | AWS Lambda, Amazon SQS, Amazon Aurora, Amazon Bedrock Runtime, Amazon SES, AWS End User Messaging Social, Amazon SNS, Amazon S3, AWS Secrets Manager, TypeScript. |
-| Repository | GitHub repository URL. |
-| Architecture | `docs/architecture.svg` |
-| Demo video | Public YouTube or Vimeo URL, approximately three minutes. |
-| Test/deployment instructions | Repository README. |
-| ACE opportunity | Add the net-new Partner Central ACE Opportunity ID. |
-| WhatsApp prize | State that AWS End User Messaging Social sends and receives WhatsApp Business communication within the evidence-bound case flow. |
+| Tagline | Omnichannel coordination that preserves the facts, restrictions, and evidence behind textile decisions. |
+| Built with | TypeScript, AWS Lambda, Amazon SQS, Amazon Aurora PostgreSQL, Amazon Bedrock, Amazon SES, AWS End User Messaging Social, Amazon SNS, Amazon S3, AWS Secrets Manager, Terraform |
+| Architecture image | `docs/architecture.svg` |
+| Repository | Public repository URL |
+| Test instructions | README and `docs/OPERATIONS.md` |
+| WhatsApp prize description | ILIEN uses AWS End User Messaging Social to send WhatsApp Business coordination requests and process provider events within an evidence-bound case. It preserves WhatsApp session/template blocks as visible case state rather than treating them as successful delivery. |
 
-## Release checklist
+## Before submission
 
-1. Confirm the public repository shows the `LICENSE` file.
-2. Confirm the deployed console URL and judge test instructions work without paid access.
-3. Confirm the demo video shows a live case, a channel message, reply evidence, blocked/uncertain behavior, and final source outcome.
-4. Create or verify the ACE opportunity and campaign code: `AWS CDS Agentic AI Hackathon -Sept. 2026`.
-5. Use the actual deployed URL, repository URL, video URL, and ACE ID in Devpost; do not invent values in source files.
+1. Add the real deployed project URL and working judge access/test instructions.
+2. Add a public YouTube or Vimeo demo, about three minutes, showing the running project.
+3. Create a net-new ACE opportunity and add its ID. Use campaign code `AWS CDS Agentic AI Hackathon -Sept. 2026`.
+4. Confirm the public repository displays the MIT license and contains all source, assets, and run instructions.
+5. Verify that the video and text distinguish recorded provider delivery, participant response, and source outcome from factory action.
 
+The related Devpost rules require a repository, runtime use of a qualifying CDS SDK, architecture diagram, project description, public video, deployed/testable access, ACE opportunity ID, and an open-source license for a public repository. Review the current rules before final submission.

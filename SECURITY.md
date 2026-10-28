@@ -1,11 +1,9 @@
 # Security
 
-No production release is currently supported. Do not enter real customer data or credentials into demonstration fixtures.
+ILIEN is a demonstration system. Do not use real customer records, credentials, or production contact details in its synthetic examples.
 
-Do not post secrets or sensitive vulnerability details in public issues. Private vulnerability reporting must be enabled and its contact documented before a public executable release. Operational security controls and limitations will be documented alongside implementation; no certification is claimed.
+The runtime uses IAM-scoped workloads, a private encrypted Aurora cluster, encrypted S3 evidence storage, Secrets Manager, API authentication, and server-side membership checks. Original source content, inbound messages, provider events, and case actions are retained separately so a later interpretation cannot overwrite their provenance.
 
-Operational admin commands require current Cognito membership/role, idempotency IDs, bounded retries and committed audit. Source APIs cannot mutate operations controls. Independent structural flags hold queued effects. Legal hold is default; only a scoped retention function may redact eligible closed-case AI traces. See [operations](docs/OPERATIONS.md) for incident response, retained-data limits and pending security/recovery validation. These are implemented controls, not a certification or completed independent assessment.
+Do not report secrets or sensitive vulnerability details in public issues. Use a private reporting channel agreed by the repository owner. Before production use, establish a customer-specific vulnerability contact, operator identity policy, retention/deletion process, incident notification destination, and independent security review.
 
-The optional shared guest sign-in, when explicitly enabled by the deployment owner, intentionally publishes a full-access account to visitors. Password masking and copy controls are presentation features, not confidentiality controls. Review [shared access setup and revocation](docs/OPERATOR_WORKSPACE.md#optional-shared-guest-sign-in) before enabling it. Individual memberships continue to be enforced, but a shared admin account can perform all normal admin actions. This configuration is not suitable for confidential customer data.
-
-Browser sign-in can persist for 24 hours using a rotating refresh token in local storage, with memory-only 15-minute access tokens. JavaScript-accessible refresh tokens remain exposed to successful XSS/device compromise; CSP is a mitigation, not an HttpOnly cookie substitute. Explicit logout clears local state and attempts provider revocation. See [session limitations](docs/OPERATOR_WORKSPACE.md#browser-session-security-limits).
+Provider delivery and participant identity are not equivalent to business authorization. Treat blocked or uncertain delivery as unresolved until supported by provider evidence and an authorized case action.
