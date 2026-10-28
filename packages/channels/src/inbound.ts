@@ -260,12 +260,12 @@ export async function receive(
             ? "greeting_received"
             : "quoted_message_without_new_reply";
         }
-        if(d?.request.contact.kind==="decision_update") {status="received";reason="decision_update_acknowledged";}
+        if(d?.request.contact.kind==="decision_update"||d?.request.contact.kind==='completion_notice') {status="received";reason=d.request.contact.kind==='completion_notice'?'completion_notice_acknowledged':"decision_update_acknowledged";}
         if (
           authored &&
           !isGreeting(authored) &&
           d &&
-          d.request.contact.kind!=="decision_update" &&
+          !["decision_update","completion_notice"].includes(d.request.contact.kind) &&
           bindingMatches(d,binding!) &&
           caseRow
         ) {

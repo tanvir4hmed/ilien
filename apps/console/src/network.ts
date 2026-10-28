@@ -17,12 +17,20 @@ export function channelIcon(channel:string) {
  return svg;
 }
 export function deliveryRecoveries(data:Journey) {
- return data.deliveries.filter(d=>['blocked','uncertain'].includes(String(d.status))).map(failed=>{
+ const optionalNotices=new Set(completionNoticeDeliveries(data).map(d=>d.id));
+ return data.deliveries.filter(d=>!optionalNotices.has(d.id)&&['blocked','uncertain'].includes(String(d.status))).map(failed=>{
   const alternatives=data.deliveries.filter(d=>d.id!==failed.id&&d.contact_id===failed.contact_id&&d.actor_id===failed.actor_id);
   const obligation=data.state.obligations.find(o=>o.id===failed.obligation_id);
   const answered=!!obligation&&['accepted','verified'].includes(obligation.status)&&alternatives.some(d=>data.receipts.some(r=>r.delivery_id===d.id&&r.status==='applied'&&r.evidence_id===obligation.reply?.evidenceId));
   return {failed,alternatives,state:answered?'alternate_answer_received':alternatives.length?'alternate_delivery_recorded':failed.status==='uncertain'?'send_outcome_unknown':'no_alternate_answer'};
  });
+}
+export function completionNoticeDeliveries(data:Journey){
+ const contacts=new Set((data.contacts??[]).filter(c=>{const contact=typeof c.contact==='string'?JSON.parse(c.contact):c.contact;return contact?.kind==='completion_notice';}).map(c=>c.id));
+ return data.deliveries.filter(d=>contacts.has(d.contact_id));
+}
+export function communicationPending(data:Journey){
+ return data.state.status==='active'||data.results.some(r=>r.current&&['pending','publishing'].includes(String(r.dispatch_state)))||completionNoticeDeliveries(data).some(d=>['pending','sending'].includes(String(d.status))||d.status==='accepted'&&!data.deliveryEvents.some(e=>e.provider_message_id===d.provider_message_id&&['delivered','read','delivery'].includes(String(e.event_type))));
 }
 export const departmentGroups=(data:Journey)=>[...new Set(data.state.obligations.map(o=>o.group))];
 function readiness(data:Journey,actorId:string) {
@@ -38,7 +46,8 @@ export function renderCommunicationNetwork(host:HTMLElement,data:Journey,evidenc
  host.replaceChildren();const groups=departmentGroups(data);
  const legend=node('div','','network-legend');for(const [name,status]of [['Active','active'],['Waiting','waiting'],['Accepted','accepted'],['Completed','completed'],['Blocked / uncertain','blocked'],['Paused','paused']]){const b=node('span',name,'badge');b.dataset.tone=statusTone(status);legend.append(b);}host.append(legend);
  const frame=node('div','','journey-scroll network-scroll'),canvas=node('div','','journey-canvas network-canvas'),inspector=node('section','','journey-inspector');frame.append(canvas);frame.tabIndex=0;frame.setAttribute('aria-label','Communication network with ILIEN between participants');
- const nodeWidth=132,nodeHeight=78,width=800,pageHeight=300,height=Math.max(280,Math.ceil(groups.length/4)*pageHeight);canvas.style.width=`${width}px`;canvas.style.height=`${height}px`;
+ const notices=completionNoticeDeliveries(data),noticeIds=new Set(notices.map(d=>d.id));
+ const nodeWidth=132,nodeHeight=78,width=800,pageHeight=300,height=Math.max(notices.length?310:280,Math.ceil(groups.length/4)*pageHeight);canvas.style.width=`${width}px`;canvas.style.height=`${height}px`;
  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox',`0 0 ${width} ${height}`);svg.setAttribute('aria-hidden','true');canvas.append(svg);
  const defs=document.createElementNS(svg.namespaceURI,'defs'),marker=document.createElementNS(svg.namespaceURI,'marker');const markerId=`network-arrow-${crypto.randomUUID()}`;marker.id=markerId;for(const[k,v]of Object.entries({viewBox:'0 0 10 10',refX:'9',refY:'5',markerWidth:'6',markerHeight:'6',orient:'auto-start-reverse'}))marker.setAttribute(k,v);const tip=document.createElementNS(svg.namespaceURI,'path');tip.setAttribute('d','M0 0 L10 5 L0 10z');tip.setAttribute('fill','context-stroke');marker.append(tip);defs.append(marker);svg.append(defs);
  type Pos={x:number;y:number};const hub={x:Math.round(width/2-nodeWidth/2),y:111};
@@ -50,7 +59,7 @@ export function renderCommunicationNetwork(host:HTMLElement,data:Journey,evidenc
  const palette=['#7657ad','#2274a5','#ae6532','#257f72','#a14478','#57689c'];
  for(const[index,group]of groups.entries()){
   const page=Math.floor(index/4),slot=index%4,pos={x:slot%2===0?Math.max(165,hub.x-170):Math.min(width-nodeWidth-165,hub.x+170),y:(slot<2?22:200)+page*pageHeight};const tasks=data.state.obligations.filter(o=>o.group===group),ids=new Set(tasks.map(o=>o.id));
-  const sends=data.deliveries.filter(d=>ids.has(String(d.obligation_id))),sendIds=new Set(sends.map(d=>d.id)),replies=data.receipts.filter(r=>sendIds.has(r.delivery_id));
+  const sends=data.deliveries.filter(d=>!noticeIds.has(d.id)&&ids.has(String(d.obligation_id))),sendIds=new Set(sends.map(d=>d.id)),replies=data.receipts.filter(r=>sendIds.has(r.delivery_id));
   const hasFailure=sends.some(d=>['blocked','uncertain'].includes(String(d.status)))||tasks.some(o=>['blocked','disputed','uncertain'].includes(o.status));const allAccepted=tasks.every(o=>o.skipped||['accepted','verified'].includes(o.status));const anyReply=replies.length>0;const status=data.state.status==='paused'?'paused':allAccepted?'accepted':tasks.some(o=>['blocked','disputed','uncertain'].includes(o.status))?'blocked':tasks.every(o=>o.dependencies.some(id=>!data.state.obligations.some(d=>d.id===id&&(d.skipped||['accepted','verified'].includes(d.status)))))?'waiting for prerequisites':'awaiting answer';
   const channels=[...new Set(sends.map(d=>String(d.channel)))];const ownerReadiness=[...new Map(tasks.flatMap(o=>readiness(data,o.assignee)).map(r=>[`${r.channel}/${r.label}`,r])).values()];const planned=[...new Set(ownerReadiness.filter(r=>r.channel!=="unavailable").map(r=>r.channel))];
   if(sends.some(d=>['accepted','sending'].includes(String(d.status))))edge(hub,pos,'outbound',-9);else edge(hub,pos,hasFailure?'failure':'planned');if(replies.length)edge(pos,hub,'inbound',9);
@@ -59,6 +68,7 @@ export function renderCommunicationNetwork(host:HTMLElement,data:Journey,evidenc
   if(!sends.length)b.append(node('small',ownerReadiness.map(r=>r.label).join(' · ')||'No configured send recorded','muted'));if(hasFailure)b.append(node('small','Channel delivery failed','failure-label'));if(synthetic)b.append(node('small','Simulated answer','simulation-label'));
  }
  const result=data.results.find(r=>r.current);if(result){edge(hub,outcome,'outbound');box(data.state.origin==='simulated'?'Intelactory':'Requesting source',data.state.origin==='simulated'?'Simulated source · Receiver API':'Receiver API',outcome,data.state.status==='completed'?'completed':result.dispatch_state==='published'?'progress report sent':'report pending',{dispatch:result.dispatch_state,acknowledgement:result.acknowledgement,scope:'Communication outcome; no operational execution'});}
+ if(notices.length){const notice=notices[0]!,pos={x:outcome.x,y:216},delivered=data.deliveryEvents.some(e=>e.provider_message_id===notice.provider_message_id&&['delivered','read','delivery'].includes(String(e.event_type))),status=delivered?'completed':String(notice.status);edge(outcome,pos,['blocked','uncertain'].includes(status)?'failure':status==='pending'?'planned':'outbound');box('Order confirmation','Optional · WhatsApp',pos,status,{purpose:'Final notification after source publication; no reply required.',providerAccepted:notice.status==='accepted',deliveryConfirmed:delivered,status:notice.status,reason:notice.reason},['whatsapp']);}
  const fit=node('button','Fit map to screen');fit.dataset.fitMap='true';fit.onclick=()=>openMapPreview(canvas,'Communication network');const tools=node('div','','map-tools');tools.append(fit);(toolbar??host).append(tools);host.append(frame,node('p','Teal arrow: request sent. Blue arrow: reply received. Dashed arrow: planned or delivery problem. Select a department to inspect its messages and evidence.','muted'),inspector);
  const recoveries=deliveryRecoveries(data);if(recoveries.length){const card=node('section','','recovery-visibility');card.append(node('h3','Delivery recovery'));for(const r of recoveries){const p=node('p',`${words(r.failed.channel)}: ${words(r.failed.reason)}. ${r.state==='alternate_answer_received'?'An applied answer arrived through the same authorized actor’s alternate channel.':r.state==='alternate_delivery_recorded'?'Alternate delivery recorded; a valid answer is still required.':r.state==='send_outcome_unknown'?'Outcome unknown. Do not resend or fail over until reconciled.':'No authorized alternate-channel answer recorded. Required evidence cannot be skipped.'}`);p.dataset.tone=statusTone(r.state==='alternate_answer_received'?'accepted':'blocked');card.append(p);}host.append(card);}
 }

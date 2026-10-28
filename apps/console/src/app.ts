@@ -5,7 +5,7 @@ import { companySettings } from "./company-settings.js";
 import type {ProductConfiguration} from "../../../packages/product/src/configuration.js";
 import { WorkspaceSession, SessionError, SESSION_KEY } from "./session.js";
 import { authoredReplyText } from "../../../packages/channels/src/text.js";
-import { statusTone } from "./network.js";
+import { statusTone,communicationPending } from "./network.js";
 import {
   renderJourney,
   recordedRequirements,
@@ -754,7 +754,7 @@ async function casePage(id: string) {
       : "Updates are off";
     schedule();
   };
-  live.checked=state.status==="active";status.textContent=live.checked?"Live · checks every 10 seconds":"Updates are off";schedule();
+  live.checked=communicationPending(journey);status.textContent=live.checked?"Live · checks every 10 seconds":"Updates are off";schedule();
   stopLive = () => {
     disposed = true;
     if (timer) clearTimeout(timer);

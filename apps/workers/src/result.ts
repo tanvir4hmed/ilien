@@ -10,6 +10,7 @@ import {
 import { decode } from "../../../packages/channels/src/intents.js";
 import { pausedFor } from "../../../packages/operations/src/controls.js";
 import { caseHeld } from "../../../packages/operations/src/supervision.js";
+import {queueCompletionNotice} from '../../../packages/channels/src/completion.js';
 const sns = new SNSClient({ maxAttempts: 1 });
 export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
   const batchItemFailures: { itemIdentifier: string }[] = [];
@@ -101,13 +102,14 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
         }),
         { abortSignal: AbortSignal.timeout(10000) },
       );
-      await transaction(job.tenantId, (tx) =>
-        query(
+      await transaction(job.tenantId, async (tx) => {
+        await query(
           "UPDATE result_dispatches SET state='published',provider_id=:provider WHERE result_id=CAST(:id AS uuid)",
           [param("id", job.resultId), param("provider", published.MessageId!)],
           tx,
-        ),
-      );
+        );
+        await queueCompletionNotice(job.tenantId,job.resultId,tx);
+      });
     } catch {
       console.error(
         JSON.stringify({

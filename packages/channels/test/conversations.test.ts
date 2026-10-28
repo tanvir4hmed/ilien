@@ -14,7 +14,8 @@ import {
   type OpenDelivery,
 } from "../src/matching.js";
 import type { Binding } from "../src/intents.js";
-import {bindingMatches} from "../src/intents.js";
+import {bindingMatches,contactCurrent} from "../src/intents.js";
+import {verifiedTemplate,ORDER_CONFIRMATION_BODY} from '../src/templates.js';
 import {contactBindings} from "../src/routing.js";
 import type {Delivery} from "../src/intents.js";
 import { textilePolicy } from "../../domain-packs/src/textile.js";
@@ -26,6 +27,28 @@ import {
 import type { CaseState } from "../../coordination/src/types.js";
 const now = new Date().toISOString();
 const later = new Date(Date.now() + 1800000).toISOString();
+
+test('completion confirmation is valid only for the exact completed case revision',()=>{
+ const c=state();c.status='completed';
+ const d={actor_id:c.obligations[0]!.assignee,obligation_id:c.obligations[0]!.id,request:{contact:{kind:'completion_notice',resultId:'result',resultRevision:c.revision},subject:c.subject}} as Delivery;
+ assert.equal(contactCurrent(c,d),true);
+ assert.equal(contactCurrent({...c,status:'active'},d),false);
+ assert.equal(contactCurrent({...c,revision:c.revision+1},d),false);
+ assert.equal(contactCurrent(c,{...d,actor_id:'unrelated'}),false);
+ assert.match(render(d),new RegExp(c.subject.id));
+});
+
+test('order template requires exact approved utility content and receives the actual order ID',()=>{
+ const d={request:{contact:{kind:'completion_notice'},subject:{id:'PO-2048'}}} as Delivery;
+ const selected={name:'order_confirmation',language:'en',approvalRef:'provider-reference',enabled:true};
+ const definition={name:selected.name,language:'en',category:'UTILITY',status:'APPROVED',components:[{type:'BODY',text:ORDER_CONFIRMATION_BODY},{type:'FOOTER',text:'Reply STOP to stop WhatsApp updates.'}]};
+ const result=verifiedTemplate(d,selected,JSON.stringify(definition));
+ assert.equal(result?.components[0]?.parameters?.[0]?.text,'PO-2048');
+ assert.equal(result?.body.includes('{{1}}'),false);
+ for(const status of ['PENDING','REJECTED'])assert.equal(verifiedTemplate(d,selected,JSON.stringify({...definition,status})),null);
+ assert.equal(verifiedTemplate(d,selected,JSON.stringify({...definition,category:'MARKETING'})),null);
+ assert.equal(verifiedTemplate(d,selected,JSON.stringify({...definition,components:[{type:'BODY',text:'Your shipment has been executed.'}]})),null);
+});
 
 test("shared recipients are explicitly scoped by department and channel, only for simulated sources",()=>{
  const endpoints=[{id:"qa",actor_id:"qa_endpoint",channel:"email",enabled:true},{id:"operations",actor_id:"operations_endpoint",channel:"email",enabled:true},{id:"phone",actor_id:"phone_endpoint",channel:"whatsapp",enabled:true}];

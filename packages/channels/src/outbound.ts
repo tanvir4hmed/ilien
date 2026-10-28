@@ -19,7 +19,7 @@ import {
   type Delivery,
 } from "./intents.js";
 import { configurationFor } from "../../product/src/configuration.js";
-import { approvedTemplate } from "./templates.js";
+import { approvedTemplate,ORDER_CONFIRMATION_BODY } from "./templates.js";
 import { pausedFor } from "../../operations/src/controls.js";
 import { caseHeld } from "../../operations/src/supervision.js";
 import { projectProviderEvents } from "./events.js";
@@ -33,6 +33,7 @@ export function emailPresentation(d:Delivery,body:string) {
 }
 
 export function render(d: Delivery) {
+  if(d.request.contact.kind==='completion_notice')return ORDER_CONFIRMATION_BODY.replace('{{1}}',()=>d.request.subject.id);
   if(d.request.profile) return renderProfile(d,d.request.profile);
   if(d.request.autonomous || d.request.facts?.length || d.request.contact.kind==="decision_notice") return renderProfile(d,{group:"configured",channel:d.channel,format:"human",version:"default-v1",language:"en",style:"concise",sourceFields:Object.keys(d.request.sourceContext ?? {}),factKeys:["available_quantity","usable_quantity","completion_time","completion_reference","delay_days","passing_quantity","quarantined_quantity","dispatch_deadline","release_authorization","supplier_commitment","supplier_quantity","supplier_arrival","customer_deadline","quantity","unit","status","hold","restriction","instruction","uncertainty"],fields:[]});
   const r = d.request;
@@ -128,7 +129,8 @@ export async function sendDelivery(tenant: string, id: string) {
       !contactCurrent(decode(c.snapshot), d)
     )
       reason = "stale_contact";
-    else if (
+    if(!reason&&d.request.contact.kind==='completion_notice'&&!rows(await query("SELECT r.id FROM coordination_results r JOIN result_dispatches d ON d.tenant_id=r.tenant_id AND d.result_id=r.id WHERE r.id=CAST(:id AS uuid) AND r.case_id=CAST(:case AS uuid) AND r.case_revision=CAST(:revision AS integer) AND d.state='published'",[param('id',d.request.contact.resultId!),param('case',d.case_id),param('revision',String(d.request.contact.resultRevision))],tx)).length)reason='completion_result_not_published';
+    if (!reason && binding &&
       d.channel === "whatsapp" &&
       (!binding.last_inbound_at ||
         Date.parse(binding.last_inbound_at) < Date.now() - 23.9 * 3600000)

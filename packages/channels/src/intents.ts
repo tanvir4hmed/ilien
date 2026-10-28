@@ -170,6 +170,7 @@ export async function createDelivery(
 }
 
 export function contactCurrent(state: CaseState, d: Delivery) {
+  if(d.request.contact.kind==='completion_notice')return state.status==='completed'&&state.revision===d.request.contact.resultRevision&&!!d.request.contact.resultId&&state.obligations.some(o=>o.id===d.obligation_id&&o.assignee===d.actor_id);
   if(d.request.contact.kind==="source_question")return !["completed","cancelled","handed_off"].includes(state.status)&&!!state.sourceQuestions?.some(q=>q.id===d.request.contact.sourceQuestionId&&!q.answer);
   if(d.request.contact.kind==="operator_attention")return ["blocked","paused"].includes(state.status)&&!!state.attentionReason;
   const o = state.obligations.find((o) => o.id === d.obligation_id);
@@ -243,6 +244,7 @@ export async function fallbackDelivery(tenant: string, id: string) {
       ),
     )[0];
     d.request = decode(d.request);
+    if(d.request.contact.kind==='completion_notice')return null;
     if (
       !c ||
       !p ||

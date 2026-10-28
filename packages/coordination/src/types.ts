@@ -253,7 +253,9 @@ export interface CaseState {
 export interface Contact {
   obligationId: string;
   actorId: string;
-  kind: "ask" | "reminder" | "escalation" | "verify_request" | "decision_notice" | "decision_update" | "source_question" | "operator_attention";
+  kind: "ask" | "reminder" | "escalation" | "verify_request" | "decision_notice" | "decision_update" | "source_question" | "operator_attention" | "completion_notice";
+  resultId?:string;
+  resultRevision?:number;
   sourceQuestionId?: string;
   decisionId?: string;
   decisionHash?: string;

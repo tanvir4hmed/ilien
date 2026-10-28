@@ -52,6 +52,7 @@ export const configurationSchema = z.strictObject({
   assistedIntake:z.boolean().optional(),
   intakeGroup:identifier.optional(),
   demoRouting:z.strictObject({enabled:z.boolean(),actorId:identifier,routes:z.array(z.strictObject({group:identifier,channel:z.enum(["email","whatsapp"]),actorId:identifier})).max(64).optional()}).optional(),
+  completionNotice:z.strictObject({enabled:z.boolean(),group:identifier,actorId:identifier,template:z.strictObject({name:z.string().regex(/^[a-z0-9_]{1,128}$/),language:z.string().regex(/^[a-z]{2,3}(?:_[A-Z]{2})?$/),approvalRef:z.string().min(1).max(200),enabled:z.boolean()}).optional()}).optional(),
   whatsappTemplate: z
     .strictObject({
       name: z.string().regex(/^[a-z0-9_]{1,128}$/),
@@ -162,6 +163,8 @@ export async function publishConfiguration(
   const sharedRoutes=input.configuration.demoRouting?.routes??[];
   if(new Set(sharedRoutes.map(r=>`${r.group}/${r.channel}`)).size!==sharedRoutes.length)throw new CoordinationError("duplicate_shared_participant_route");
   if(sharedRoutes.some(r=>!input.policy.groups.includes(r.group)||!input.policy.actors.some(a=>a.id===r.actorId&&a.enabled)))throw new CoordinationError("invalid_shared_participant_route");
+  const notice=input.configuration.completionNotice;
+  if(notice?.enabled&&!input.policy.actors.some(a=>a.enabled&&a.id===notice.actorId&&a.group===notice.group&&a.role==='respondent'))throw new CoordinationError("invalid_completion_notice_recipient");
   if (
     new Set(input.configuration.workflows.map((w) => w.eventType)).size !==
     input.configuration.workflows.length
