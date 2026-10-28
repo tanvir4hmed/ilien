@@ -257,8 +257,8 @@ export function renderJourney(
       hub = { x: 16+nodeWidth+32, y: height/2-nodeHeight/2 };
     box(
       "source",
-      `${words(state.subject.type)} · ${state.subject.id}`,
-      "Original request",
+      state.origin==="simulated"?"Intelactory (simulated)":"Requesting source",
+      "Sender API",
       `${state.origin === "simulated" ? "Simulated" : "Recorded"} · ${words(data.sourceEvent?.event_type || "source event")}`,
       source,
       "received",
@@ -311,7 +311,7 @@ export function renderJourney(
         channels.join(" / ") || "No channel send recorded",
         o.question,
         pos,
-        o.skipped ? "not applicable" : o.satisfiedFrom ? "evidence reused" : o.status,
+        o.skipped ? "not applicable" : o.satisfiedFrom ? "evidence reused" : ["accepted","verified","blocked","disputed"].includes(o.status)?o.status:o.dependencies.some(id=>!state.obligations.some(d=>d.id===id&&(d.skipped||["accepted","verified"].includes(d.status))))?"waiting for prerequisites":"awaiting answer",
         () => inspectTask(o.id),
       );
     }
@@ -320,13 +320,13 @@ export function renderJourney(
       const end = { x: width-nodeWidth-16, y: height/2-nodeHeight/2 };
       box(
         "result",
-        "Outcome to source",
-        "Result",
+        state.origin==="simulated"?"Intelactory (simulated)":"Requesting source",
+        "Receiver API",
         current.acknowledgement
           ? `Source ${words(current.acknowledgement)}`
           : `Delivery: ${words(current.dispatch_state || "not recorded")}`,
         end,
-        "recorded",
+        state.status==="completed"?"completed":current.dispatch_state==="published"?"progress report sent":"report pending",
         () =>
           show("Outcome", {
             outcome: object(current.result),
