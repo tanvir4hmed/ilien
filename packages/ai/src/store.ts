@@ -1,3 +1,4 @@
+import { criticalRestrictions } from "./contracts.js";
 import {needsCasePlanning} from "./scheduling.js";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -388,7 +389,7 @@ export function gate(context: Context, proposal: Proposal) {
         const previousRestrictions=context.state.obligations.find(o=>o.id===r.obligationId)?.reply?.restrictions ?? context.state.obligations.find(o=>o.id===r.obligationId)?.retainedRestrictions ?? [];
         if(op.withdrawRestrictions?.some(text=>!previousRestrictions.some(p=>p.text===text&&p.actorId===r.actorId)||!groundedQuote(r.text,text)))fail("exact_restriction_withdrawal_required");
         if(op.corrects?.length && !/\b(correct(?:ion|ed)?|replace|supersede|withdraw|retract|previous.{0,30}(wrong|incorrect))\b|সংশোধন|আগের.{0,20}ভুল/iu.test(r.text))fail("explicit_correction_required");
-        const critical=r.text.split(/(?<=[.!?।])\s+|\n+/u).filter(s=>/\b(hold|quarantin\w*|do not|must not|not authori[sz]ed|only if|unless|subject to|prohibit\w*|reserved|restriction)\b|আটকে|নিষেধ|অনুমতি নেই|শর্ত/iu.test(s));
+        const critical=criticalRestrictions(r.text);
         if(critical.some(s=>!(op.restrictions ?? []).some(q=>groundedQuote(q,s.trim()))))fail("critical_instruction_omitted");
         if(context.state.autonomous && /\b(wrong department|do not own|don't own|not our department)\b/iu.test(r.text)) fail("ai_wrong_department_requires_routing");
         for(const fact of op.facts ?? []) {

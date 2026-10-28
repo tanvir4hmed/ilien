@@ -268,3 +268,13 @@ test("proposal citations inherit immutable prerequisite fact references, not mod
  assert.doesNotThrow(()=>autonomousGate(c,p));
  const invented=structuredClone(p);if(invented.operation?.type!=='attach_proposal')throw Error('proposal expected');invented.operation.statement='1800 units at 16:00';assert.throws(()=>autonomousGate(c,invented),/ai_proposal_number_not_grounded|ai_unknown_citation/);
 });
+
+ test("email wrapping cannot discard quarantine and release restrictions from an answer",()=>{
+ let s=fresh();s=apply(s,"coordinator",{type:"route_initial",obligationId:"stock",group:"stores",question:"Confirm usable stock"}).state;
+ const o=s.obligations[0]!,text="800 units usable. 100 units remains\nquarantined. Stock release is not authorized.";
+ const c={executionMode:"autonomous" as const,state:s,policy:textilePolicy,policyHash:"hash",actorId:o.assignee,evidence:[{id:"r",text,sha256:"hash",origin:"external"}],knowledge:[],receipt:{id:"r",evidenceId:"r",deliveryId:"d",bindingId:"b",actorId:o.assignee,obligationId:o.id,obligationRevision:o.revision,kind:"ask",text,receivedAt:now,expiresAt:later}};
+ const p=autonomousToolProposal("coordinate_record_answer",{reason:"Record grounded stock",statement:text,facts:[{key:"usable_quantity",value:"800",unit:"units",quote:"800 units usable"}],uncertainties:[]},c);
+ assert.equal(p.operation?.type,"reply");if(p.operation?.type!=="reply")throw Error("reply required");
+ assert.deepEqual(p.operation.restrictions,["100 units remains quarantined.","Stock release is not authorized."]);
+ assert.doesNotThrow(()=>autonomousGate(c,p));
+ });

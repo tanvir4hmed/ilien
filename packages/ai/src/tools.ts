@@ -3,7 +3,7 @@ import type { Tool } from "@aws-sdk/client-bedrock-runtime";
 import { factSchema } from "../../contracts/src/communication.js";
 import { satisfied } from "../../coordination/src/engine.js";
 import { CoordinationError, type Operation } from "../../coordination/src/types.js";
-import { hash, type Context, type Proposal } from "./contracts.js";
+import { criticalRestrictions, hash, type Context, type Proposal } from "./contracts.js";
 const text=z.string().min(1).max(1000);
 const common=z.strictObject({reason:z.string().min(1).max(800),citations:z.array(z.strictObject({ref:z.string().min(1).max(100),quote:z.string().min(1).max(500)})).max(8).optional(),uncertainties:z.array(z.string().min(1).max(200)).max(8).default([])});
 type Definition={name:string;description:string;schema:z.ZodType;operation:(input:any)=>Operation|null};
@@ -57,6 +57,9 @@ export function autonomousToolProposal(name:string,input:unknown,context:Context
  if(!definition)throw new CoordinationError("ai_unknown_action_tool");
  const parsed=definition.schema.parse(input) as z.infer<typeof common>;
  const operation=definition.operation(parsed);
+ if(operation?.type==="reply" && context.receipt && !operation.withdrawRestrictions?.length) {
+  operation.restrictions=[...new Set([...(operation.restrictions??[]),...criticalRestrictions(context.receipt.text)])];
+ }
  let citations=parsed.citations ?? [];
  if(context.receipt) citations=[{ref:context.receipt.evidenceId,quote:context.receipt.text.slice(0,500)}];
  else if(operation) {
