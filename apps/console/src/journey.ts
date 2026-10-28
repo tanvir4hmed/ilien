@@ -181,7 +181,7 @@ export function renderJourney(
       return n;
     }
     for (const o of state.obligations) depth(o.id);
-    const nodeWidth=132,nodeHeight=78,canvasWidth=Math.max(760,frame.clientWidth-4),columns = new Map<number, number>(),
+    const nodeWidth=132,nodeHeight=78,columns = new Map<number, number>(),
       positions = new Map<string, { x: number; y: number }>();
     for (const o of state.obligations) {
       const d = levels.get(o.id) ?? 0;
@@ -189,10 +189,10 @@ export function renderJourney(
       columns.set(d, row + 1);
     }
     const maxDepth = Math.max(0, ...levels.values()),
-      width = canvasWidth,
+      width = 32+(maxDepth+4)*nodeWidth+(maxDepth+2)*32+80,
       height = Math.max(180, ...[...columns.values()].map((n) => n * 104 + 20));
-    const firstTaskX=314,resultX=width-nodeWidth-16,stageGap=Math.max(nodeWidth+14,(resultX-firstTaskX)/(maxDepth+2));
-    for(const o of state.obligations){const d=levels.get(o.id)??0,row=[...state.obligations].filter(candidate=>(levels.get(candidate.id)??0)===d).indexOf(o);positions.set(o.id,{x:firstTaskX+d*stageGap,y:22+row*104});}
+    const firstTaskX=16+2*(nodeWidth+32),stageGap=nodeWidth+32;
+    for(const o of state.obligations){const d=levels.get(o.id)??0,row=[...state.obligations].filter(candidate=>(levels.get(candidate.id)??0)===d).indexOf(o);positions.set(o.id,{x:firstTaskX+d*stageGap,y:(height-((columns.get(d)??1)-1)*104-nodeHeight)/2+row*104});}
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -253,8 +253,8 @@ export function renderJourney(
       b.dataset.node = id;
       canvas.append(b);
     }
-    const source = { x: 16, y: 22 },
-      hub = { x: 165, y: 22 };
+    const source = { x: 16, y: height/2-nodeHeight/2 },
+      hub = { x: 16+nodeWidth+32, y: height/2-nodeHeight/2 };
     box(
       "source",
       `${words(state.subject.type)} · ${state.subject.id}`,
@@ -317,7 +317,7 @@ export function renderJourney(
     }
     const current = data.results.find((r) => r.current === true);
     if (current) {
-      const end = { x: width-nodeWidth-16, y: 22 };
+      const end = { x: width-nodeWidth-16, y: height/2-nodeHeight/2 };
       box(
         "result",
         "Outcome to source",

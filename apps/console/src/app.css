@@ -831,3 +831,8 @@ blockquote {
 .case-map .journey-scroll + p { margin-bottom:0; font-size:.88rem; }
 @media (max-width:700px) { .case-filters label,.case-filters label:last-child { flex:1 1 100%; }.binding-item { grid-template-columns:1fr; gap:5px; }.journey-meta { align-items:flex-start; flex-direction:column; }.map-tools { margin-left:0; } }
 @media (min-width:900px) {.main:has(.case-heading) .top {margin-bottom:16px;} }
+
+/* Content-sized maps stay centered; cards and connectors share exact bounds. */
+.journey-canvas { margin-inline:auto; min-height:0; flex-shrink:0; }
+.journey-node,.network-canvas .network-node { box-sizing:border-box; height:78px; }
+.map-preview-viewport { box-sizing:border-box; display:flex; justify-content:center; align-items:center; overflow:auto; }

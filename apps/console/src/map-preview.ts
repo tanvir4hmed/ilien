@@ -7,4 +7,6 @@ export function openMapPreview(canvas: HTMLElement, title: string) {
   const viewport=document.createElement('div');viewport.className='map-preview-viewport';
   const copy=canvas.cloneNode(true) as HTMLElement;copy.style.zoom='1';copy.querySelectorAll('button').forEach(button=>button.tabIndex=-1);viewport.append(copy);
   dialog.append(toolbar,viewport);dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
+  const fit=()=>{const width=parseFloat(canvas.style.width),height=parseFloat(canvas.style.height);const scale=Math.min(1,(viewport.clientWidth-36)/width,(viewport.clientHeight-36)/height);copy.style.zoom=String(Math.max(.1,scale));};
+  requestAnimationFrame(fit);const observer=new ResizeObserver(fit);observer.observe(viewport);dialog.addEventListener('close',()=>observer.disconnect(),{once:true});
 }

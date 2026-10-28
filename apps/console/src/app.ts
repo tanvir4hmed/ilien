@@ -220,7 +220,14 @@ function table(
   wrap.append(t);
   parent.append(wrap);
 }
+const pendingReads=new Map<string,Promise<unknown>>();
 async function api<T = unknown>(path: string, body?: unknown): Promise<T> {
+  if(body!==undefined)return apiRequest<T>(path,body);
+  const existing=pendingReads.get(path);if(existing)return existing as Promise<T>;
+  const request=apiRequest<T>(path);pendingReads.set(path,request);
+  try{return await request;}finally{if(pendingReads.get(path)===request)pendingReads.delete(path);}
+}
+async function apiRequest<T = unknown>(path: string, body?: unknown): Promise<T> {
   let access:string;
   try {access=await session.accessToken();}catch(error){if(error instanceof SessionError && error.ended){stopLive?.();loginScreen(error.message);}throw error;}
   const request = () => fetch(`${config.apiUrl}/console/v1${path}`, {
@@ -2102,9 +2109,10 @@ async function knowledge() {
   }
 }
 async function settings() {
-  const [configuration, ai] = await Promise.all([
+  const [configuration, ai, membership] = await Promise.all([
     api<Row>("/configuration"),
     api<Row>("/ai/settings"),
+    role==="admin"?api<{items:Row[]}>("/members"):Promise.resolve({items:[]}),
   ]);
   const intro = card("Workspace settings");
   intro.append(
@@ -2129,7 +2137,7 @@ async function settings() {
     aiCard.append(field("Use AI to process incoming replies",enabled),field("Process eligible replies automatically",automatic),field("How to apply AI suggestions",mode),button("Save AI behavior",async()=>{await api("/ai/settings",{enabled:enabled.checked,autoReceipts:automatic.checked,executionMode:mode.value,expectedRevision:ai.revision});toast("AI behavior updated.");await show("Settings");},true));
     const m = card("Workspace access",tabs.panels.get("Workspace access")!);
     m.append(el("p","These are application sign-in identities, separate from textile employees and channel contacts. Add only people who should administer or view this workspace.","muted"));
-    const members=(await api<{ items: Row[] }>("/members")).items.map(member=>({"Account ID":String(member.subject),Role:member.role,Active:member.enabled,Added:member.created_at}));
+    const members=membership.items.map(member=>({"Account ID":String(member.subject),Role:member.role,Active:member.enabled,Added:member.created_at}));
     table(members,["Account ID","Role","Active","Added"],m);
     const identity=input(),accessRole=options([{value:"viewer",label:"Viewer — read cases"},{value:"admin",label:"Administrator — change company settings"}]),active=input("","checkbox");active.checked=true;
     m.append(field("Account ID from your identity provider",identity),field("Access role",accessRole),field("Enable access",active),button("Save workspace access",async()=>{await api("/members",{subject:required(identity,"an account ID"),role:accessRole.value,enabled:active.checked});toast("Workspace access updated.");await show("Settings");},true));
